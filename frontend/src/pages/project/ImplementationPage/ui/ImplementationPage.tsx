@@ -7,12 +7,14 @@ import { useCharacteristicStore } from '@/entities/characteristic';
 import { useImplementationStore } from '@/entities/implementation';
 import { useModelingStore } from '@/entities/modeling';
 import { useProjectStore } from '@/entities/project';
+import { useProjectGithubRepo } from '@/features/github-sync';
 import { formatApiError } from '@/shared/api';
 import {
 	Ai,
 	ArrowLeft,
 	CursorClickFill,
 	Implementation,
+	Load,
 	Loading,
 	SuccessCheckIcon,
 	toast,
@@ -28,10 +30,19 @@ const ImplementationPage = () => {
 	const currentProject = useProjectStore((s) => s.currentProject);
 	const currentProjectId = currentProject?.id;
 
+	const {
+		viewState: githubViewState,
+		status: githubStatus,
+		loading: githubLoading,
+		error: githubError,
+		createRepo: retryCreateRepo,
+	} = useProjectGithubRepo(currentProjectId ?? null);
+
 	const status = useImplementationStore((s) => s.status);
 	const progress = useImplementationStore((s) => s.progress);
 	const errorMessage = useImplementationStore((s) => s.errorMessage);
 	const implementations = useImplementationStore((s) => s.implementations);
+	const requiresReviewByFeature = useImplementationStore((s) => s.requiresReviewByFeature);
 	const startGeneration = useImplementationStore((s) => s.startGeneration);
 	const loadImplementation = useImplementationStore((s) => s.loadImplementation);
 
@@ -41,6 +52,9 @@ const ImplementationPage = () => {
 	const hasCharacteristics = characteristics.length > 0;
 	const hasAnyImplementation = Object.values(implementations).some(Boolean);
 	const currentHasImpl = selectedId ? !!implementations[selectedId] : false;
+	const currentRequiresReview = selectedId
+		? !!requiresReviewByFeature[selectedId] || status === 'requires_review'
+		: false;
 	const selectedHasDiagram = selectedId ? !!hasDiagram[selectedId] : false;
 	const isGenerating = status === 'generating';
 
@@ -87,6 +101,77 @@ const ImplementationPage = () => {
 			selectedId,
 			selectedCharacteristic.title,
 			selectedCharacteristic.display_id,
+		);
+	};
+
+	const renderGenerateAction = (buttonLabel: string) => {
+		if (githubViewState === 'syncing') {
+			return (
+				<div className='flex flex-col items-center gap-2'>
+					<button disabled className='btn btn-secondary cursor-not-allowed opacity-80'>
+						<span className='inline-flex animate-spin text-primary-500'>
+							<Load size={16} color='text-current' />
+						</span>
+						Preparando repositorio en GitHub...
+					</button>
+					<p className='text-xs text-neutral-400'>
+						El repositorio se está inicializando en segundo plano. Estará listo en un momento.
+					</p>
+				</div>
+			);
+		}
+
+		if (githubViewState === 'failed') {
+			return (
+				<div className='flex flex-col items-center gap-3 p-4 rounded-xl border border-error-200 bg-error-50 max-w-md text-center'>
+					<div className='flex items-center gap-2 text-error-700 font-semibold text-sm'>
+						<WarningIcon size={18} color='text-error-600' />
+						Error al preparar repositorio de GitHub
+					</div>
+					<p className='text-xs text-error-600'>
+						{githubStatus?.error_message ??
+							githubError ??
+							'No se pudo crear el repositorio en GitHub. Se requiere tener el repositorio listo antes de implementar.'}
+					</p>
+					<button
+						type='button'
+						onClick={async () => {
+							const repoName =
+								githubStatus?.suggested_repo_name || `kosmo-${currentProject?.slug || 'app'}`;
+							try {
+								await retryCreateRepo({ repo_name: repoName, is_public: true });
+								toast.success('Repositorio creado exitosamente en GitHub');
+							} catch {
+								toast.error('No se pudo crear el repositorio. Verifica tu conexión.');
+							}
+						}}
+						disabled={githubLoading}
+						className='btn btn-primary btn-sm'
+					>
+						{githubLoading ? 'Reintentando...' : 'Reintentar creación de repositorio'}
+					</button>
+				</div>
+			);
+		}
+
+		if (githubViewState === 'not-linked') {
+			return (
+				<div className='flex flex-col items-center gap-2 p-4 rounded-xl border border-warning-200 bg-warning-50 max-w-md text-center'>
+					<p className='text-xs text-warning-700 font-medium'>
+						Debes conectar tu cuenta de GitHub antes de generar la implementación.
+					</p>
+					<Link href='/perfil' className='btn btn-secondary btn-sm'>
+						Conectar GitHub en Perfil
+					</Link>
+				</div>
+			);
+		}
+
+		return (
+			<button onClick={handleGenerate} className='btn btn-ai'>
+				<Ai color='' size={18} />
+				{buttonLabel}
+			</button>
 		);
 	};
 
@@ -158,6 +243,7 @@ const ImplementationPage = () => {
 								selectedId={selectedId}
 								onSelectCharacteristic={handleSelectCharacteristic}
 								hasIcon={implementations}
+								warningByFeature={requiresReviewByFeature}
 								icon={Implementation}
 							/>
 
@@ -228,10 +314,7 @@ const ImplementationPage = () => {
 														creará la estructura de implementación automáticamente.
 													</p>
 												</div>
-												<button onClick={handleGenerate} className='btn btn-ai'>
-													<Ai color='' size={18} />
-													Generar implementación
-												</button>
+												{renderGenerateAction('Generar implementación')}
 											</div>
 										)}
 									</div>
@@ -240,34 +323,64 @@ const ImplementationPage = () => {
 								{selectedCharacteristic && currentHasImpl && (
 									<div className='flex flex-col flex-1 min-h-0 gap-3'>
 										<div className='flex flex-col gap-1 px-2'>
-											<div className='flex items-center gap-2'>
+											<div className='flex items-center gap-2 flex-wrap'>
 												<span className='text-base font-bold text-neutral-500'>
 													{selectedCharacteristic.display_id}
 												</span>
 												<span className='text-base font-semibold text-neutral-800'>
 													{selectedCharacteristic.title}
 												</span>
+												{currentRequiresReview && (
+													<span className='rounded-full bg-warning-100 text-warning-800 border border-warning-200 px-2.5 py-0.5 text-xs font-semibold'>
+														Requiere actualización
+													</span>
+												)}
 											</div>
 											<p className='text-neutral-500 text-sm'>
 												{selectedCharacteristic.description}
 											</p>
 										</div>
 
-										<div className='flex flex-col my-auto items-center gap-5 px-12'>
-											<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-success-50'>
-												<SuccessCheckIcon size={40} color='text-success-600' />
+										{currentRequiresReview ? (
+											<div className='flex flex-col my-auto items-center gap-5 px-12'>
+												<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-warning-50'>
+													<WarningIcon size={44} color='text-warning-600' />
+												</div>
+												<div className='flex flex-col items-center gap-2 text-center max-w-lg'>
+													<h3 className='text-neutral-800 text-lg font-semibold'>
+														Implementación desactualizada
+													</h3>
+													<p className='text-neutral-600 text-sm'>
+														Las especificaciones de esta funcionalidad (Descubrimiento, Requisitos o Modelo) cambiaron recientemente. El código generado previamente ya no coincide con los nuevos requisitos.
+													</p>
+													<p className='text-neutral-500 text-xs mt-1'>
+														Haz clic en «Regenerar implementación» para actualizar el código automáticamente con las nuevas reglas.
+													</p>
+												</div>
+												<div className='flex items-center gap-3 mt-2 flex-wrap justify-center'>
+													{renderGenerateAction('Regenerar implementación')}
+													<Link href='/proyecto/codigo/resumen' className='btn btn-secondary'>
+														Ver código actual
+													</Link>
+												</div>
 											</div>
-											<div className='flex flex-col items-center gap-2 text-center max-w-md'>
-												<h3 className='text-neutral-800 text-lg font-semibold'>
-													Implementación generada
-												</h3>
-												<p className='text-neutral-500 text-sm'>
-													La estructura de esta funcionalidad ha sido generada
-													exitosamente. Puedes ver el resumen completo en el botón
-													&quot;Ver resumen&quot;.
-												</p>
+										) : (
+											<div className='flex flex-col my-auto items-center gap-5 px-12'>
+												<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-success-50'>
+													<SuccessCheckIcon size={40} color='text-success-600' />
+												</div>
+												<div className='flex flex-col items-center gap-2 text-center max-w-md'>
+													<h3 className='text-neutral-800 text-lg font-semibold'>
+														Implementación generada
+													</h3>
+													<p className='text-neutral-500 text-sm'>
+														La estructura de esta funcionalidad ha sido generada
+														exitosamente. Puedes ver el resumen completo en el botón
+														&quot;Ver resumen&quot;.
+													</p>
+												</div>
 											</div>
-										</div>
+										)}
 									</div>
 								)}
 							</div>

@@ -55,7 +55,8 @@ AB#
 
 ## ✅ Lista de verificación
 
-- [ ] Mi rama parte de la versión actualizada de `develop`.
+- [ ] Mi rama parte de la versión actualizada de `develop`; si es `docs/*`, parte de `main`.
+- [ ] Mi PR apunta a `develop`; si es `docs/*`, `release/*` o `hotfix/*`, apunta a `main`.
 - [ ] El título del Pull Request incluye el elemento de trabajo `AB#ID`.
 - [ ] Todos los commits cumplen `tipo(alcance): descripción AB#ID` (el alcance es opcional).
 - [ ] El código sigue las convenciones del proyecto.

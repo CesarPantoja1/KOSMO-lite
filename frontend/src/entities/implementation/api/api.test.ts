@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildSummary, fetchImplementation, fetchImplementationFile, fetchPreviewUrl } from './api';
+import { buildSummary, fetchImplementation, fetchImplementationFile } from './api';
 
 const fetchMock = vi.fn();
 
@@ -147,35 +147,6 @@ describe('fetchImplementation', () => {
 	});
 });
 
-describe('fetchPreviewUrl', () => {
-	it('devuelve la URL de la vista previa del proyecto', async () => {
-		// Arrange
-		vi.stubGlobal('fetch', fetchMock);
-		mockFetchOk({ url: 'http://localhost:3002' });
-
-		// Act
-		const url = await fetchPreviewUrl('prj_01');
-
-		// Assert
-		expect(url).toBe('http://localhost:3002');
-		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/api/v1/projects/prj_01/preview'),
-			expect.anything(),
-		);
-	});
-
-	it('devuelve null cuando el proyecto no tiene vista previa activa (404)', async () => {
-		// Arrange
-		vi.stubGlobal('fetch', fetchMock);
-		mockFetchError(404, { detail: 'No tiene una vista previa activa' });
-
-		// Act
-		const url = await fetchPreviewUrl('prj_none');
-
-		// Assert
-		expect(url).toBeNull();
-	});
-});
 
 describe('generateImplementation', () => {
 	function sseResponse(payload: string): Response {

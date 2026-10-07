@@ -65,6 +65,19 @@ describe('formatApiError', () => {
 		expect(formatApiError(error, 'fallback')).toBe('Sugerencia obsoleta (trace_id: trc_01)');
 	});
 
+	it('prioriza detail sobre title genérico cuando ambos están presentes', () => {
+		const error = new ApiError({
+			status: 400,
+			title: 'Bad Request',
+			detail: "Validación efímera fallida en el paso 'lint'",
+			traceId: '01a0b711c930f9f47e447b75d7120ae5',
+		});
+
+		expect(formatApiError(error, 'fallback')).toBe(
+			"Validación efímera fallida en el paso 'lint' (trace_id: 01a0b711c930f9f47e447b75d7120ae5)",
+		);
+	});
+
 	it('usa el fallback para errores no ApiError', () => {
 		expect(formatApiError(new Error('boom'), 'fallback')).toBe('boom');
 		expect(formatApiError(null, 'fallback')).toBe('fallback');

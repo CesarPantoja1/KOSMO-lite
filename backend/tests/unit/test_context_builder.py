@@ -7,11 +7,11 @@ from __future__ import annotations
 
 import pytest
 
+from kosmo.application.pipeline.context_builder import ContextBuilder
 from kosmo.contracts.pipeline.phase_contexts import ImplementationPhaseContext
 from kosmo.contracts.sdd.errors import FeatureNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
-from kosmo.domain.pipeline.context_builder import ContextBuilder
 from tests.unit.fakes import (
     InMemoryDocumentRepository,
     InMemoryFeatureRepository,

@@ -65,6 +65,7 @@ strict = ["src/kosmo"]
 exclude = [
     "**/__pycache__",
     "**/.venv",
+    "**/node_modules",
 ]
 pythonVersion = "3.13"
 venvPath = "."
@@ -78,5 +79,6 @@ markers = [
     "integration: testcontainers PG/Mongo/Redis",
     "contract: schemathesis contra OpenAPI",
     "property: hypothesis sobre invariantes",
+    "idor: pruebas de aislamiento cross-tenant e idor",
 ]
-addopts = "--cov=kosmo --cov-report=xml --cov-report=term-missing --cov-fail-under=60"
+addopts = "--cov=kosmo --cov-report=xml --cov-report=term-missing --cov-branch --cov-fail-under=80"

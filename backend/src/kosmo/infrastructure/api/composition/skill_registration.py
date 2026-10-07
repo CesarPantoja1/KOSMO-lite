@@ -193,12 +193,62 @@ def build_skill_registry() -> SkillRegistry:
     )
     skill_registry.register(
         Skill(
+            name="consistency_evaluate_discovery_features",
+            description="Evalua consistencia desde descubrimiento hacia características (downstream)",
+            phase=SpecPhase.DESCUBRIMIENTO,
+            mode=ConsistencyEvaluationMode(
+                phase_name=SpecPhase.DESCUBRIMIENTO,
+            ),  # type: ignore[reportArgumentType]
+        )
+    )
+    skill_registry.register(
+        Skill(
+            name="consistency_evaluate_discovery_implementation",
+            description="Evalua impacto de descubrimiento en implementaciones de código (downstream)",
+            phase=SpecPhase.DESCUBRIMIENTO,
+            mode=ConsistencyEvaluationMode(
+                phase_name=SpecPhase.DESCUBRIMIENTO,
+            ),  # type: ignore[reportArgumentType]
+        )
+    )
+    skill_registry.register(
+        Skill(
+            name="consistency_evaluate_features_implementation",
+            description="Evalua impacto de características en implementaciones de código (downstream)",
+            phase=SpecPhase.CARACTERISTICAS,
+            mode=ConsistencyEvaluationMode(
+                phase_name=SpecPhase.CARACTERISTICAS,
+            ),  # type: ignore[reportArgumentType]
+        )
+    )
+    skill_registry.register(
+        Skill(
+            name="consistency_evaluate_requirements_implementation",
+            description="Evalua impacto de requisitos en implementaciones de código (downstream)",
+            phase=SpecPhase.REQUISITOS,
+            mode=ConsistencyEvaluationMode(
+                phase_name=SpecPhase.REQUISITOS,
+            ),  # type: ignore[reportArgumentType]
+        )
+    )
+    skill_registry.register(
+        Skill(
             name="consistency_evaluate_requirements_model",
             description="Evalua consistencia desde requisitos EARS hacia el diagrama de actividad (downstream)",
             phase=SpecPhase.REQUISITOS,
             mode=ConsistencyEvaluationMode(
                 phase_name=SpecPhase.REQUISITOS,
                 system_prompt=CONSISTENCY_REQUIREMENTS_MODEL_SYSTEM_PROMPT,
+            ),  # type: ignore[reportArgumentType]
+        )
+    )
+    skill_registry.register(
+        Skill(
+            name="consistency_evaluate_model_implementation",
+            description="Evalua impacto de modelo/diagrama en implementaciones de código (downstream)",
+            phase=SpecPhase.MODELO,
+            mode=ConsistencyEvaluationMode(
+                phase_name=SpecPhase.MODELO,
             ),  # type: ignore[reportArgumentType]
         )
     )

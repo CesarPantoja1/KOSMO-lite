@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -8,10 +9,18 @@ from fastapi import HTTPException
 from kosmo.application.consistency.evaluate_project_consistency import (
     EvaluateProjectConsistencyUseCase,
 )
+from kosmo.application.consistency.manage_consistency import (
+    ApplyConsistencyEvaluationUseCase,
+    DiscardConsistencyEvaluationUseCase,
+)
 from kosmo.contracts import ConsistencyEvaluationOutput, ConsistencyEvaluator
 from kosmo.contracts.auth import Principal
-from kosmo.contracts.sdd.ids import FeatureId, ProjectId
-from kosmo.infrastructure.api.routers.consistency import evaluate_consistency
+from kosmo.contracts.sdd.ids import ConsistencyEvaluationId, FeatureId, ProjectId
+from kosmo.infrastructure.api.routers.consistency import (
+    apply_consistency_evaluation,
+    discard_consistency_evaluation,
+    evaluate_consistency,
+)
 from kosmo.infrastructure.api.schemas import (
     ChangeInputView,
     EvaluateConsistencyRequestView,
@@ -174,3 +183,51 @@ async def test_evaluate_consistency_unknown_origin_phase_raises_400() -> None:
         )
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_consistency_evaluation_passes_project_id() -> None:
+    # Arrange
+    uc = MagicMock(spec=ApplyConsistencyEvaluationUseCase)
+    uc.execute = AsyncMock(return_value={"evaluation_id": "cev_001", "applied": True})
+
+    # Act
+    result = await apply_consistency_evaluation(
+        project_id="prj_001",
+        evaluation_id="cev_001",
+        _principal=_principal(),
+        uc=uc,
+    )
+
+    # Assert
+    assert result["project_id"] == "prj_001"
+    assert result["applied"] is True
+    uc.execute.assert_awaited_once_with(
+        ConsistencyEvaluationId("cev_001"),
+        project_id=ProjectId("prj_001"),
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_discard_consistency_evaluation_passes_project_id() -> None:
+    # Arrange
+    uc = MagicMock(spec=DiscardConsistencyEvaluationUseCase)
+    uc.execute = AsyncMock(return_value={"evaluation_id": "cev_001", "discarded": True})
+
+    # Act
+    result = await discard_consistency_evaluation(
+        project_id="prj_001",
+        evaluation_id="cev_001",
+        _principal=_principal(),
+        uc=uc,
+    )
+
+    # Assert
+    assert result["project_id"] == "prj_001"
+    assert result["discarded"] is True
+    uc.execute.assert_awaited_once_with(
+        ConsistencyEvaluationId("cev_001"),
+        project_id=ProjectId("prj_001"),
+    )

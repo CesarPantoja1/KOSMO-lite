@@ -53,7 +53,7 @@ export class ApiError extends Error {
 		errorCode?: string | null;
 		retryAfter?: number | null;
 	}) {
-		super(title ?? detail ?? `Error del servidor (HTTP ${status})`);
+		super(detail ?? title ?? `Error del servidor (HTTP ${status})`);
 		this.name = 'ApiError';
 		this.status = status;
 		this.type = type;
@@ -87,7 +87,7 @@ export function parseApiError(res: Response, body: unknown): ApiError {
 		});
 	}
 
-	// RFC 6749 §5.2 (flujo OAuth)
+	// RFC 6749 (flujo OAuth)
 	if (typeof body.error === 'string') {
 		return new ApiError({
 			status,
@@ -132,7 +132,7 @@ export function formatApiError(err: unknown, fallback: string): string {
 				'Tu clave de API de IA no es válida o ha expirado. Por favor, revísala y actualízala en tu Perfil (Pestaña IA).'
 			);
 		}
-		const base = err.title ?? err.detail ?? err.message;
+		const base = err.detail ?? err.title ?? err.message;
 		return err.traceId ? `${base} (trace_id: ${err.traceId})` : base;
 	}
 	if (err instanceof Error && err.message) {

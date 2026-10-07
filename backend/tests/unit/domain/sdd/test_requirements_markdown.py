@@ -103,3 +103,25 @@ def test_render_and_count_requirements() -> None:
     assert len(reqs) == 2
     assert "### REQ-1.1 Registro" in rendered
     assert "### REQ-1.2 Login" in rendered
+
+
+@pytest.mark.unit
+def test_parse_requirements_markdown_with_injected_created_at() -> None:
+    from datetime import UTC, datetime
+
+    fixed_time = datetime(2026, 3, 15, 10, 30, 0, tzinfo=UTC)
+    md = "### REQ-1.1 Registro\n\n**Ubicuo**\n\nEl sistema debe registrar usuarios.\n"
+
+    reqs = parse_requirements_markdown(md, FeatureId("feat_01"), 1, created_at=fixed_time)
+    assert len(reqs) == 1
+    assert reqs[0].created_at == fixed_time
+
+    single = parse_requirement_from_markdown(
+        md,
+        FeatureId("feat_01"),
+        1,
+        RequirementId("req_01"),
+        created_at=fixed_time,
+    )
+    assert single is not None
+    assert single.created_at == fixed_time

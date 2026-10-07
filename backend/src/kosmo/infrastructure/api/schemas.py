@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from kosmo.contracts.ai.chat import HistorialChat, MensajeChat
 from kosmo.contracts.auth import TokenPair
@@ -344,6 +344,20 @@ class PrincipalView(BaseModel):
     )
 
 
+class RegisterResponse(BaseModel):
+    """Confirmación genérica de registro para mitigar enumeración de usuarios (CWE-204)."""
+
+    email: EmailStr = Field(
+        description="Correo electrónico asociado a la solicitud de registro.",
+        examples=["usuario@ejemplo.com"],
+    )
+    message: str = Field(
+        default="Si el correo no estaba registrado previamente, la cuenta ha sido creada exitosamente.",
+        description="Mensaje genérico de confirmación.",
+        examples=["Si el correo no estaba registrado previamente, la cuenta ha sido creada exitosamente."],
+    )
+
+
 class UserPublic(BaseModel):
     """Datos públicos del usuario recién registrado. No incluye información sensible."""
 
@@ -374,7 +388,7 @@ class UserPublic(BaseModel):
 
 
 class OAuthErrorResponse(BaseModel):
-    """Respuesta de error compatible con RFC 6749 §5.2.
+    """Respuesta de error compatible con RFC 6749.
 
     Todos los endpoints de autenticación devuelven este esquema cuando
     falla la operación, permitiendo al cliente manejar errores de forma
@@ -539,6 +553,10 @@ class FeatureResponse(BaseModel):
     display_id: str = Field(
         description="Identificador visible para el usuario (ej: C01).",
         examples=["C01"],
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Advertencias sobre solapamientos funcionales o inconsistencias menores.",
     )
 
 
@@ -952,12 +970,6 @@ class ValidateWorkspaceResponse(BaseModel):
     total_duration_ms: int = Field(default=0, description="Duración total en milisegundos")
 
 
-class ProjectPreviewResponse(BaseModel):
-    """URL de la vista previa del proyecto activo."""
-
-    url: str = Field(description="URL pública de la vista previa del proyecto")
-
-
 class AIModelInfoResponse(BaseModel):
     id: str
     display_name: str
@@ -1038,11 +1050,20 @@ class PushGitHubRequest(BaseModel):
         default=None, min_length=1, max_length=100, description="Nombre deseado para el repositorio"
     )
     is_public: bool = Field(
-        default=False, description="Visibilidad del repositorio (privado por defecto; público requiere confirmación)"
+        default=True, description="Visibilidad del repositorio (siempre público; no se permiten repositorios privados)"
     )
     commit_message: str | None = Field(
         default=None, max_length=300, description="Mensaje descriptivo para el commit de sincronización"
     )
+
+    @field_validator("is_public")
+    @classmethod
+    def validate_is_public(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError(
+                "No se permiten repositorios privados. Todos los repositorios de GitHub deben ser públicos."
+            )
+        return v
 
 
 # ── Cloud Deployment (HU-24) ──

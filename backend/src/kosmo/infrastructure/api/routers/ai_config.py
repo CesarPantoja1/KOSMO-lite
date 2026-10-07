@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from kosmo.application.ai.manage_ai_preferences import ManageAIPreferencesUseCase
 from kosmo.application.ai.validate_ai_connection import ValidateAIConnectionUseCase
@@ -72,6 +72,7 @@ async def get_preferences(
 )
 async def save_preferences(
     request: SaveAIConfigRequest,
+    req: Request,
     principal: Annotated[Principal, Depends(get_principal)],
     use_case: Annotated[ManageAIPreferencesUseCase, Depends(get_manage_ai_preferences_use_case)],
 ) -> AIConfigResponse:
@@ -90,6 +91,16 @@ async def save_preferences(
             api_key=request.api_key,
         )
         view = await use_case.save_preferences(principal.subject, input_data)
+        try:
+            container = getattr(req.app.state, "container", None)
+            if container is not None:
+                llm_client = getattr(container.pipeline, "llm_client", None)
+                if llm_client is not None:
+                    invalidate_fn = getattr(llm_client, "invalidate_cache", None)
+                    if callable(invalidate_fn):
+                        invalidate_fn(principal.subject)
+        except Exception:
+            pass
     except AIConfigError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -112,10 +123,21 @@ async def save_preferences(
     summary="Elimina la configuracion de IA del usuario",
 )
 async def delete_preferences(
+    req: Request,
     principal: Annotated[Principal, Depends(get_principal)],
     use_case: Annotated[ManageAIPreferencesUseCase, Depends(get_manage_ai_preferences_use_case)],
 ) -> None:
     await use_case.delete_preferences(principal.subject)
+    try:
+        container = getattr(req.app.state, "container", None)
+        if container is not None:
+            llm_client = getattr(container.pipeline, "llm_client", None)
+            if llm_client is not None:
+                invalidate_fn = getattr(llm_client, "invalidate_cache", None)
+                if callable(invalidate_fn):
+                    invalidate_fn(principal.subject)
+    except Exception:
+        pass
 
 
 @router.post(

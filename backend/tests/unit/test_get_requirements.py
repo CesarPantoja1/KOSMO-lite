@@ -54,6 +54,8 @@ async def test_get_requirements_returns_markdown_when_exists() -> None:
     # Assert
     assert result.markdown is not None
     assert "Requisitos EARS" in result.markdown
+    assert result.feature_id == feature.id
+    assert result.feature_number == 1
 
 
 @pytest.mark.asyncio

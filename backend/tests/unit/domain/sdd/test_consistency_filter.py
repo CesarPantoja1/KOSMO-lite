@@ -91,3 +91,30 @@ def test_filter_falls_back_to_all_when_no_terms_extracted() -> None:
 
     # Assert
     assert len(result) == 1
+
+
+@pytest.mark.unit
+def test_filter_finds_artifacts_when_actor_is_renamed() -> None:
+    change = _change(
+        "Cambio en Actores",
+        before="### Actores\n- Administrador: Gestiona la plataforma.",
+        after="### Actores\n- Jefe: Gestiona la plataforma.",
+    )
+    artifacts = [
+        _artifact("feat_01", "Panel de Control", "Permite al Administrador gestionar usuarios."),
+        _artifact("feat_02", "Catálogo de Productos", "Permite ver productos a clientes."),
+    ]
+
+    result = filter_downstream_artifacts(artifacts, [change])
+
+    # feat_01 menciona al actor anterior (Administrador) y debe ser seleccionada
+    assert any(a.artifact_id == "feat_01" for a in result)
+
+
+@pytest.mark.unit
+def test_extract_key_terms_includes_two_and_three_char_tokens() -> None:
+    change = _change("Cambio de rol y UI", before="ui admin rol", after="ui jefe rol")
+    terms = extract_key_terms([change])
+
+    assert "ui" in terms
+    assert "rol" in terms

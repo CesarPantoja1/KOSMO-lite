@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import contextvars
+import asyncio
+import hashlib
+from collections import OrderedDict
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -9,15 +11,16 @@ import structlog
 
 from kosmo.contracts.ai.ai_config import UserAiConfigRepository
 from kosmo.contracts.auth import SecretCipher
+from kosmo.contracts.auth.context import current_user_id
 from kosmo.contracts.auth.secrets import EncryptedSecret
 from kosmo.contracts.llm.ports import LLMClient, LLMResponse, PromptTemplate, ToolCallRecord
 from kosmo.contracts.sdd.errors import AIProviderAuthError
 from kosmo.infrastructure.llm.noop_adapter import NoopLLMClient
 from kosmo.infrastructure.llm.pydantic_ai_adapter import PydanticAILLMClient, StreamedTypedResult
 
-current_user_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_user_id", default=None)
-
 _log = structlog.get_logger(__name__)
+
+_MAX_CACHED_LLM_CLIENTS = 64
 
 _AUTH_ERROR_KEYWORDS = (
     "unauthorized",
@@ -34,6 +37,18 @@ _AUTH_ERROR_KEYWORDS = (
     "401",
     "403",
 )
+
+
+def mask_user_id(user_id: str | None) -> str:
+    """Enmascara y trunca un user_id para registrarlo en logs de forma anónima."""
+    if not user_id:
+        return "anonymous"
+    cleaned = user_id.strip()
+    if not cleaned:
+        return "anonymous"
+    if len(cleaned) <= 6:
+        return f"{cleaned[0]}***{cleaned[-1]}" if len(cleaned) >= 2 else "***"
+    return f"{cleaned[:4]}***{cleaned[-4:]}"
 
 
 def is_ai_auth_error(exc: Exception) -> bool:
@@ -92,21 +107,50 @@ class DynamicUserLLMClient(LLMClient):
         default_provider: str,
         default_model: str,
         default_api_key: str | None = None,
+        max_concurrency: int = 15,
+        cache_ttl_seconds: float = 60.0,
     ) -> None:
         self._config_repo = config_repo
         self._cipher = cipher
         self._default_provider = default_provider
         self._default_model = default_model
         self._default_api_key = default_api_key
-        self._clients: dict[tuple[str, str, str | None], PydanticAILLMClient] = {}
+        self._max_concurrency = max_concurrency
+        self._cache_ttl_seconds = cache_ttl_seconds
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+        self._config_cache: dict[str, tuple[float, str, str, str | None]] = {}
+        self._config_locks: dict[str, asyncio.Lock] = {}
+        self._clients: OrderedDict[tuple[str, str, str | None], PydanticAILLMClient] = OrderedDict()
 
-    async def _resolve_client(self) -> LLMClient:
-        user_id = current_user_id.get()
-        provider = self._default_provider
-        model = self._default_model
-        api_key = self._default_api_key
+    def invalidate_cache(self, user_id: str) -> None:
+        """Invalida la configuración en cache de un usuario para refresco inmediato."""
+        self._config_cache.pop(user_id, None)
 
-        if user_id:
+    async def _resolve_config(self, user_id: str | None) -> tuple[str, str, str | None]:
+        if not user_id:
+            return (self._default_provider, self._default_model, self._default_api_key)
+
+        now = asyncio.get_running_loop().time()
+        cached = self._config_cache.get(user_id)
+        if cached is not None and (now - cached[0]) < self._cache_ttl_seconds:
+            return (cached[1], cached[2], cached[3])
+
+        # Lock por usuario: evita thundering herd cuando el TTL vence con N coroutines
+        # concurrentes del mismo usuario. El primer waiter renueva; los demás leen el valor
+        # ya actualizado en el double-check posterior.
+        if user_id not in self._config_locks:
+            self._config_locks[user_id] = asyncio.Lock()
+        async with self._config_locks[user_id]:
+            # Double-check: otro waiter pudo haber renovado mientras esperábamos el lock.
+            now = asyncio.get_running_loop().time()
+            cached = self._config_cache.get(user_id)
+            if cached is not None and (now - cached[0]) < self._cache_ttl_seconds:
+                return (cached[1], cached[2], cached[3])
+
+            provider = self._default_provider
+            model = self._default_model
+            api_key = self._default_api_key
+
             try:
                 user_config = await self._config_repo.by_user_id(user_id)
                 if user_config and user_config.encrypted_api_key is not None:
@@ -125,66 +169,90 @@ class DynamicUserLLMClient(LLMClient):
                     model = user_config.model
                     api_key = raw_key.decode("utf-8")
             except Exception:
-                _log.warning("dynamic_llm_client.resolve_user_config_failed", user_id=user_id, exc_info=True)
+                _log.warning(
+                    "dynamic_llm_client.resolve_user_config_failed",
+                    user_id=mask_user_id(user_id),
+                    exc_info=True,
+                )
+
+            self._config_cache[user_id] = (now, provider, model, api_key)
+            return (provider, model, api_key)
+
+    @staticmethod
+    def _hash_api_key(key: str | None) -> str:
+        if not key:
+            return "none"
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+    async def _resolve_client(self) -> LLMClient:
+        user_id = current_user_id.get()
+        provider, model, api_key = await self._resolve_config(user_id)
 
         if provider.lower() == "noop":
             return NoopLLMClient()
 
-        key_tuple = (provider, model, api_key)
+        key_tuple = (provider, model, self._hash_api_key(api_key))
         client = self._clients.get(key_tuple)
-        if client is None:
-            pydantic_model = build_pydantic_ai_model(provider, model, api_key)
-            client = PydanticAILLMClient(model=pydantic_model)
-            self._clients[key_tuple] = client
+        if client is not None:
+            self._clients.move_to_end(key_tuple)
+            return client
+        pydantic_model = build_pydantic_ai_model(provider, model, api_key)
+        client = PydanticAILLMClient(model=pydantic_model)
+        self._clients[key_tuple] = client
+        if len(self._clients) > _MAX_CACHED_LLM_CLIENTS:
+            self._clients.popitem(last=False)
         return client
 
     async def complete(
         self,
         prompt: PromptTemplate,
         temperature: float = 0.3,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> LLMResponse:
         client = await self._resolve_client()
-        try:
-            return await client.complete(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
-        except Exception as exc:
-            if is_ai_auth_error(exc):
-                raise AIProviderAuthError() from exc
-            raise
+        async with self._semaphore:
+            try:
+                return await client.complete(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
+            except Exception as exc:
+                if is_ai_auth_error(exc):
+                    raise AIProviderAuthError() from exc
+                raise
 
     async def complete_json(
         self,
         prompt: PromptTemplate,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> LLMResponse:
         client = await self._resolve_client()
-        try:
-            return await client.complete_json(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
-        except Exception as exc:
-            if is_ai_auth_error(exc):
-                raise AIProviderAuthError() from exc
-            raise
+        async with self._semaphore:
+            try:
+                return await client.complete_json(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
+            except Exception as exc:
+                if is_ai_auth_error(exc):
+                    raise AIProviderAuthError() from exc
+                raise
 
     async def complete_typed[T](
         self,
         prompt: PromptTemplate,
         output_type: type[T],
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> T:
         client = await self._resolve_client()
-        try:
-            return await client.complete_typed(
-                prompt=prompt,
-                output_type=output_type,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-        except Exception as exc:
-            if is_ai_auth_error(exc):
-                raise AIProviderAuthError() from exc
-            raise
+        async with self._semaphore:
+            try:
+                return await client.complete_typed(
+                    prompt=prompt,
+                    output_type=output_type,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            except Exception as exc:
+                if is_ai_auth_error(exc):
+                    raise AIProviderAuthError() from exc
+                raise
 
     @property
     def supports_native_tools(self) -> bool:
@@ -200,18 +268,19 @@ class DynamicUserLLMClient(LLMClient):
     ) -> tuple[str, list[ToolCallRecord]]:
         client = await self._resolve_client()
         if isinstance(client, PydanticAILLMClient):
-            try:
-                return await client.complete_with_tools(
-                    prompt=prompt,
-                    tools=tools,
-                    tool_handler=tool_handler,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-            except Exception as exc:
-                if is_ai_auth_error(exc):
-                    raise AIProviderAuthError() from exc
-                raise
+            async with self._semaphore:
+                try:
+                    return await client.complete_with_tools(
+                        prompt=prompt,
+                        tools=tools,
+                        tool_handler=tool_handler,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+                except Exception as exc:
+                    if is_ai_auth_error(exc):
+                        raise AIProviderAuthError() from exc
+                    raise
         return ("", [])
 
     @asynccontextmanager
@@ -220,7 +289,7 @@ class DynamicUserLLMClient(LLMClient):
         prompt: PromptTemplate,
         output_type: type[T],
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> AsyncGenerator[StreamedTypedResult[T]]:
         client = await self._resolve_client()
         stream_fn: Any = getattr(client, "stream_typed", None)

@@ -92,6 +92,8 @@ class StepRecordingCodeRunner(CodeRunnerPort):
 class FakeWorkspaceManager(WorkspaceManagerPort):
     def __init__(self, workspaces: dict[str, CodeWorkspace] | None = None) -> None:
         self._workspaces: dict[str, CodeWorkspace] = workspaces or {}
+        self.acquired_locks: list[ProjectId] = []
+        self.released_locks: list[ProjectId] = []
 
     async def ensure_workspace(self, project_id: ProjectId) -> CodeWorkspace:
         if str(project_id) not in self._workspaces:
@@ -113,10 +115,10 @@ class FakeWorkspaceManager(WorkspaceManagerPort):
         return False
 
     async def acquire_lock(self, project_id: ProjectId) -> None:
-        pass
+        self.acquired_locks.append(project_id)
 
     async def release_lock(self, project_id: ProjectId) -> None:
-        pass
+        self.released_locks.append(project_id)
 
     async def publish_preview(self, project_id: ProjectId) -> None:
         pass
@@ -300,3 +302,31 @@ async def test_validate_workspace_custom_steps_subset() -> None:
     assert output.all_passed is True
     assert len(output.steps) == 2
     assert runner.executed_steps == [ValidationStep.TYPECHECK, ValidationStep.TESTS]
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_validate_workspace_adquiere_y_libera_workspace_lock() -> None:
+    # Arrange
+    project_id = ProjectId("prj_lock_test")
+    ws_mgr = FakeWorkspaceManager(
+        workspaces={
+            str(project_id): CodeWorkspace(
+                id=WorkspaceId(f"ws_{project_id}"),
+                project_id=project_id,
+                status=WorkspaceStatus.READY,
+                workspace_dir="/workspaces/prj_lock_test",
+            )
+        }
+    )
+    runner = StepRecordingCodeRunner(failing_step=None)
+    use_case = ValidateWorkspaceUseCase(code_runner=runner, workspace_manager=ws_mgr)
+    input_data = ValidateWorkspaceInput(project_id=project_id)
+
+    # Act
+    output = await use_case.execute(input_data)
+
+    # Assert
+    assert output.all_passed is True
+    assert ws_mgr.acquired_locks == [project_id]
+    assert ws_mgr.released_locks == [project_id]

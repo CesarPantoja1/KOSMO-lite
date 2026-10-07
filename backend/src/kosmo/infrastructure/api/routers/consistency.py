@@ -32,7 +32,7 @@ from kosmo.contracts.sdd.errors import (
 )
 from kosmo.contracts.sdd.ids import ConsistencyEvaluationId, ProjectId
 from kosmo.infrastructure.api.async_generation import sse_consistency_response
-from kosmo.infrastructure.api.dependencies.auth import get_principal
+from kosmo.infrastructure.api.dependencies.auth import get_principal, verify_project_owner
 from kosmo.infrastructure.api.dependencies.container import get_container
 from kosmo.infrastructure.api.schemas import (
     ChangeInputView,
@@ -43,6 +43,7 @@ from kosmo.infrastructure.api.schemas import (
 router = APIRouter(
     prefix="/api/v1/projects/{project_id}/consistency",
     tags=["consistency"],
+    dependencies=[Depends(verify_project_owner)],
     responses={
         401: {"model": HttpErrorResponse, "description": "Token ausente, inválido o expirado"},
         404: {"model": HttpErrorResponse, "description": "Proyecto no encontrado"},
@@ -110,7 +111,10 @@ async def get_consistency_review(
     project_id: str,
     _principal: Annotated[Principal, Depends(get_principal)],
     uc: Annotated[GetConsistencyReviewUseCase, Depends(_review_uc)],
-    target_phase: Annotated[str, Query(description="Fase destino a revisar (features, requirements, model)")],
+    target_phase: Annotated[
+        str,
+        Query(description="Fase destino a revisar (features, requirements, model, implementation)"),
+    ],
 ) -> dict[str, Any]:
     phase = _to_spec_phase(target_phase)
     cards = await uc.execute(project_id=ProjectId(project_id), target_phase=phase)
@@ -131,7 +135,10 @@ async def apply_consistency_evaluation(
     uc: Annotated[ApplyConsistencyEvaluationUseCase, Depends(_apply_evaluation_uc)],
 ) -> dict[str, Any]:
     try:
-        result = await uc.execute(ConsistencyEvaluationId(evaluation_id))
+        result = await uc.execute(
+            ConsistencyEvaluationId(evaluation_id),
+            project_id=ProjectId(project_id),
+        )
         return {**result, "project_id": project_id}
     except ConsistencyEvaluationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.problem.detail) from exc
@@ -152,7 +159,10 @@ async def discard_consistency_evaluation(
     uc: Annotated[DiscardConsistencyEvaluationUseCase, Depends(_discard_evaluation_uc)],
 ) -> dict[str, Any]:
     try:
-        result = await uc.execute(ConsistencyEvaluationId(evaluation_id))
+        result = await uc.execute(
+            ConsistencyEvaluationId(evaluation_id),
+            project_id=ProjectId(project_id),
+        )
         return {**result, "project_id": project_id}
     except ConsistencyEvaluationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.problem.detail) from exc
@@ -277,6 +287,7 @@ def _resolve_origin_phase(phase_name: str) -> SpecPhase:
         "features": SpecPhase.CARACTERISTICAS,
         "requirements": SpecPhase.REQUISITOS,
         "model": SpecPhase.MODELO,
+        "implementation": SpecPhase.IMPLEMENTACION,
     }
     if phase_name not in reverse:
         raise HTTPException(
@@ -292,6 +303,7 @@ def _to_spec_phase(api_phase: str) -> SpecPhase:
         "features": SpecPhase.CARACTERISTICAS,
         "requirements": SpecPhase.REQUISITOS,
         "model": SpecPhase.MODELO,
+        "implementation": SpecPhase.IMPLEMENTACION,
     }
     if api_phase not in reverse:
         raise HTTPException(

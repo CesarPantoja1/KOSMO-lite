@@ -17,7 +17,6 @@ export {
 	generateImplementation,
 	fetchImplementation,
 	fetchImplementationFile,
-	fetchPreviewUrl,
 	subscribeImplementationEvents,
 } from './api/api';
 export type { ImplementationRecord, ImplementationEventHandlers } from './api/api';

@@ -594,3 +594,122 @@ async def test_apply_diagram_valid_update_persists() -> None:
     assert saved is not None
     assert "Registrar pago con tarjeta" in saved.diagram_syntax
     assert saved.diagram_syntax.endswith("@enduml")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_feature_implementation_update_marks_requires_review() -> None:
+    from datetime import UTC, datetime
+
+    from kosmo.contracts.sdd.codegen import FeatureImplementation, FeatureImplementationStatus
+    from kosmo.contracts.sdd.ids import ImplementationId
+    from tests.unit.fakes import InMemoryFeatureImplementationRepository
+
+    project = _make_project()
+    project_repo = InMemoryProjectRepository()
+    await project_repo.save(project)
+    document_repo = InMemoryDocumentRepository()
+    feature_repo = InMemoryFeatureRepository()
+    feature = _make_feature(project.id)
+    await feature_repo.save(feature)
+
+    impl_repo = InMemoryFeatureImplementationRepository()
+    now = datetime.now(UTC)
+    impl = FeatureImplementation(
+        id=ImplementationId("impl_01"),
+        feature_id=feature.id,
+        project_id=project.id,
+        status=FeatureImplementationStatus.IMPLEMENTED,
+        attempt_count=1,
+        max_attempts=3,
+        generated_files=("src/index.ts",),
+        created_at=now,
+        updated_at=now,
+    )
+    await impl_repo.save(impl)
+
+    uow = InMemoryUnitOfWork(
+        projects=project_repo,
+        documents=document_repo,
+        features=feature_repo,
+        implementations=impl_repo,
+    )
+    uc = ApplyConsistencyImpactsUseCase(uow=uow)
+
+    result = await uc.execute(
+        project_id=project.id,
+        impacts=[
+            {
+                "artifact_type": "FeatureImplementation",
+                "target_id": str(feature.id),
+                "action": "update",
+                "field": "código",
+                "before": "",
+                "after": "",
+            }
+        ],
+    )
+
+    assert len(result.applied) == 1
+    assert len(result.failed) == 0
+    updated_impl = await impl_repo.by_feature_id(feature.id)
+    assert updated_impl is not None
+    assert updated_impl.status == FeatureImplementationStatus.REQUIRES_REVIEW
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_feature_implementation_delete_removes_it() -> None:
+    from datetime import UTC, datetime
+
+    from kosmo.contracts.sdd.codegen import FeatureImplementation, FeatureImplementationStatus
+    from kosmo.contracts.sdd.ids import ImplementationId
+    from tests.unit.fakes import InMemoryFeatureImplementationRepository
+
+    project = _make_project()
+    project_repo = InMemoryProjectRepository()
+    await project_repo.save(project)
+    document_repo = InMemoryDocumentRepository()
+    feature_repo = InMemoryFeatureRepository()
+    feature = _make_feature(project.id)
+    await feature_repo.save(feature)
+
+    impl_repo = InMemoryFeatureImplementationRepository()
+    now = datetime.now(UTC)
+    impl = FeatureImplementation(
+        id=ImplementationId("impl_01"),
+        feature_id=feature.id,
+        project_id=project.id,
+        status=FeatureImplementationStatus.IMPLEMENTED,
+        attempt_count=1,
+        max_attempts=3,
+        generated_files=("src/index.ts",),
+        created_at=now,
+        updated_at=now,
+    )
+    await impl_repo.save(impl)
+
+    uow = InMemoryUnitOfWork(
+        projects=project_repo,
+        documents=document_repo,
+        features=feature_repo,
+        implementations=impl_repo,
+    )
+    uc = ApplyConsistencyImpactsUseCase(uow=uow)
+
+    result = await uc.execute(
+        project_id=project.id,
+        impacts=[
+            {
+                "artifact_type": "FeatureImplementation",
+                "target_id": str(feature.id),
+                "action": "delete",
+                "field": "código",
+                "before": "",
+                "after": "",
+            }
+        ],
+    )
+
+    assert len(result.applied) == 1
+    assert await impl_repo.by_feature_id(feature.id) is None

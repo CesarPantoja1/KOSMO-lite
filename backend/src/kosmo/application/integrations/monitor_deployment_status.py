@@ -120,12 +120,26 @@ class MonitorDeploymentStatusUseCase:
             )
 
             if has_changed:
+                error_msg: str | None = None
+                build_logs: str | None = deployment.build_logs_url
+                if status == DeploymentStatus.FAILED:
+                    build_logs = logs_or_error or deployment.build_logs_url
+                    if logs_or_error and not logs_or_error.startswith(("http://", "https://")):
+                        error_msg = logs_or_error
+                    elif logs_or_error:
+                        error_msg = (
+                            deployment.error_message
+                            or "Fallo durante el despliegue en Railway. Revisa los registros de compilación."
+                        )
+                    else:
+                        error_msg = deployment.error_message or "Fallo durante el despliegue en Railway."
+
                 deployment = replace(
                     deployment,
                     status=status,
                     public_url=public_url if public_url else deployment.public_url,
-                    build_logs_url=logs_or_error if status == DeploymentStatus.FAILED else deployment.build_logs_url,
-                    error_message=logs_or_error if status == DeploymentStatus.FAILED else None,
+                    build_logs_url=build_logs,
+                    error_message=error_msg,
                 )
                 await self._project_deployment_repo.save(deployment)
 

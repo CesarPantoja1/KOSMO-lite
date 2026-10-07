@@ -24,6 +24,7 @@ def test_default_template_directory_exists_and_has_required_files() -> None:
 
     expected_files = [
         "package.json",
+        "package-lock.json",
         "tsconfig.json",
         "next.config.ts",
         "drizzle.config.ts",
@@ -118,6 +119,17 @@ def test_package_json_structure_and_dependencies() -> None:
 
 
 @pytest.mark.unit
+def test_template_lockfile_matches_package_json() -> None:
+    package = json.loads((DEFAULT_TEMPLATE_DIR / "package.json").read_text(encoding="utf-8"))
+    lock = json.loads((DEFAULT_TEMPLATE_DIR / "package-lock.json").read_text(encoding="utf-8"))
+    root = lock["packages"][""]
+
+    assert lock["lockfileVersion"] >= 2
+    assert root["dependencies"] == package["dependencies"]
+    assert root["devDependencies"] == package["devDependencies"]
+
+
+@pytest.mark.unit
 def test_tsconfig_json_has_strict_configuration() -> None:
     # Arrange
     tsconfig_file = DEFAULT_TEMPLATE_DIR / "tsconfig.json"
@@ -197,6 +209,7 @@ async def test_local_workspace_manager_copies_default_template() -> None:
         ws_dir = Path(ws.workspace_dir)
 
         assert (ws_dir / "package.json").exists()
+        assert (ws_dir / "package-lock.json").exists()
         assert (ws_dir / "tsconfig.json").exists()
         assert (ws_dir / "next.config.ts").exists()
         assert (ws_dir / "drizzle.config.ts").exists()
@@ -218,3 +231,66 @@ async def test_local_workspace_manager_copies_default_template() -> None:
         assert "src/app/layout.tsx" in ws.manifest_files
         assert "src/db/schema.ts" in ws.manifest_files
         assert "tests/example.test.ts" in ws.manifest_files
+
+
+@pytest.mark.unit
+def test_dockerfile_configuration_supports_native_addons() -> None:
+    # Arrange
+    dockerfile = (DEFAULT_TEMPLATE_DIR / "Dockerfile").read_text(encoding="utf-8")
+
+    # Assert
+    assert "python3 make g++" in dockerfile
+    assert "--ignore-scripts" in dockerfile
+    assert "npm rebuild better-sqlite3" in dockerfile
+    assert "better-sqlite3" in dockerfile
+
+
+@pytest.mark.unit
+def test_next_config_includes_server_external_packages() -> None:
+    # Arrange
+    next_cfg = (DEFAULT_TEMPLATE_DIR / "next.config.ts").read_text(encoding="utf-8")
+
+    # Assert
+    assert "serverExternalPackages" in next_cfg
+    assert "better-sqlite3" in next_cfg
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_local_workspace_manager_repairs_existing_workspace_dockerfile_and_config() -> None:
+    # Arrange
+    with tempfile.TemporaryDirectory() as tmp_root:
+        manager = LocalWorkspaceManager(
+            workspaces_root=tmp_root,
+            git_init=False,
+        )
+        project_id = ProjectId("prj_repair_test")
+        target_dir = Path(tmp_root) / str(project_id)
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Crear archivos rotos preexistentes (simulando proyecto ya creado como nc-disc)
+        broken_dockerfile = target_dir / "Dockerfile"
+        broken_dockerfile.write_text("FROM node:20-slim\nRUN npm ci\n", encoding="utf-8")
+        outdated_next_config = target_dir / "next.config.ts"
+        outdated_next_config.write_text("export default { reactStrictMode: true };\n", encoding="utf-8")
+        outdated_db_dir = target_dir / "src" / "db"
+        outdated_db_dir.mkdir(parents=True, exist_ok=True)
+        outdated_db_index = outdated_db_dir / "index.ts"
+        outdated_db_index.write_text("export const sqlite = null;\n", encoding="utf-8")
+
+        # Act
+        await manager.ensure_workspace(project_id)
+
+        # Assert
+        repaired_df = broken_dockerfile.read_text(encoding="utf-8")
+        assert "--ignore-scripts" in repaired_df
+        assert "npm rebuild better-sqlite3" in repaired_df
+        assert "python3 make g++" in repaired_df
+        assert "better-sqlite3" in repaired_df
+
+        repaired_nc = outdated_next_config.read_text(encoding="utf-8")
+        assert "serverExternalPackages" in repaired_nc
+        assert "better-sqlite3" in repaired_nc
+
+        repaired_db = outdated_db_index.read_text(encoding="utf-8")
+        assert "syncSchema" in repaired_db

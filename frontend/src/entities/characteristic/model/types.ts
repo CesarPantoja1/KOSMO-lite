@@ -7,6 +7,7 @@ export interface CharacteristicResponse {
 	description: string;
 	origin: string;
 	display_id: string;
+	warnings?: string[];
 }
 
 export interface SuggestCharacteristic {
@@ -28,6 +29,7 @@ export interface CreateCharacteristicResponse {
 	origin: string;
 	is_consistent: boolean;
 	inconsistency_reason?: string;
+	warnings?: string[];
 }
 
 export interface CreateCharacteristicParams {

@@ -34,8 +34,9 @@ def create_session(
     reflection: str | None = None,
     validation_error_messages: list[str] | None = None,
     embedding_model: str | None = None,
+    now: datetime | None = None,
 ) -> AgentSession:
-    now = datetime.now(UTC)
+    timestamp = now if now is not None else datetime.now(UTC)
     return AgentSession(
         session_id=generate_session_id(),
         project_id=project_id,
@@ -57,6 +58,6 @@ def create_session(
         embedding=embedding,
         embedding_model=embedding_model,
         reflection=reflection,
-        created_at=now,
-        updated_at=now,
+        created_at=timestamp,
+        updated_at=timestamp,
     )

@@ -379,3 +379,61 @@ def test_validate_feature_uniqueness_passes_for_empty_list() -> None:
 
     # Assert
     assert result.is_valid is True
+
+
+@pytest.mark.unit
+def test_validate_feature_uniqueness_emits_warnings_for_capability_overlap() -> None:
+    # Arrange: features that overlap functionally as subcapability
+    features = [
+        _a_valid_feature(
+            number=1,
+            title="Registro de usuarios",
+            description="Permite registrar nuevos usuarios con datos personales y credenciales.",
+        ),
+        _a_valid_feature(
+            number=2,
+            title="Aceptar términos y condiciones",
+            description="Confirmación y consentimiento de políticas para nuevos usuarios.",
+        ),
+    ]
+
+    # Act
+    result = validate_feature_uniqueness(features)
+
+    # Assert
+    assert result.is_valid is True
+    assert len(result.warnings) > 0
+    assert any("solapamiento" in w.lower() or "sub-capacidad" in w.lower() for w in result.warnings)
+
+
+@pytest.mark.unit
+def test_validate_feature_uniqueness_emits_warnings_for_existing_features_overlap() -> None:
+    # Arrange
+    from kosmo.contracts.sdd.feature import Feature
+    from kosmo.contracts.sdd.ids import FeatureId, ProjectId
+
+    existing = [
+        Feature(
+            id=FeatureId("feat_exist_1"),
+            number=1,
+            title="Registro de usuarios",
+            slug="registro-de-usuarios",
+            description="Permite registrar nuevos usuarios con credenciales y perfil.",
+            project_id=ProjectId("prj_001"),
+        )
+    ]
+    features = [
+        _a_valid_feature(
+            number=2,
+            title="Verificación por captcha",
+            description="Confirmación de captcha y políticas para registro de usuarios.",
+        )
+    ]
+
+    # Act
+    result = validate_feature_uniqueness(features, existing_features=existing)
+
+    # Assert
+    assert result.is_valid is True
+    assert len(result.warnings) > 0
+    assert any("solapamiento" in w.lower() or "sub-capacidad" in w.lower() for w in result.warnings)

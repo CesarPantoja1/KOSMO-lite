@@ -41,7 +41,7 @@ def test_mensaje_chat_creation_with_suggested_change():
     )
     sugerencia = SugerenciaCambio(
         id="chg_01KT",
-        section="§2 Alcance del producto",
+        section="2 Alcance del producto",
         description="Ampliar alcance de 'nacionales' a 'LATAM'",
         diff=diff,
     )
@@ -56,7 +56,7 @@ def test_mensaje_chat_creation_with_suggested_change():
     assert msg.role == ChatRole.ASSISTANT
     assert msg.suggested_change is not None
     assert msg.suggested_change.id == "chg_01KT"
-    assert msg.suggested_change.section == "§2 Alcance del producto"
+    assert msg.suggested_change.section == "2 Alcance del producto"
     assert msg.suggested_change.diff.before == "viajes nacionales dentro del país"
     assert msg.suggested_change.diff.after == "viajes y vuelos dentro de la región LATAM"
 
@@ -76,14 +76,14 @@ def test_applied_change_values_and_immutability():
     diff = DiffCambio(before="nacional", after="LATAM")
     change = AppliedChange(
         id="chg_100",
-        section="§2 Alcance del producto",
+        section="2 Alcance del producto",
         description="Ampliar alcance a LATAM",
         diff=diff,
         rationale="Solicitud del usuario",
     )
 
     assert change.id == "chg_100"
-    assert change.section == "§2 Alcance del producto"
+    assert change.section == "2 Alcance del producto"
     assert change.description == "Ampliar alcance a LATAM"
     assert change.diff.before == "nacional"
     assert change.diff.after == "LATAM"
@@ -96,7 +96,7 @@ def test_applied_change_values_and_immutability():
 def test_applied_change_defaults():
     change = AppliedChange(
         id="chg_101",
-        section="§3 Monedas",
+        section="3 Monedas",
         diff=DiffCambio(before="v1", after="v2"),
     )
 
@@ -186,15 +186,11 @@ class FakeChatRepository:
             messages=tuple(self.messages),
         )
 
-    async def save_history(self, history: HistorialChat) -> HistorialChat:
-        self.messages = list(history.messages)
-        return history
-
     async def create_session(self, session: ChatSession) -> ChatSession:
         return session
 
-    async def delete_session(self, session_id: ChatSessionId) -> None:
-        return None
+    async def delete_session(self, session_id: ChatSessionId, project_id: ProjectId) -> bool:  # noqa: ARG002
+        return True
 
     async def list_sessions(
         self,
@@ -202,6 +198,7 @@ class FakeChatRepository:
         phase: SpecPhase,  # noqa: ARG002
         *,
         context_id: str | None = None,  # noqa: ARG002
+        limit: int = 100,  # noqa: ARG002
     ) -> list[ChatSessionSummary]:
         return []
 

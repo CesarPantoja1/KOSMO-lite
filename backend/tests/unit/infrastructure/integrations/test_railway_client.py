@@ -1068,6 +1068,71 @@ async def test_get_service_status_queries_latest_deployment_through_root_graphql
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_get_service_status_graphql_failed_returns_logs_url() -> None:
+    # Arrange
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/graphql/v2"
+        payload = json.loads(request.content.decode("utf-8"))
+        query = payload["query"]
+
+        if "query ServiceStatus" in query:
+            calls.append("service")
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "service": {
+                            "id": "srv_123",
+                            "projectId": "prj_abc",
+                            "serviceInstances": {"edges": []},
+                        }
+                    }
+                },
+            )
+
+        if "query DeploymentStatus" in query:
+            calls.append("deployments")
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "deployments": {
+                            "edges": [
+                                {
+                                    "node": {
+                                        "id": "dep_999",
+                                        "status": "FAILED",
+                                        "url": None,
+                                        "staticUrl": None,
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+            )
+
+        pytest.fail(f"Consulta GraphQL inesperada: {query}")
+
+    railway_client = RailwayHttpClient(client=_create_mock_client(handler))
+
+    # Act
+    status, public_url, logs_url = await railway_client.get_service_status(
+        token="rw_token_123",
+        service_id="srv_123",
+    )
+
+    # Assert
+    assert calls == ["service", "deployments"]
+    assert status == DeploymentStatus.FAILED
+    assert public_url is None
+    assert logs_url == "https://railway.com/project/prj_abc/service/srv_123?id=dep_999"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_get_service_status_building() -> None:
     # Arrange
     def handler(request: httpx.Request) -> httpx.Response:

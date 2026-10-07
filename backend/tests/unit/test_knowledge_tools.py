@@ -109,3 +109,68 @@ async def test_get_diagram_missing_param() -> None:
 
     # Assert
     assert "feature_id" in result.lower()
+
+
+@pytest.mark.unit
+def test_principal_has_scopes_matching_and_wildcard() -> None:
+    from kosmo.contracts.auth import Principal
+
+    user = Principal(subject="usr_1", scopes=frozenset({"read", "write"}))
+    assert not user.has_scopes(frozenset({"admin"}))
+    assert user.has_scopes(frozenset({"read"}))
+
+    admin = Principal(subject="usr_admin", scopes=frozenset({"admin"}))
+    assert admin.has_scopes(frozenset({"admin"}))
+
+    super_user = Principal(subject="usr_super", scopes=frozenset({"*"}))
+    assert super_user.has_scopes(frozenset({"admin"}))
+    assert super_user.has_scopes(frozenset({"anything", "custom"}))
+
+
+@pytest.mark.unit
+def test_knowledge_consolidate_endpoint_requires_admin_scope() -> None:
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from kosmo.contracts.auth import Principal
+    from kosmo.infrastructure.api.dependencies.auth import get_principal
+    from kosmo.infrastructure.api.routers.knowledge import router as knowledge_router
+
+    mock_uc = AsyncMock()
+    mock_uc.execute.return_value = ["phase_analysis", "phase_synthesis"]
+
+    app = FastAPI()
+    app.include_router(knowledge_router)
+    app.state.container = SimpleNamespace(pipeline=SimpleNamespace(consolidate_patterns=mock_uc))
+
+    # 1. Unauthenticated request -> 401
+    with TestClient(app) as client:
+        res_unauth = client.post("/api/v1/knowledge/consolidate")
+        assert res_unauth.status_code == 401
+
+    # 2. Authenticated user without admin scope -> 403
+    app.dependency_overrides[get_principal] = lambda: Principal(
+        subject="usr_standard", scopes=frozenset({"read", "write"})
+    )
+    with TestClient(app) as client:
+        res_forbidden = client.post("/api/v1/knowledge/consolidate")
+        assert res_forbidden.status_code == 403
+        assert "Insufficient scope" in res_forbidden.json()["detail"]
+
+    # 3. Authenticated user with admin scope -> 200
+    app.dependency_overrides[get_principal] = lambda: Principal(subject="usr_admin", scopes=frozenset({"admin"}))
+    with TestClient(app) as client:
+        res_admin = client.post("/api/v1/knowledge/consolidate")
+        assert res_admin.status_code == 200
+        assert res_admin.json() == {"phases": ["phase_analysis", "phase_synthesis"]}
+
+    # 4. Authenticated user with wildcard scope (*) -> 200
+    app.dependency_overrides[get_principal] = lambda: Principal(subject="usr_super", scopes=frozenset({"*"}))
+    with TestClient(app) as client:
+        res_wildcard = client.post("/api/v1/knowledge/consolidate")
+        assert res_wildcard.status_code == 200
+
+    app.dependency_overrides.clear()

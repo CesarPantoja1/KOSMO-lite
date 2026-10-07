@@ -179,7 +179,7 @@ export function buildSummary(
 			'Continúa con la siguiente funcionalidad de tu proyecto',
 		],
 		generatedAt: timestamp || new Date().toISOString(),
-		generatedFiles: files.map(String).slice().sort(),
+		generatedFiles: files.map(String).slice().sort((a, b) => a.localeCompare(b)),
 	};
 }
 
@@ -187,17 +187,9 @@ export const fetchImplementationFile = async (
 	implementationId: string,
 	path: string,
 ): Promise<string> => {
-	const res = await fetch(
-		`${API_BASE_URL}/api/v1/implementations/${implementationId}/files/content?path=${encodeURIComponent(path)}`,
-		{
-			headers: authHeaders(),
-			cache: 'no-store',
-		},
+	const data = await apiClient<{ content: string }>(
+		`/api/v1/implementations/${implementationId}/files/content?path=${encodeURIComponent(path)}`,
 	);
-	if (!res.ok) {
-		throw parseApiError(res, await res.json().catch(() => null));
-	}
-	const data = (await res.json()) as { content: string };
 	return data.content;
 };
 
@@ -251,35 +243,22 @@ const toRecord = (data: {
 export const fetchImplementation = async (
 	featureId: string,
 ): Promise<ImplementationRecord | null> => {
-	const res = await fetch(
-		`${API_BASE_URL}/api/v1/implementations?feature_id=${encodeURIComponent(featureId)}`,
-		{
-			headers: authHeaders(),
-			cache: 'no-store',
-		},
-	);
-	if (res.status === 404) {
-		return null;
+	try {
+		const data = await apiClient<Parameters<typeof toRecord>[0]>(
+			`/api/v1/implementations?feature_id=${encodeURIComponent(featureId)}`,
+		);
+		return toRecord(data);
+	} catch (err: unknown) {
+		if (
+			typeof err === 'object' &&
+			err !== null &&
+			'status' in err &&
+			(err as { status: number }).status === 404
+		) {
+			return null;
+		}
+		throw err;
 	}
-	if (!res.ok) {
-		throw parseApiError(res, await res.json().catch(() => null));
-	}
-	return toRecord((await res.json()) as Parameters<typeof toRecord>[0]);
-};
-
-export const fetchPreviewUrl = async (projectId: string): Promise<string | null> => {
-	const res = await fetch(`${API_BASE_URL}/api/v1/projects/${projectId}/preview`, {
-		headers: authHeaders(),
-		cache: 'no-store',
-	});
-	if (res.status === 404) {
-		return null;
-	}
-	if (!res.ok) {
-		throw parseApiError(res, await res.json().catch(() => null));
-	}
-	const data = (await res.json()) as { url: string };
-	return data.url;
 };
 
 export const generateImplementation = async (
@@ -428,7 +407,7 @@ export const generateImplementation = async (
 	await consumeSse(res, onEvent);
 
 	if (!done) {
-		throw new Error('El flujo de generación terminó sin completarse.');
+		throw new Error('La generación no se completó. Puedes volver a intentarlo.');
 	}
 	return done;
 };

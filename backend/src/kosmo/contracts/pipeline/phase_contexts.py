@@ -74,6 +74,7 @@ class FeatureChatContext:
     feature: Feature
     discovery_document: RichTextDocument
     user_preferences: list[UserPreference] = field(default_factory=list)  # type: ignore[reportUnknownVariableType]
+    other_features: tuple[Feature, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)

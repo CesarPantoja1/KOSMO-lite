@@ -88,48 +88,42 @@ class ExecuteEphemeralValidationUseCase:
         if not workspace_dir:
             raise ValueError("Se requiere 'workspace_path' o 'project_id' válido para ejecutar la validación efímera.")
 
-        # 2. Ejecutar secuencialmente los pasos en el contenedor efímero
-        step_results: list[ValidationStepResult] = []
-        all_passed = True
-        failed_step: ValidationStep | None = None
-        error_summary_list: list[str] = []
-        total_duration_ms = 0
+        # 2. Ejecutar el pipeline completo en una sola copia efímera. En los runners
+        # remotos, cada solicitud recibe un archive limpio sin node_modules; usar
+        # run_step por separado perdería las dependencias entre typecheck/lint/tests.
+        run_result = await self._code_runner.run_pipeline(
+            workspace_dir=workspace_dir,
+            steps=cmd.steps,
+            run_id="ephemeral-validation",
+        )
+        failed_result = next((result for result in run_result.steps if not result.success), None)
+        failed_step = failed_result.step if failed_result is not None else None
+        error_summary_list = list(run_result.error_summary)
 
-        for step in cmd.steps:
-            res = await self._code_runner.run_step(
-                workspace_dir=workspace_dir,
-                step=step,
-                timeout_seconds=cmd.timeout_seconds,
-            )
-            step_results.append(res)
-            total_duration_ms += res.duration_ms
-
-            if not res.success:
-                all_passed = False
-                failed_step = step
-                for msg in res.error_messages:
-                    error_summary_list.append(msg)
-                if not res.error_messages and res.errors:
-                    for err in res.errors:
-                        error_summary_list.append(f"{err.file}:{err.line}:{err.column}: {err.message}")
-                if not error_summary_list:
-                    error_summary_list.append(f"El paso '{step}' falló con código de salida {res.exit_code}.")
-                # Detener tempranamente en el primer fallo
-                break
+        if failed_result is not None and not error_summary_list:
+            error_summary_list.extend(failed_result.error_messages)
+            if not error_summary_list:
+                error_summary_list.extend(
+                    f"{error.file}:{error.line}:{error.column}: {error.message}" for error in failed_result.errors
+                )
+            if not error_summary_list:
+                error_summary_list.append(
+                    f"El paso '{failed_result.step}' falló con código de salida {failed_result.exit_code}."
+                )
 
         run_result = ValidationRunResult(
-            steps=tuple(step_results),
-            all_passed=all_passed,
-            total_duration_ms=total_duration_ms,
-            executed_at=datetime.now(UTC),
+            steps=run_result.steps,
+            all_passed=run_result.all_passed,
+            total_duration_ms=run_result.total_duration_ms,
+            executed_at=run_result.executed_at or datetime.now(UTC),
             error_summary=tuple(error_summary_list),
         )
 
         return ExecuteEphemeralValidationResult(
-            is_valid=all_passed,
-            steps=tuple(step_results),
+            is_valid=run_result.all_passed,
+            steps=run_result.steps,
             failed_step=failed_step,
             error_summary=tuple(error_summary_list),
-            total_duration_ms=total_duration_ms,
+            total_duration_ms=run_result.total_duration_ms,
             run_result=run_result,
         )

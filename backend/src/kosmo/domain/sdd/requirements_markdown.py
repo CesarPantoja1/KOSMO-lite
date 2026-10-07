@@ -44,7 +44,10 @@ def parse_requirement_from_markdown(
     feature_id: FeatureId,
     feature_number: int,
     requirement_id: RequirementId,
+    *,
+    created_at: datetime | None = None,
 ) -> EARSRequirement | None:
+    timestamp = created_at if created_at is not None else datetime.now(UTC)
     display_prefix = f"REQ-{feature_number}."
     blocks = _normalize_markdown_blocks(markdown)
     for block in blocks:
@@ -80,7 +83,7 @@ def parse_requirement_from_markdown(
             statement=statement,
             origin=_parse_origin(block),
             acceptance_criteria=acceptance_criteria,
-            created_at=datetime.now(UTC),
+            created_at=timestamp,
         )
 
     return None
@@ -90,7 +93,10 @@ def parse_requirements_markdown(
     markdown: str,
     feature_id: FeatureId,
     feature_number: int,
+    *,
+    created_at: datetime | None = None,
 ) -> list[EARSRequirement]:
+    timestamp = created_at if created_at is not None else datetime.now(UTC)
     display_prefix = f"REQ-{feature_number}."
     blocks = _normalize_markdown_blocks(markdown)
     results: list[EARSRequirement] = []
@@ -130,7 +136,7 @@ def parse_requirements_markdown(
                 statement=statement,
                 origin=_parse_origin(block),
                 acceptance_criteria=acceptance_criteria,
-                created_at=datetime.now(UTC),
+                created_at=timestamp,
             )
         )
 

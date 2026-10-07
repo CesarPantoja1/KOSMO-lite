@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AIConfigView, AIProviderInfo, TestAIConnectionResult } from './types';
-import { DEFAULT_AI_MODEL, DEFAULT_AI_PROVIDER } from './types';
 
 const apiMocks = vi.hoisted(() => ({
 	getProviders: vi.fn(),
@@ -95,7 +94,7 @@ describe('useAiConfigStore', () => {
 		expect(useAiConfigStore.getState().loading).toBe(false);
 	});
 
-	it('deleteConfig llama a la API y restablece la configuración por defecto', async () => {
+	it('deleteConfig llama a la API y elimina la configuración activa', async () => {
 		useAiConfigStore.setState({ config: mockConfig });
 		apiMocks.deleteConfig.mockResolvedValue(undefined);
 
@@ -103,8 +102,8 @@ describe('useAiConfigStore', () => {
 
 		expect(apiMocks.deleteConfig).toHaveBeenCalledTimes(1);
 		expect(useAiConfigStore.getState().config).toEqual({
-			provider: DEFAULT_AI_PROVIDER,
-			model: DEFAULT_AI_MODEL,
+			provider: null,
+			model: null,
 			is_custom: false,
 			has_api_key: false,
 			masked_key: null,

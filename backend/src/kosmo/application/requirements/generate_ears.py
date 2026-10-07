@@ -46,6 +46,8 @@ class GenerateEARSOutput:
 class GetRequirementsOutput:
     markdown: str | None
     total: int
+    feature_id: FeatureId | None = None
+    feature_number: int | None = None
 
 
 class GenerateEARSUseCase:
@@ -167,4 +169,9 @@ class GetRequirementsUseCase:
         from kosmo.domain.sdd.requirements_markdown import count_requirements
 
         total = count_requirements(markdown)
-        return GetRequirementsOutput(markdown=markdown, total=total)
+        return GetRequirementsOutput(
+            markdown=markdown,
+            total=total,
+            feature_id=feature.id,
+            feature_number=feature.number,
+        )

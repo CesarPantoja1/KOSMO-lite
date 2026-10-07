@@ -95,7 +95,7 @@ class GitHubClientPort(Protocol):
         token: str,
         name: str,
         description: str = "",
-        is_private: bool = True,
+        is_private: bool = False,
         auto_init: bool = False,
     ) -> GitHubRepository:
         """Crea un nuevo repositorio en la cuenta del usuario autenticado."""
@@ -155,7 +155,7 @@ class ProjectGitHubIntegration:
     project_id: ProjectId
     repo_url: str = ""
     repo_name: str | None = None
-    is_public: bool = False
+    is_public: bool = True
     default_branch: str = "main"
     last_push_at: datetime | None = None
     last_commit_hash: str | None = None

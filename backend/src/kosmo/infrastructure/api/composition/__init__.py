@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import (
 
 from kosmo.config import Settings
 from kosmo.infrastructure.api.composition.auth import AuthComponents, build_auth_components
-from kosmo.infrastructure.api.composition.codegen import CodegenComponents, build_codegen_components
+from kosmo.infrastructure.api.composition.codegen import (
+    CodegenComponents,
+    build_code_runner,
+    build_codegen_components,
+    build_workspace_manager,
+)
 from kosmo.infrastructure.api.composition.integrations import (
     IntegrationsComponents,
     build_integrations_components,
@@ -50,6 +55,7 @@ __all__ = [
     "RequirementsComponents",
     "build_app_components",
     "build_auth_components",
+    "build_code_runner",
     "build_codegen_components",
     "build_consistency_components",
     "build_discovery_components",
@@ -59,6 +65,7 @@ __all__ = [
     "build_pipeline_components",
     "build_project_components",
     "build_requirements_components",
+    "build_workspace_manager",
 ]
 
 
@@ -85,6 +92,7 @@ class AppContainer:
     async def close(self) -> None:
         if self.redis is not None:
             await self.redis.aclose()
+        await self.codegen.implementation_broker.aclose()
         await self.codegen.opencode_client.aclose()
         if isinstance(self.codegen.code_runner, RemoteCodeRunner):
             await self.codegen.code_runner.aclose()
@@ -93,9 +101,17 @@ class AppContainer:
 
 
 def build_app_components(settings: Settings) -> AppContainer:
+    workers = max(1, settings.server_workers)
+    pool_size = max(5, settings.db_pool_size // workers)
+    max_overflow = max(3, settings.db_max_overflow // workers)
+
     db_engine = create_async_engine(
         settings.database_url.get_secret_value(),
         pool_pre_ping=True,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_timeout=settings.db_pool_timeout,
+        pool_recycle=settings.db_pool_recycle,
         connect_args={"statement_cache_size": 0},
     )
     session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
@@ -114,7 +130,6 @@ def build_app_components(settings: Settings) -> AppContainer:
     features = build_features_components(repos, pipeline, discovery.consistency_evaluator)
     requirements = build_requirements_components(repos, pipeline, uow)
     modelo = build_modelo_components(repos, pipeline)
-    codegen = build_codegen_components(settings, repos)
     consistency = build_consistency_components(repos, discovery.consistency_evaluator, uow)
 
     cipher = (
@@ -126,23 +141,35 @@ def build_app_components(settings: Settings) -> AppContainer:
             else FernetSecretCipher.generate_master_key()
         )
     )
+    code_runner = build_code_runner(settings)
+    workspace_manager = build_workspace_manager(settings, repos, code_runner=code_runner)
+
     integrations = build_integrations_components(
         settings,
         repos,
-        codegen.workspace_manager,
+        workspace_manager,
         cipher,
-        code_runner=codegen.code_runner,
+        code_runner=code_runner,
     )
-    codegen.generate_feature_implementation.set_sync_github_repository(integrations.sync_github_repository)
+    codegen = build_codegen_components(
+        settings,
+        repos,
+        sync_github_repository=integrations.sync_github_repository,
+        workspace_manager=workspace_manager,
+        code_runner=code_runner,
+        redis=redis,
+        integrations=integrations,
+    )
 
     projects = build_project_components(
         repos,
         pipeline,
-        workspace_manager=codegen.workspace_manager,
+        workspace_manager=workspace_manager,
         github_client=integrations.github_client,
         railway_client=integrations.railway_client,
         deployment_worker=integrations.deployment_worker,
         cipher=cipher,
+        delete_deployment=integrations.delete_deployment,
     )
 
     return AppContainer(

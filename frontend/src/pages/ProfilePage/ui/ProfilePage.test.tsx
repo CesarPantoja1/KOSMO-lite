@@ -179,6 +179,10 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 
 		render(<ProfilePage />);
 
+		expect(screen.getByText('Completando autorización…')).toBeInTheDocument();
+		expect(screen.queryByText('Gestiona tu cuenta y configuración')).not.toBeInTheDocument();
+
+		expect(mockOpener.postMessage).toHaveBeenCalledTimes(1);
 		expect(mockOpener.postMessage).toHaveBeenCalledWith(
 			{
 				type: 'github-oauth-code',
@@ -190,6 +194,33 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 		expect(closeSpy).toHaveBeenCalled();
 
 		// Cleanup
+		Object.defineProperty(window, 'opener', {
+			value: null,
+			writable: true,
+			configurable: true,
+		});
+	});
+
+	it('no emite postMessage duplicado si ProfilePage en popup se vuelve a renderizar', async () => {
+		const mockOpener = {
+			postMessage: vi.fn(),
+		};
+		vi.spyOn(window, 'close').mockImplementation(() => {});
+
+		Object.defineProperty(window, 'opener', {
+			value: mockOpener,
+			writable: true,
+			configurable: true,
+		});
+
+		delete (window as { location?: unknown }).location;
+		window.location = new URL('http://localhost:3000/perfil?code=github_code_abc&state=github.test-state') as unknown as Location;
+
+		const { rerender } = render(<ProfilePage />);
+		rerender(<ProfilePage />);
+
+		expect(mockOpener.postMessage).toHaveBeenCalledTimes(1);
+
 		Object.defineProperty(window, 'opener', {
 			value: null,
 			writable: true,

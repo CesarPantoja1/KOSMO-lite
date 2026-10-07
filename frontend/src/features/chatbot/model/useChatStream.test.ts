@@ -174,6 +174,8 @@ describe('useChatStream', () => {
 			result.current.send('/url', { content: 'x' });
 			await Promise.resolve();
 		});
+
+		expect(startMock).toHaveBeenCalled();
 	});
 
 	it('expone stop del stream subyacente', () => {

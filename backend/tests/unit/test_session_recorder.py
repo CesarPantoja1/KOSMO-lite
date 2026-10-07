@@ -7,9 +7,8 @@ from kosmo.contracts.llm.ports import LLMResponse, LLMUsage, PromptTemplate
 from kosmo.contracts.pipeline.phase_outputs import ValidationResult
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import AgentMemoryId, ProjectId
-from kosmo.infrastructure.persistence.memory.in_memory_store import InMemoryAgentSessionStore
 from tests.factories import a_session
-from tests.unit.fakes import InMemoryOutbox
+from tests.unit.fakes import InMemoryAgentSessionStore, InMemoryOutbox
 
 
 class _StubReflectionLLM:

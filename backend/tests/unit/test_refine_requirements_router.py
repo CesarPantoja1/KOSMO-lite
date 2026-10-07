@@ -37,10 +37,16 @@ class StubRefineAgent:
 
 
 class _FakeState:
-    def __init__(self, use_case: RefineRequirementsUseCase, feature_repo: Any) -> None:
+    def __init__(
+        self,
+        use_case: RefineRequirementsUseCase,
+        feature_repo: Any,
+        project_repo: Any | None = None,
+    ) -> None:
         self.container = SimpleNamespace(
             requirements=SimpleNamespace(refine_requirements=use_case),
             features=SimpleNamespace(feature_repo=feature_repo),
+            repos=SimpleNamespace(projects=project_repo or InMemoryProjectRepository()),
         )
 
 
@@ -50,8 +56,13 @@ class _FakeApp:
 
 
 class _FakeRequest:
-    def __init__(self, use_case: RefineRequirementsUseCase, feature_repo: Any) -> None:
-        self.app = _FakeApp(_FakeState(use_case, feature_repo))
+    def __init__(
+        self,
+        use_case: RefineRequirementsUseCase,
+        feature_repo: Any,
+        project_repo: Any | None = None,
+    ) -> None:
+        self.app = _FakeApp(_FakeState(use_case, feature_repo, project_repo))
 
 
 def _principal() -> Principal:
@@ -107,7 +118,7 @@ def _seed_project_and_feature(
         name="Test Project",
         slug="test-project",
         description="Test",
-        owner_id=UserId("usr_refine01"),
+        owner_id=UserId("usr_test123"),
     )
     project_repo.projects[project_id] = project
     feature = Feature(
@@ -138,7 +149,7 @@ async def test_refine_requirements_returns_refined_markdown_when_requirements_ex
         requirement_repo=requirement_repo,  # type: ignore[arg-type]
         agent=agent,  # type: ignore[arg-type]
     )
-    request: Any = _FakeRequest(use_case, feature_repo)
+    request: Any = _FakeRequest(use_case, feature_repo, project_repo)
     body = RefineRequirementsRequest(
         project_id="prj_refine01",
         instructions="Agrega casos limite y escenarios alternativos a los criterios.",
@@ -213,7 +224,7 @@ async def test_refine_requirements_raises_404_when_no_previous_requirements() ->
         requirement_repo=requirement_repo,  # type: ignore[arg-type]
         agent=agent,  # type: ignore[arg-type]
     )
-    request: Any = _FakeRequest(use_case, feature_repo)
+    request: Any = _FakeRequest(use_case, feature_repo, project_repo)
     body = RefineRequirementsRequest(
         project_id="prj_refine02",
         instructions="Refina los requisitos existentes.",
@@ -245,7 +256,7 @@ async def test_refine_requirements_raises_404_when_feature_not_found() -> None:
         name="Test Project",
         slug="test-project",
         description="Test",
-        owner_id=UserId("usr_refine03"),
+        owner_id=UserId("usr_test123"),
     )
     project_repo.projects["prj_refine03"] = project
     agent = StubRefineAgent(_valid_phase_output(FeatureId("feat_missing"), "irrelevante"))
@@ -255,7 +266,7 @@ async def test_refine_requirements_raises_404_when_feature_not_found() -> None:
         requirement_repo=requirement_repo,  # type: ignore[arg-type]
         agent=agent,  # type: ignore[arg-type]
     )
-    request: Any = _FakeRequest(use_case, feature_repo)
+    request: Any = _FakeRequest(use_case, feature_repo, project_repo)
     body = RefineRequirementsRequest(
         project_id="prj_refine03",
         instructions="Refina los requisitos.",

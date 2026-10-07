@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from typing import Any, cast
 
 from kosmo.contracts.pipeline.phase_outputs import ValidationResult
+from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.guardrails import DISCOVERY_SECTIONS
+from kosmo.contracts.sdd.ids import FeatureId, ProjectId
+from kosmo.domain.codegen.integration_rules import detect_capability_overlap
 from kosmo.domain.sdd.output_guardrails import (
     detect_feature_level_violations,
     detect_technical_terms,
@@ -184,6 +188,7 @@ def validate_feature_structure(features: Any) -> ValidationResult:
 def validate_feature_uniqueness(
     features: Any,
     existing_titles: list[str] | None = None,
+    existing_features: Sequence[Feature] | None = None,
 ) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -193,8 +198,9 @@ def validate_feature_uniqueness(
 
     normalized_titles: list[tuple[str, set[str]]] = []
     normalized_descs: list[tuple[str, set[str]]] = []
+    feature_objects: list[Feature] = []
 
-    for raw_feat in cast(list[object], features):
+    for idx, raw_feat in enumerate(cast(list[object], features)):
         if isinstance(raw_feat, dict):
             feat: dict[str, Any] = {}
             for k, v in cast(dict[object, object], raw_feat).items():
@@ -203,9 +209,22 @@ def validate_feature_uniqueness(
 
             title = feat.get("title")
             desc = feat.get("description")
+            origin = str(feat.get("origin", ""))
+            num = feat.get("number", idx + 1)
             if isinstance(title, str) and isinstance(desc, str):
                 normalized_titles.append((title, _normalize_text(title)))
                 normalized_descs.append((title, _normalize_text(desc)))
+                feature_objects.append(
+                    Feature(
+                        id=FeatureId(f"feat_{idx}"),
+                        project_id=ProjectId("temp"),
+                        number=int(num) if isinstance(num, int) else idx + 1,
+                        title=title,
+                        slug=f"feature-{idx + 1}",
+                        description=desc,
+                        origin=origin,
+                    )
+                )
 
     n = len(normalized_titles)
     for i in range(n):
@@ -229,6 +248,23 @@ def validate_feature_uniqueness(
                     f"Redundancia semántica detectada: las descripciones de '{title_i}' "
                     f"y '{title_j}' son demasiado similares (similitud {desc_sim:.2f})."
                 )
+
+    seen_warnings: set[str] = set()
+    for feat_i in feature_objects:
+        other_feats = [f for f in feature_objects if f.id != feat_i.id]
+        overlaps = detect_capability_overlap(feat_i, other_feats)
+        for overlap in overlaps:
+            if overlap.message and overlap.message not in seen_warnings:
+                seen_warnings.add(overlap.message)
+                warnings.append(overlap.message)
+
+    if existing_features:
+        for feat_obj in feature_objects:
+            overlaps = detect_capability_overlap(feat_obj, existing_features)
+            for overlap in overlaps:
+                if overlap.message and overlap.message not in seen_warnings:
+                    seen_warnings.add(overlap.message)
+                    warnings.append(overlap.message)
 
     if existing_titles:
         normalized_existing = [(t, _normalize_text(t)) for t in existing_titles]

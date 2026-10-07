@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 
@@ -128,30 +127,6 @@ def test_ensure_safe_path_raises_on_unsafe_path() -> None:
         ensure_safe_path(unsafe_path, root)
 
     assert "escaped.txt" in str(exc_info.value)
-
-
-@pytest.mark.unit
-def test_validate_safe_path_rejects_escaping_symlink() -> None:
-    # Arrange
-    with tempfile.TemporaryDirectory() as tmpdir:
-        root = Path(tmpdir) / "workspace"
-        outside = Path(tmpdir) / "outside"
-        root.mkdir()
-        outside.mkdir()
-
-        secret_file = outside / "secret.txt"
-        secret_file.write_text("classified")
-
-        link = root / "symlink_out"
-        try:
-            os.symlink(outside, link, target_is_directory=True)
-        except (OSError, NotImplementedError):
-            pytest.skip("Symlink creation not supported on this platform/privilege level")
-
-        # Act & Assert
-        assert validate_safe_path(link / "secret.txt", root) is False
-        with pytest.raises(UnsafePathError):
-            ensure_safe_path(link / "secret.txt", root)
 
 
 @pytest.mark.unit

@@ -190,3 +190,48 @@ async def test_edit_feature_enqueues_downstream_evaluation() -> None:
     assert job_type == "consistency_evaluate"
     assert payload["project_id"] == str(project_id)
     assert payload["source_phase"] == "caracteristicas"
+
+
+@pytest.mark.asyncio
+async def test_edit_feature_emits_warning_on_capability_overlap(
+    use_case: EditFeatureUseCase,
+    feature_repo: InMemoryFeatureRepository,
+    consistency_evaluator: AsyncMock,
+):
+    project_id = ProjectId(ULID().hex)
+    feat1 = Feature(
+        id=FeatureId(ULID().hex),
+        project_id=project_id,
+        number=1,
+        title="Registro de usuarios",
+        slug="registro-de-usuarios",
+        description="Registro y gestion de nuevos usuarios.",
+    )
+    feat2 = Feature(
+        id=FeatureId(ULID().hex),
+        project_id=project_id,
+        number=2,
+        title="Perfil",
+        slug="perfil",
+        description="Perfil de usuario.",
+    )
+    await feature_repo.save(feat1)
+    await feature_repo.save(feat2)
+
+    consistency_evaluator.evaluate.return_value = ConsistencyEvaluationOutput(
+        report_id="rep_1",
+        status=ConsistencyStatus.ANALIZADO_SIN_IMPACTO,
+    )
+
+    result = await use_case.execute(
+        EditFeatureInput(
+            project_id=project_id,
+            feature_id=feat2.id,
+            title="Aceptar terminos y condiciones",
+            description="Confirmacion de politicas y consentimiento para registro de usuarios.",
+        )
+    )
+
+    assert result.is_saved is True
+    assert len(result.warnings) > 0
+    assert any("solapamiento" in w.lower() or "sub-capacidad" in w.lower() for w in result.warnings)

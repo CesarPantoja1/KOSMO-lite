@@ -195,20 +195,38 @@ export const GateReviewCard = ({
 
 	return (
 		<article className='flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-0 p-4 shadow-sm'>
-			<header className='flex flex-wrap items-center justify-between gap-2'>
-				<div className='flex items-center gap-2 min-w-0'>
-					<span className='rounded-md bg-neutral-100 px-2 py-0.5 font-mono text-xs font-semibold text-neutral-700'>
+			<header className='sticky top-0 z-10 -mx-4 -mt-4 mb-1 flex flex-wrap items-center justify-between gap-3 rounded-t-lg border-b border-neutral-200 bg-neutral-50/95 px-4 py-3 backdrop-blur-xs'>
+				<div className='flex items-center gap-2 min-w-0 flex-1'>
+					<span className='rounded-md bg-neutral-200 px-2 py-0.5 font-mono text-xs font-semibold text-neutral-700 shrink-0'>
 						{card.target_display_id || card.target_artifact_id}
 					</span>
-					<h3 className='truncate text-sm font-semibold text-neutral-800'>
+					<h3 className='truncate text-sm font-semibold text-neutral-800' title={card.target_title}>
 						{card.target_title}
 					</h3>
+					<span
+						className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${actionStyles}`}
+					>
+						{actionLabel}
+					</span>
 				</div>
-				<span
-					className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${actionStyles}`}
-				>
-					{actionLabel}
-				</span>
+				<div className='flex items-center gap-2 shrink-0'>
+					<button
+						type='button'
+						onClick={onDiscard}
+						disabled={busy}
+						className='btn btn-secondary btn-sm disabled:opacity-60'
+					>
+						Descartar
+					</button>
+					<button
+						type='button'
+						onClick={onApply}
+						disabled={busy}
+						className='btn btn-primary btn-sm disabled:opacity-60'
+					>
+						{busy ? 'Aplicando…' : 'Aplicar'}
+					</button>
+				</div>
 			</header>
 
 			{card.rationale && (
@@ -284,25 +302,6 @@ export const GateReviewCard = ({
 					{card.failure_reason}
 				</p>
 			)}
-
-			<footer className='flex items-center justify-end gap-2'>
-				<button
-					type='button'
-					onClick={onDiscard}
-					disabled={busy}
-					className='btn btn-secondary btn-sm disabled:opacity-60'
-				>
-					Descartar
-				</button>
-				<button
-					type='button'
-					onClick={onApply}
-					disabled={busy}
-					className='btn btn-primary btn-sm disabled:opacity-60'
-				>
-					{busy ? 'Aplicando…' : 'Aplicar'}
-				</button>
-			</footer>
 		</article>
 	);
 };

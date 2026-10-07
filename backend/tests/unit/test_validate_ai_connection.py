@@ -118,14 +118,14 @@ async def test_validate_ai_connection_success_for_kosmo_default_without_key() ->
     tester.test_connection = AsyncMock(
         return_value=TestAIConnectionResult(
             is_connected=True,
-            detected_model="gemini-2.5-flash",
-            message=("Conexión exitosa con el proveedor predeterminado de KOSMO. Modelo gemini-2.5-flash verificado."),
+            detected_model="gemini-3.8-flash",
+            message=("Conexión exitosa con el proveedor predeterminado de KOSMO. Modelo gemini-3.8-flash verificado."),
         )
     )
     use_case = ValidateAIConnectionUseCase(connection_tester=tester)
     input_data = TestAIConnectionInput(
         provider=AIProvider.KOSMO_DEFAULT,
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         api_key=None,
     )
 
@@ -134,10 +134,10 @@ async def test_validate_ai_connection_success_for_kosmo_default_without_key() ->
 
     # Assert
     assert result.is_connected is True
-    assert result.detected_model == "gemini-2.5-flash"
+    assert result.detected_model == "gemini-3.8-flash"
     tester.test_connection.assert_awaited_once_with(
         provider=AIProvider.KOSMO_DEFAULT,
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         api_key=None,
     )
 
@@ -255,12 +255,12 @@ async def test_http_tester_kosmo_default_and_custom() -> None:
     # Act - KOSMO_DEFAULT
     result_default = await tester.test_connection(
         provider=AIProvider.KOSMO_DEFAULT,
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
     )
 
     # Assert - KOSMO_DEFAULT
     assert result_default.is_connected is True
-    assert result_default.detected_model == "gemini-2.5-flash"
+    assert result_default.detected_model == "gemini-3.8-flash"
     assert "predeterminado" in result_default.message
 
     # Act - CUSTOM
@@ -358,7 +358,7 @@ async def test_http_tester_google_gemini_and_deepseek() -> None:
     # Arrange - Google 200 OK
     def handler_google(request: httpx.Request) -> httpx.Response:
         assert "key=AIzaSyValid" in str(request.url)
-        return httpx.Response(200, json={"name": "models/gemini-2.5-flash"})
+        return httpx.Response(200, json={"name": "models/gemini-3.8-flash"})
 
     client_google = httpx.AsyncClient(transport=httpx.MockTransport(handler_google))
     tester_google = HttpAIConnectionTester(client=client_google)
@@ -366,13 +366,13 @@ async def test_http_tester_google_gemini_and_deepseek() -> None:
     # Act - Google
     res_google = await tester_google.test_connection(
         provider=AIProvider.GOOGLE,
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         api_key="AIzaSyValid",
     )
 
     # Assert - Google
     assert res_google.is_connected is True
-    assert res_google.detected_model == "gemini-2.5-flash"
+    assert res_google.detected_model == "gemini-3.8-flash"
 
     # Arrange - DeepSeek 200 OK
     def handler_deepseek(request: httpx.Request) -> httpx.Response:

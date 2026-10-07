@@ -10,7 +10,7 @@ import { RailwayStep } from './RailwayStep';
 import { StepIndicator } from './StepIndicator';
 
 const STEPS = [
-	{ key: 'apikey', label: 'API Key', required: false },
+	{ key: 'apikey', label: 'API Key', required: true },
 	{ key: 'github', label: 'GitHub', required: true },
 	{ key: 'railway', label: 'Railway', required: true },
 ] as const;
@@ -37,22 +37,17 @@ function OnboardingPage() {
 	}));
 
 	const handleNext = useCallback(() => {
-		if (currentStep < STEPS.length - 1) {
-			setCurrentStep((prev) => prev + 1);
-		} else {
-			refresh();
-			router.push('/proyecto');
-		}
-	}, [currentStep, refresh, router]);
+		if (currentStep === 0 && !hasApiKey) return;
+		if (currentStep === 1 && !githubConnected) return;
+		if (currentStep === 2 && !railwayConnected) return;
 
-	const handleSkip = useCallback(() => {
 		if (currentStep < STEPS.length - 1) {
 			setCurrentStep((prev) => prev + 1);
 		} else {
 			refresh();
 			router.push('/proyecto');
 		}
-	}, [currentStep, refresh, router]);
+	}, [currentStep, hasApiKey, githubConnected, railwayConnected, refresh, router]);
 
 	const handleGitHubStatusChange = useCallback((connected: boolean) => {
 		setGithubConnected(connected);
@@ -63,14 +58,14 @@ function OnboardingPage() {
 	}, []);
 
 	return (
-		<div className='min-h-screen bg-neutral-50 flex items-center justify-center p-6'>
+		<div className='min-h-screen flex items-center justify-center p-6'>
 			<div className='w-full max-w-2xl'>
 				<div className='mb-8 flex flex-col items-center gap-3'>
 					<Logo size={40} />
 					<h1 className='text-2xl font-bold text-neutral-800'>Bienvenido a KOSMO</h1>
 					<p className='text-neutral-500 text-sm text-center max-w-md'>
-						Configura tu cuenta para empezar. Puedes saltar los pasos opcionales y
-						configurarlos luego en tu perfil.
+						Configura tu cuenta para empezar. Cada paso es obligatorio para usar
+						KOSMO.
 					</p>
 				</div>
 
@@ -90,18 +85,15 @@ function OnboardingPage() {
 					)}
 				</div>
 
-				<div className='flex items-center justify-between'>
-					<button type='button' onClick={handleSkip} className='btn btn-secondary'>
-						{currentStep === STEPS.length - 1 ? 'Omitir' : 'Saltar'}
-					</button>
+				<div className='flex items-center justify-center'>
 					<button type='button' onClick={handleNext} className='btn btn-primary'>
 						{currentStep === STEPS.length - 1 ? 'Continuar a KOSMO' : 'Continuar'}
 					</button>
 				</div>
 
-				{STEPS.some((s) => s.required && !steps[STEPS.indexOf(s)]?.completed) && (
+				{!hasApiKey && (
 					<p className='text-center text-neutral-400 text-xs mt-4'>
-						Paso obligatorio: conecta tu cuenta de GitHub para crear proyectos.
+						Paso obligatorio: configura tu API Key de IA para continuar.
 					</p>
 				)}
 			</div>

@@ -1,9 +1,10 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from kosmo.contracts.ai.chat import (
@@ -165,6 +166,7 @@ class SqlAlchemyChatRepository(ChatRepository):
         phase: SpecPhase,
         *,
         context_id: str | None = None,
+        limit: int = 100,
     ) -> list[ChatSessionSummary]:
         stmt = (
             select(
@@ -179,6 +181,7 @@ class SqlAlchemyChatRepository(ChatRepository):
             )
             .group_by(ChatSessionModel.id)
             .order_by(ChatSessionModel.created_at.desc())
+            .limit(limit)
         )
         if context_id is not None:
             stmt = stmt.where(ChatSessionModel.context_id == context_id)
@@ -208,30 +211,42 @@ class SqlAlchemyChatRepository(ChatRepository):
             return {}
         stmt = (
             select(ChatMessageModel.session_id, ChatMessageModel.content)
+            .distinct(ChatMessageModel.session_id)
             .where(
                 ChatMessageModel.session_id.in_(session_ids),
                 ChatMessageModel.role == ChatRole.USER.value,
             )
-            .order_by(ChatMessageModel.created_at.asc())
+            .order_by(ChatMessageModel.session_id, ChatMessageModel.created_at.asc())
         )
         async with self._session_ctx() as db:
             result = await db.execute(stmt)
             rows = result.all()
 
-        first: dict[str, str] = {}
-        for session_id, content in rows:
-            if session_id is None or session_id in first:
-                continue
-            first[session_id] = content or ""
-        return first
+        return {sid: content or "" for sid, content in rows if sid is not None}
 
-    async def delete_session(self, session_id: ChatSessionId) -> None:
+    async def delete_session(self, session_id: ChatSessionId, project_id: ProjectId) -> bool:
         from sqlalchemy import delete
 
         async with self._session_ctx() as db:
-            await db.execute(delete(ChatMessageModel).where(ChatMessageModel.session_id == str(session_id)))
-            await db.execute(delete(ChatSessionModel).where(ChatSessionModel.id == str(session_id)))
+            result = cast(
+                CursorResult[Any],
+                await db.execute(
+                    delete(ChatSessionModel).where(
+                        ChatSessionModel.id == str(session_id),
+                        ChatSessionModel.project_id == str(project_id),
+                    )
+                ),
+            )
+            deleted = bool(result.rowcount > 0)
+            if deleted:
+                await db.execute(
+                    delete(ChatMessageModel).where(
+                        ChatMessageModel.session_id == str(session_id),
+                        ChatMessageModel.project_id == str(project_id),
+                    )
+                )
             await self._commit(db)
+            return deleted
 
     async def delete_by_project(self, project_id: ProjectId) -> None:
         from sqlalchemy import delete
@@ -244,15 +259,6 @@ class SqlAlchemyChatRepository(ChatRepository):
     @staticmethod
     def _compose_history_id(project_id: ProjectId, phase: SpecPhase, context_id: str | None) -> str:
         return f"{project_id}:{phase.value}:{context_id or ''}"
-
-    # ponytail: no-op — el historial se persiste como mensajes individuales (save_message).
-    # save_history existe por el contrato ChatRepository Protocol; eliminar cuando el
-    # contrato migre a append-only.
-    async def save_history(
-        self,
-        history: HistorialChat,
-    ) -> HistorialChat:
-        return history
 
 
 def _model_to_message(model: ChatMessageModel) -> MensajeChat:

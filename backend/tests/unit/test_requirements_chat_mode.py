@@ -184,7 +184,7 @@ def test_requirements_chat_mode_config() -> None:
 
     # Act & Assert
     assert mode.temperature == 0.4
-    assert mode.max_tokens == 4096
+    assert mode.max_tokens == 8192
     assert mode.available_tools == []
 
 

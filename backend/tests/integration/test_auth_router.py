@@ -4,8 +4,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -20,13 +18,6 @@ from kosmo.application.auth import (  # noqa: E402
     RevokeSession,
     VerifyAccessToken,
 )
-from kosmo.contracts.audit import AuditEvent  # noqa: E402
-from kosmo.contracts.auth import (  # noqa: E402
-    AuthorizationCode,
-    RefreshConsumeResult,
-    User,
-    UserAlreadyExistsError,  # noqa: E402
-)
 from kosmo.domain.auth import s256_challenge  # noqa: E402
 from kosmo.infrastructure.api.routers.auth import router as auth_router  # noqa: E402
 from kosmo.infrastructure.api.routers.schemas import router as schemas_router  # noqa: E402
@@ -37,136 +28,18 @@ from kosmo.infrastructure.security import (  # noqa: E402
     JoseJwtVerifier,
     JwtSettings,
 )
-
-# Par de llaves RSA efímero — generado una vez para toda la sesión de pruebas
-_RSA_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
-_PRIVATE_PEM: str = _RSA_KEY.private_bytes(
-    encoding=serialization.Encoding.PEM,
-    format=serialization.PrivateFormat.TraditionalOpenSSL,
-    encryption_algorithm=serialization.NoEncryption(),
-).decode()
-
-_PUBLIC_PEM: str = (
-    _RSA_KEY.public_key()
-    .public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    .decode()
+from tests.conftest import _PRIVATE_KEY_PEM as _PRIVATE_PEM  # noqa: E402
+from tests.conftest import _PUBLIC_KEY_PEM as _PUBLIC_PEM
+from tests.unit.fakes import (  # noqa: E402
+    InMemoryAuditEventSink,
+    InMemoryAuthorizationCodeStore,
+    InMemoryLoginAttemptStore,
+    InMemoryStore,
+    InMemoryUserRepository,
 )
 
 _MAX_FAILURES = 10
 _LOCKOUT_SECONDS = 900
-
-
-class InMemoryUserRepository:
-    def __init__(self) -> None:
-        self.users: dict[str, User] = {}
-
-    async def by_email(self, email: str) -> User | None:
-        for user in self.users.values():
-            if user.email == email:
-                return user
-        return None
-
-    async def by_id(self, user_id: str) -> User | None:
-        return self.users.get(user_id)
-
-    async def create(self, user: User) -> None:
-        if any(u.email == user.email for u in self.users.values()):
-            raise UserAlreadyExistsError("Email ya registrado")
-        self.users[user.id] = user
-
-    async def update_password(self, *, user_id: str, hashed_password: str) -> None:
-        existing = self.users.get(user_id)
-        if existing is None:
-            return
-        self.users[user_id] = User(
-            id=existing.id,
-            email=existing.email,
-            hashed_password=hashed_password,
-            created_at=existing.created_at,
-            disabled_at=existing.disabled_at,
-        )
-
-
-class InMemoryAuthorizationCodeStore:
-    def __init__(self) -> None:
-        self.entries: dict[str, AuthorizationCode] = {}
-
-    async def store(self, entry: AuthorizationCode) -> None:
-        self.entries[entry.code] = entry
-
-    async def consume(self, code: str) -> AuthorizationCode | None:
-        return self.entries.pop(code, None)
-
-
-class InMemoryStore:
-    def __init__(self) -> None:
-        self.refresh: dict[str, tuple[str, str | None]] = {}
-        self.revoked_access: set[str] = set()
-        self.families: set[str] = set()
-
-    async def register_refresh(
-        self,
-        *,
-        jti: str,
-        subject: str,
-        ttl_seconds: int,
-        family_id: str | None = None,
-    ) -> None:
-        if ttl_seconds <= 0:
-            return
-        self.refresh[jti] = (subject, family_id)
-        if family_id is not None:
-            self.families.add(family_id)
-
-    async def consume_refresh(self, *, jti: str) -> RefreshConsumeResult | None:
-        entry = self.refresh.pop(jti, None)
-        if entry is None:
-            return None
-        return RefreshConsumeResult(subject=entry[0], family_id=entry[1])
-
-    async def revoke_access(self, *, jti: str, ttl_seconds: int) -> None:
-        if ttl_seconds <= 0:
-            return
-        self.revoked_access.add(jti)
-
-    async def is_access_revoked(self, *, jti: str) -> bool:
-        return jti in self.revoked_access
-
-    async def revoke_refresh(self, *, jti: str) -> None:
-        self.refresh.pop(jti, None)
-
-    async def is_family_alive(self, *, family_id: str) -> bool:
-        return family_id in self.families
-
-    async def revoke_family(self, *, family_id: str) -> None:
-        self.families.discard(family_id)
-
-
-class InMemoryLoginAttemptStore:
-    def __init__(self) -> None:
-        self._counts: dict[str, int] = {}
-
-    async def record_failure(self, identifier: str) -> None:
-        self._counts[identifier] = self._counts.get(identifier, 0) + 1
-
-    async def clear(self, identifier: str) -> None:
-        self._counts.pop(identifier, None)
-
-    async def lockout_seconds(self, identifier: str) -> int | None:
-        count = self._counts.get(identifier, 0)
-        return _LOCKOUT_SECONDS if count >= _MAX_FAILURES else None
-
-
-class InMemoryAuditEventSink:
-    def __init__(self) -> None:
-        self.events: list[AuditEvent] = []
-
-    async def record(self, event: AuditEvent) -> None:
-        self.events.append(event)
 
 
 @pytest.fixture
@@ -193,6 +66,7 @@ def client() -> TestClient:
     app.state.container = SimpleNamespace(
         redis=None,
         auth=SimpleNamespace(
+            token_store=token_store,
             user_repository=user_repository,
             register_user=RegisterUser(user_repository=user_repository, password_hasher=hasher, audit_sink=audit_sink),
             authorize_with_pkce=AuthorizeWithPkce(
@@ -263,24 +137,25 @@ def _full_login_flow(
     return token.json()
 
 
-def test_register_returns_201_and_user_payload(client: TestClient) -> None:
+def test_register_returns_201_and_generic_response(client: TestClient) -> None:
     response = client.post(
         "/api/v1/auth/register",
         json={"name": "Alice", "email": "alice@example.com", "password": "password-12345"},
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["name"] == "Alice"
     assert body["email"] == "alice@example.com"
-    assert "id" in body and "created_at" in body
+    assert "message" in body
 
 
-def test_register_rejects_duplicate_email_with_409(client: TestClient) -> None:
+def test_register_same_response_for_duplicate_email_prevents_enumeration(client: TestClient) -> None:
     payload = {"name": "Alice", "email": "alice@example.com", "password": "password-12345"}
-    client.post("/api/v1/auth/register", json=payload)
+    first = client.post("/api/v1/auth/register", json=payload)
     second = client.post("/api/v1/auth/register", json=payload)
-    assert second.status_code == 409
-    assert second.json()["detail"] == "Email ya registrado"
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json() == second.json()
+    assert first.json()["email"] == "alice@example.com"
 
 
 def test_register_rejects_short_password(client: TestClient) -> None:
@@ -358,6 +233,18 @@ def test_refresh_rotates_pair_and_replay_revokes_family(client: TestClient) -> N
     assert rotated.status_code == 200
     assert rotated.json()["refresh"]["jti"] != pair["refresh"]["jti"]
 
+    # En ventana de gracia: peticion concurrente con el token anterior devuelve 200 y el mismo par
+    replay_grace = client.post(
+        "/api/v1/auth/refresh",
+        json={"grant_type": "refresh_token", "refresh_token": pair["refresh"]["token"]},
+    )
+    assert replay_grace.status_code == 200
+    assert replay_grace.json()["refresh"]["jti"] == rotated.json()["refresh"]["jti"]
+
+    # Fuera de la ventana de gracia: reuso fraudulento revoca la familia y retorna 401
+    store = client.app.state.container.auth.token_store  # type: ignore[union-attr]
+    store.grace.clear()
+
     replay = client.post(
         "/api/v1/auth/refresh",
         json={"grant_type": "refresh_token", "refresh_token": pair["refresh"]["token"]},
@@ -406,8 +293,15 @@ def test_me_rejects_missing_token(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_schemas_rejects_unauthenticated_access(client: TestClient) -> None:
+    assert client.get("/api/v1/schemas").status_code == 401
+    assert client.get("/api/v1/schemas/RegisterRequest").status_code == 401
+
+
 def test_schemas_index_lists_models(client: TestClient) -> None:
-    response = client.get("/api/v1/schemas")
+    pair = _full_login_flow(client)
+    headers = {"Authorization": f"Bearer {pair['access']['token']}"}
+    response = client.get("/api/v1/schemas", headers=headers)
     assert response.status_code == 200
     schemas = response.json()["schemas"]
     assert "RegisterRequest" in schemas
@@ -415,7 +309,9 @@ def test_schemas_index_lists_models(client: TestClient) -> None:
 
 
 def test_schemas_returns_json_schema(client: TestClient) -> None:
-    response = client.get("/api/v1/schemas/RegisterRequest")
+    pair = _full_login_flow(client)
+    headers = {"Authorization": f"Bearer {pair['access']['token']}"}
+    response = client.get("/api/v1/schemas/RegisterRequest", headers=headers)
     assert response.status_code == 200
     body = response.json()
     assert body["title"] == "RegisterRequest"
@@ -424,8 +320,9 @@ def test_schemas_returns_json_schema(client: TestClient) -> None:
 
 
 def test_schemas_returns_oauth_error_schema_with_seconds_remaining(client: TestClient) -> None:
-    # Arrange / Act
-    response = client.get("/api/v1/schemas/OAuthErrorResponse")
+    pair = _full_login_flow(client)
+    headers = {"Authorization": f"Bearer {pair['access']['token']}"}
+    response = client.get("/api/v1/schemas/OAuthErrorResponse", headers=headers)
 
     # Assert
     assert response.status_code == 200
@@ -437,7 +334,9 @@ def test_schemas_returns_oauth_error_schema_with_seconds_remaining(client: TestC
 
 
 def test_schemas_unknown_returns_404(client: TestClient) -> None:
-    response = client.get("/api/v1/schemas/Unknown")
+    pair = _full_login_flow(client)
+    headers = {"Authorization": f"Bearer {pair['access']['token']}"}
+    response = client.get("/api/v1/schemas/Unknown", headers=headers)
     assert response.status_code == 404
 
 

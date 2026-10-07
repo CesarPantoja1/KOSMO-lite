@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException, Request
+from pydantic import ValidationError
 
 from kosmo.application.integrations.execute_ephemeral_validation import (
     EphemeralValidationError,
@@ -93,7 +94,7 @@ async def test_get_project_github_status_existing_repo_200() -> None:
         project_id=ProjectId("proj-1"),
         repo_name="kosmo-crm-app",
         repo_url="https://github.com/octocat/kosmo-crm-app.git",
-        is_public=False,
+        is_public=True,
         sync_status=GitHubSyncStatus.SYNCED,
         last_commit_hash="commit_sha_123",
         last_push_at=now,
@@ -160,7 +161,7 @@ async def test_push_to_github_success_200() -> None:
         project_id=ProjectId("proj-1"),
         repo_name="kosmo-crm-app",
         repo_url="https://github.com/octocat/kosmo-crm-app.git",
-        is_public=False,
+        is_public=True,
         sync_status=GitHubSyncStatus.SYNCED,
         last_commit_hash="sha_push_success",
         last_push_at=now,
@@ -168,7 +169,7 @@ async def test_push_to_github_success_200() -> None:
 
     body = PushGitHubRequest(
         repo_name="kosmo-crm-app",
-        is_public=False,
+        is_public=True,
         commit_message="feat: push inicial",
     )
 
@@ -192,7 +193,7 @@ async def test_push_to_github_success_200() -> None:
             project_id=ProjectId("proj-1"),
             project_name="CRM App",
             repo_name="kosmo-crm-app",
-            is_public=False,
+            is_public=True,
             commit_message="feat: push inicial",
         ),
         UserId("usr_123"),
@@ -281,3 +282,12 @@ async def test_push_to_github_api_error_502() -> None:
         )
 
     assert exc_info.value.status_code == 502
+
+
+@pytest.mark.unit
+def test_push_github_request_rejects_private_repository() -> None:
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        PushGitHubRequest(repo_name="my-repo", is_public=False)
+
+    assert "No se permiten repositorios privados" in str(exc_info.value)

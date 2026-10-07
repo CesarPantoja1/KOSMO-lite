@@ -62,6 +62,7 @@ export const apiClient = async <T>(
 					if (!retryRes.ok) {
 						throw parseApiError(retryRes, await retryRes.json().catch(() => null));
 					}
+					if (retryRes.status === 204) return null as T;
 					return retryRes.json();
 				});
 		}

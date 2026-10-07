@@ -14,6 +14,7 @@ from kosmo.contracts.ai.consistency import (
     ConsistencyEvaluationRepository,
     ConsistencyEvaluationStatus,
 )
+from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.document import SPEC_TO_API_PHASE, SpecPhase
 from kosmo.contracts.sdd.errors import (
     ConsistencyEvaluationNotFoundError,
@@ -37,6 +38,7 @@ _REVIEW_TARGET_PHASES = (
     SpecPhase.CARACTERISTICAS,
     SpecPhase.REQUISITOS,
     SpecPhase.MODELO,
+    SpecPhase.IMPLEMENTACION,
 )
 
 
@@ -105,12 +107,14 @@ class GetConsistencyReviewUseCase:
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
         diagram_repo: ActivityDiagramRepository,
+        implementation_repo: FeatureImplementationRepository | None = None,
     ) -> None:
         self._evaluation_repo = evaluation_repo
         self._document_repo = document_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
         self._diagram_repo = diagram_repo
+        self._implementation_repo = implementation_repo
 
     async def execute(self, project_id: ProjectId, target_phase: SpecPhase) -> list[ReviewCard]:
         rows = await self._evaluation_repo.list_unresolved(project_id, target_phase)
@@ -131,6 +135,7 @@ class GetConsistencyReviewUseCase:
                     feature_repo=self._feature_repo,
                     requirement_repo=self._requirement_repo,
                     diagram_repo=self._diagram_repo,
+                    implementation_repo=self._implementation_repo,
                 )
             except Exception:
                 _log.warning("consistency.review_snapshot_failed", evaluation_id=str(row.id), exc_info=True)
@@ -167,6 +172,7 @@ class GetConsistencyReviewUseCase:
         try:
             diagram = await self._diagram_repo.by_feature_id(FeatureId(row.target_artifact_id))
         except Exception:
+            _log.debug("manage_consistency.diagram_fetch_failed", artifact_id=row.target_artifact_id, exc_info=True)
             return row
         if diagram is None:
             return row
@@ -194,6 +200,7 @@ class ApplyConsistencyEvaluationUseCase:
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
         diagram_repo: ActivityDiagramRepository,
+        implementation_repo: FeatureImplementationRepository | None = None,
     ) -> None:
         self._evaluation_repo = evaluation_repo
         self._apply_uc = apply_uc
@@ -201,10 +208,15 @@ class ApplyConsistencyEvaluationUseCase:
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
         self._diagram_repo = diagram_repo
+        self._implementation_repo = implementation_repo
 
-    async def execute(self, evaluation_id: ConsistencyEvaluationId) -> dict[str, object]:
+    async def execute(
+        self,
+        evaluation_id: ConsistencyEvaluationId,
+        project_id: ProjectId | None = None,
+    ) -> dict[str, object]:
         row = await self._evaluation_repo.by_id(evaluation_id)
-        if row is None:
+        if row is None or (project_id is not None and str(row.project_id) != str(project_id)):
             raise ConsistencyEvaluationNotFoundError(evaluation_id=str(evaluation_id))
 
         if row.status != ConsistencyEvaluationStatus.COMPLETED:
@@ -223,6 +235,7 @@ class ApplyConsistencyEvaluationUseCase:
             feature_repo=self._feature_repo,
             requirement_repo=self._requirement_repo,
             diagram_repo=self._diagram_repo,
+            implementation_repo=self._implementation_repo,
         )
         if compute_snapshot_hash(*parts) != row.snapshot_hash:
             await self._evaluation_repo.save(
@@ -274,9 +287,13 @@ class DiscardConsistencyEvaluationUseCase:
     def __init__(self, evaluation_repo: ConsistencyEvaluationRepository) -> None:
         self._evaluation_repo = evaluation_repo
 
-    async def execute(self, evaluation_id: ConsistencyEvaluationId) -> dict[str, object]:
+    async def execute(
+        self,
+        evaluation_id: ConsistencyEvaluationId,
+        project_id: ProjectId | None = None,
+    ) -> dict[str, object]:
         row = await self._evaluation_repo.by_id(evaluation_id)
-        if row is None:
+        if row is None or (project_id is not None and str(row.project_id) != str(project_id)):
             raise ConsistencyEvaluationNotFoundError(evaluation_id=str(evaluation_id))
         if row.status != ConsistencyEvaluationStatus.COMPLETED:
             raise ConsistencyStaleError(
@@ -323,9 +340,9 @@ class BulkResolveConsistencyUseCase:
         for row in rows:
             try:
                 if action == "apply":
-                    await self._apply_uc.execute(row.id)
+                    await self._apply_uc.execute(row.id, project_id=project_id)
                 else:
-                    await self._discard_uc.execute(row.id)
+                    await self._discard_uc.execute(row.id, project_id=project_id)
             except (ConsistencyStaleError, ConsistencyEvaluationNotFoundError, ProjectNotFoundError):
                 skipped += 1
                 continue

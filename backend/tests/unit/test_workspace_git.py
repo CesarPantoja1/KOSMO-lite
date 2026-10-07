@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -11,19 +12,26 @@ from kosmo.infrastructure.git import (
     GitError,
     LocalGitWorkspaceAdapter,
     git_add,
+    git_add_async,
     git_build_authenticated_url,
     git_commit,
+    git_commit_async,
     git_current_branch,
     git_has_commits,
     git_head_hash,
+    git_head_hash_async,
     git_init,
+    git_init_async,
     git_is_clean,
+    git_is_clean_async,
     git_push,
     git_remote_add_or_update,
     git_remote_get_url,
     git_revert_commit,
     git_rollback,
+    git_rollback_async,
     git_status,
+    run_git_async,
 )
 
 
@@ -273,6 +281,15 @@ def test_git_build_authenticated_url() -> None:
     auth_url_clean = git_build_authenticated_url("https://old_user:old_token@github.com/owner/project.git", "ghp_new")
     assert auth_url_clean == "https://x-access-token:ghp_new@github.com/owner/project.git"
 
+    auth_url_encoded = git_build_authenticated_url("https://github.com/owner/project.git", "ghp_token:@value")
+    assert auth_url_encoded == "https://x-access-token:ghp_token%3A%40value@github.com/owner/project.git"
+
+    local_auth_url = git_build_authenticated_url("http://localhost:3000/owner/project.git", "local_token")
+    assert local_auth_url == "http://x-access-token:local_token@localhost:3000/owner/project.git"
+
+    with pytest.raises(GitError, match="Solo se permiten URLs HTTPS fuera"):
+        git_build_authenticated_url("http://github.com/owner/project.git", "ghp_secretToken123")
+
     # Token vacío
     with pytest.raises(GitError, match="El token de acceso no puede estar vacío"):
         git_build_authenticated_url("https://github.com/owner/project.git", "")
@@ -365,3 +382,89 @@ def test_local_git_workspace_adapter_implements_protocol() -> None:
 
     auth_url = adapter.build_authenticated_url("https://github.com/octocat/repo.git", "token123")
     assert auth_url == "https://x-access-token:token123@github.com/octocat/repo.git"
+
+
+@pytest.mark.unit
+def test_git_run_timeout_raises_git_error() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = Path(tmp_dir)
+        with (
+            patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["git", "status"], timeout=1.0)),
+            pytest.raises(GitError, match="Tiempo de espera agotado"),
+        ):
+            git_status(path)
+
+
+@pytest.mark.unit
+def test_git_run_passes_git_terminal_prompt_zero() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = Path(tmp_dir)
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = ""
+            mock_run.return_value.stderr = ""
+            git_status(path)
+            mock_run.assert_called_once()
+            env_arg = mock_run.call_args.kwargs.get("env")
+            assert env_arg is not None
+            assert env_arg.get("GIT_TERMINAL_PROMPT") == "0"
+
+
+@pytest.mark.unit
+async def test_run_git_async_executes_successfully() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = Path(tmp_dir)
+        await git_init_async(path)
+        res = await run_git_async(["git", "status", "--porcelain"], path)
+        assert res.returncode == 0
+
+
+@pytest.mark.unit
+async def test_git_async_lifecycle_init_add_commit_rollback() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = Path(tmp_dir)
+        await git_init_async(path, initial_branch="main")
+
+        assert await git_is_clean_async(path)
+        assert await git_head_hash_async(path) is None
+
+        file1 = path / "test.txt"
+        file1.write_text("async git content", encoding="utf-8")
+        assert not await git_is_clean_async(path)
+
+        await git_add_async(path)
+        committed = await git_commit_async(path, "feat: async commit")
+        assert committed is True
+        assert await git_is_clean_async(path)
+
+        head = await git_head_hash_async(path)
+        assert head is not None
+        assert len(head) == 40
+
+        # Modificación para probar rollback asíncrono
+        file1.write_text("corrupted content", encoding="utf-8")
+        assert not await git_is_clean_async(path)
+        await git_rollback_async(path)
+        assert await git_is_clean_async(path)
+        assert file1.read_text(encoding="utf-8") == "async git content"
+
+
+@pytest.mark.unit
+async def test_local_git_workspace_adapter_async_methods() -> None:
+    with tempfile.TemporaryDirectory() as bare_dir, tempfile.TemporaryDirectory() as ws_dir:
+        bare_path = Path(bare_dir)
+        ws_path = Path(ws_dir)
+
+        await run_git_async(["git", "init", "--bare", "-b", "main"], bare_path)
+        await git_init_async(ws_path, initial_branch="main")
+
+        (ws_path / "index.ts").write_text("console.log(1);", encoding="utf-8")
+        await git_add_async(ws_path)
+        await git_commit_async(ws_path, "feat: initial")
+
+        adapter = LocalGitWorkspaceAdapter()
+        await adapter.remote_add_or_update_async(str(ws_path), "origin", str(bare_path))
+
+        pushed_hash = await adapter.push_async(str(ws_path), remote="origin", branch="main")
+        head = await git_head_hash_async(ws_path)
+        assert pushed_hash == head

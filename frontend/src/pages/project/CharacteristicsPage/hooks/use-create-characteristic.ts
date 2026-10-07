@@ -122,6 +122,9 @@ export function useCreateCharacteristic(): UseCreateCharacteristicReturn {
 			setIsValidating(false);
 
 			if (result.is_saved) {
+				if (result.warnings && result.warnings.length > 0) {
+					toast.warning(result.warnings.join('\n'), undefined, 'Advertencia de solapamiento');
+				}
 				router.push('/proyecto/caracteristicas');
 			} else {
 				setConsistencyInfo({

@@ -16,7 +16,7 @@ def test_features_chat_mode_properties() -> None:
 
     assert mode.phase_name == SpecPhase.CARACTERISTICAS
     assert mode.temperature == 0.4
-    assert mode.max_tokens == 4096
+    assert mode.max_tokens == 8192
     assert mode.output_type == RespuestaChatLLM
     assert "NIVEL DE USUARIO" in mode.system_prompt
     assert "no afirmes que un cambio fue aplicado" in mode.system_prompt
@@ -106,3 +106,47 @@ def test_features_chat_mode_validate_output_empty_diff() -> None:
     val_res = mode.validate_output(response)
     assert val_res.is_valid is False
     assert any("idénticos" in e for e in val_res.errors)
+
+
+def test_features_chat_mode_build_user_prompt_with_other_features_and_overlap() -> None:
+    mode = FeaturesChatMode()
+
+    doc = RichTextDocument(
+        nodes=[
+            DocumentNode(
+                type="heading",
+                content="Alcance",
+                heading=SectionHeading(text="Alcance", level=2, slug="alcance"),
+            )
+        ]
+    )
+    feature = Feature(
+        id=FeatureId("feat_101"),
+        number=2,
+        title="Aceptar términos y condiciones",
+        slug="aceptar-terminos",
+        description="Confirmación y consentimiento de políticas para registrar usuarios.",
+        project_id=ProjectId("prj_001"),
+        origin="Deriva de Reglas de negocio.",
+    )
+    other = Feature(
+        id=FeatureId("feat_100"),
+        number=1,
+        title="Registro de usuarios",
+        slug="registro-de-usuarios",
+        description="Permite registrar nuevos usuarios con credenciales.",
+        project_id=ProjectId("prj_001"),
+        origin="Deriva de Actores.",
+    )
+    context = FeatureChatContext(
+        feature=feature,
+        discovery_document=doc,
+        other_features=(other,),
+    )
+
+    prompt = mode.build_user_prompt(context)
+
+    assert "Otras características del proyecto" in prompt
+    assert "Registro de usuarios" in prompt
+    assert "Advertencias de solapamiento funcional detectadas" in prompt
+    assert "sub-capacidad" in prompt or "solapamiento" in prompt

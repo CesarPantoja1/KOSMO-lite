@@ -83,7 +83,7 @@ class DeploymentPollingWorker(DeploymentWorkerPort):
                             )
                         )
                     except Exception as handler_exc:
-                        logger.error("Error al registrar fallo de despliegue en DB: %s", handler_exc)
+                        logger.exception("Error al registrar fallo de despliegue en DB: %s", handler_exc)
 
         task = asyncio.create_task(_run(), name=f"deploy_monitor_{project_id_str}")
         self._active_tasks[project_id_str] = task

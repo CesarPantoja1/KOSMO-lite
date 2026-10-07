@@ -59,14 +59,6 @@ class FeatureSelection:
 
 
 @dataclass(frozen=True)
-class SuggestedFeature:
-    number: int
-    title: str
-    description: str
-    origin: str = ""
-
-
-@dataclass(frozen=True)
 class AcceptanceCriterion:
     scenario: str
     given: str
@@ -130,3 +122,11 @@ EARSPattern_SYNTAX: dict[EARSPattern, str] = {
     EARSPattern.unwanted: ("SI [condición no deseada], [el sistema] debe [comportamiento de mitigación]"),
     EARSPattern.complex: "MIENTRAS [estado] Y [evento], [el sistema] debe [comportamiento]",
 }
+
+
+def __getattr__(name: str) -> Any:
+    if name == "SuggestedFeature":
+        from kosmo.contracts.pipeline.phase_outputs import SuggestedFeature
+
+        return SuggestedFeature
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -7,11 +7,11 @@ import pytest
 from kosmo.application.knowledge import ConsolidateInput, ConsolidateKnowledgePatterns
 from kosmo.contracts.llm.ports import LLMResponse, LLMUsage, PromptTemplate
 from kosmo.contracts.sdd.document import SpecPhase
-from kosmo.infrastructure.persistence.memory.in_memory_store import (
+from tests.factories import a_session
+from tests.unit.fakes import (
     InMemoryAgentSessionStore,
     InMemoryKnowledgePatternStore,
 )
-from tests.factories import a_session
 
 
 class StubPatternLLMClient:

@@ -131,3 +131,8 @@ Actualmente en desarrollo de la versión 1.0, enfocada en la generación asistid
 ## Licencia
 
 Este proyecto se encuentra en desarrollo con fines académicos y de investigación.
+
+## Versión del Sistema
+
+- **Versión actual:** v0.10.7
+- **Notas de versión:** Estabilidad de despliegue, optimización de concurrencia y documentación v1 ([AB#440](https://dev.azure.com/TICEPN/a88c67c0-0fa0-4abd-a4fc-b7f0909de778/_workitems/edit/440)).

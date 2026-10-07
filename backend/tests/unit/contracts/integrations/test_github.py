@@ -47,7 +47,7 @@ def test_project_github_integration_defaults() -> None:
     assert integration.project_id == "proj-1"
     assert integration.repo_url == "https://github.com/testuser/testrepo"
     assert integration.repo_name is None
-    assert integration.is_public is False
+    assert integration.is_public is True
     assert integration.default_branch == "main"
     assert integration.last_push_at is None
     assert integration.last_commit_hash is None

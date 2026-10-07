@@ -94,7 +94,7 @@ async def test_monitor_deployment_success_transition(
     # get_service_status se llama 2 veces
     assert deployment_client.get_service_status.call_count == 2
 
-    # Se guarda el deployment sÃ³lo cuando cambia de estado (en la segunda iteraciÃ³n)
+    # Se guarda el deployment sólo cuando cambia de estado (en la segunda iteración)
     project_deployment_repo.save.assert_called_once()
     saved_deployment = project_deployment_repo.save.call_args[0][0]
     assert saved_deployment.status == DeploymentStatus.PUBLISHED
@@ -143,6 +143,49 @@ async def test_monitor_deployment_fails_transition(
     assert saved_deployment.status == DeploymentStatus.FAILED
     assert saved_deployment.build_logs_url == "Build failed due to syntax error"
     assert saved_deployment.error_message == "Build failed due to syntax error"
+
+
+async def test_monitor_deployment_failure_with_logs_url(
+    use_case: MonitorDeploymentStatusUseCase,
+    project_deployment_repo: AsyncMock,
+    user_deployment_repo: AsyncMock,
+    deployment_client: AsyncMock,
+    cipher: MagicMock,
+):
+    # Arrange
+    cmd = MonitorDeploymentStatusCommand(
+        project_id=ProjectId("proj-1"),
+        user_id=UserId("user-1"),
+        max_attempts=5,
+        delay_seconds=0,
+    )
+    project_deployment_repo.get_by_project_id.return_value = ProjectDeployment(
+        project_id=ProjectId("proj-1"),
+        provider=DeploymentProvider.RAILWAY,
+        service_id="srv-123",
+        status=DeploymentStatus.BUILDING,
+    )
+    user_deployment_repo.get_by_user_id.return_value = UserDeploymentIntegration(
+        user_id=UserId("user-1"),
+        provider=DeploymentProvider.RAILWAY,
+        encrypted_token=base64.b64encode(b"enc").decode("utf-8"),
+    )
+    cipher.decrypt.return_value = b"real-token"
+    deployment_client.get_service_status.return_value = (
+        DeploymentStatus.FAILED,
+        None,
+        "https://railway.com/project/prj-1/service/srv-123?id=dep-1",
+    )
+
+    # Act
+    await use_case.execute(cmd)
+
+    # Assert
+    project_deployment_repo.save.assert_called_once()
+    saved = project_deployment_repo.save.call_args[0][0]
+    assert saved.status == DeploymentStatus.FAILED
+    assert saved.build_logs_url == "https://railway.com/project/prj-1/service/srv-123?id=dep-1"
+    assert "Fallo durante el despliegue en Railway" in (saved.error_message or "")
 
 
 async def test_monitor_deployment_max_attempts(

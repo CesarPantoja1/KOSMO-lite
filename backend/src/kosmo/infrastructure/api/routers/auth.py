@@ -11,6 +11,7 @@ from kosmo.application.auth import (
     RegisterUser,
     RevokeSession,
 )
+from kosmo.config import settings
 from kosmo.contracts.auth import (
     AccountLockedError,
     AuthorizationCodeError,
@@ -34,19 +35,19 @@ from kosmo.infrastructure.api.schemas import (
     OAuthErrorResponse,
     PrincipalView,
     RegisterRequest,
+    RegisterResponse,
     TokenExchangeRequest,
     TokenPairResponse,
     TokenRefreshRequest,
-    UserPublic,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 _register_limiter = IpRateLimiter(3)
-_authorize_limiter = IpRateLimiter(10)
-_token_limiter = IpRateLimiter(5)
-_refresh_limiter = IpRateLimiter(30)
-_logout_limiter = IpRateLimiter(20)
+_authorize_limiter = IpRateLimiter(60)
+_token_limiter = IpRateLimiter(60)
+_refresh_limiter = IpRateLimiter(60)
+_logout_limiter = IpRateLimiter(60)
 
 
 def _auth_components(request: Request) -> AuthComponents:
@@ -89,32 +90,41 @@ def _oauth_error(*, status_code: int, error: str, description: str) -> JSONRespo
     description=(
         "Crea una nueva cuenta de usuario en KOSMO. "
         "La contraseña se hashea con **Argon2id** (OWASP 2025) antes de persistirse. "
-        "Si el email ya existe en el sistema se devuelve `409 Conflict`. "
+        "Devuelve una confirmación genérica para prevenir la enumeración de usuarios (CWE-204). "
         "Límite de velocidad: **3 peticiones / IP / ventana**."
     ),
-    response_model=UserPublic,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
         status.HTTP_201_CREATED: {
-            "description": "Cuenta creada exitosamente. Devuelve los datos públicos del usuario.",
+            "description": "Confirmación genérica de registro recibida exitosamente.",
             "content": {
                 "application/json": {
                     "example": {
-                        "id": "usr-01HXYAZABCDEFGHIJKLMNOP",
                         "email": "usuario@ejemplo.com",
-                        "created_at": "2025-01-15T10:30:00Z",
+                        "message": (
+                            "Si el correo no estaba registrado previamente, la cuenta ha sido creada exitosamente."
+                        ),
                     }
                 }
             },
         },
-        status.HTTP_409_CONFLICT: {
-            "description": "Email ya registrado en el sistema.",
-            "model": OAuthErrorResponse,
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Datos de registro inválidos (ej. nombre vacío).",
+            "content": {"application/json": {"example": {"detail": "El nombre no puede estar vacío"}}},
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "Error de validación del payload (ej. contraseña menor a 12 caracteres).",
             "content": {
                 "application/json": {
                     "example": {
-                        "error": "email_already_registered",
-                        "error_description": "Email ya registrado",
+                        "detail": [
+                            {
+                                "loc": ["body", "password"],
+                                "msg": "String should have at least 12 characters",
+                                "type": "string_too_short",
+                            }
+                        ]
                     }
                 }
             },
@@ -136,30 +146,21 @@ def _oauth_error(*, status_code: int, error: str, description: str) -> JSONRespo
 async def register(
     payload: Annotated[RegisterRequest, Body(...)],
     use_case: Annotated[RegisterUser, Depends(_register)],
-) -> UserPublic:
+) -> RegisterResponse:
     try:
         user = await use_case.execute(
             name=payload.name,
             email=str(payload.email),
             password=payload.password,
         )
-    except UserAlreadyExistsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email ya registrado",
-        ) from exc
+        return RegisterResponse(email=user.email)
+    except UserAlreadyExistsError:
+        return RegisterResponse(email=str(payload.email).strip().lower())
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    return UserPublic(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        avatar_url=user.avatar_url,
-        created_at=user.created_at or datetime.now(UTC),
-    )
 
 
 # POST /authorize
@@ -557,13 +558,22 @@ async def me(
 )
 async def logout(
     payload: Annotated[LogoutRequest, Body(...)],
-    principal: Annotated[Principal, Depends(get_principal)],
     use_case: Annotated[RevokeSession, Depends(_revoke)],
     request: Request,
 ) -> Response:
-    _ = principal
+    if settings.auth_disabled:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     bearer = request.headers.get("authorization", "")
-    access_token = bearer.removeprefix("Bearer ").strip()
+    access_token = bearer.removeprefix("Bearer ").strip() if bearer.startswith("Bearer ") else bearer.strip()
+
+    if not access_token and not payload.refresh_token:
+        return _oauth_error(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            error="invalid_token",
+            description="Token ausente o inválido",
+        )
+
     try:
         await use_case.execute(access_token=access_token, refresh_token=payload.refresh_token)
     except (InvalidTokenError, TokenExpiredError, TokenRevokedError) as exc:

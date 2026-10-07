@@ -66,6 +66,9 @@ class _DeploymentWorkerSpy:
     def __init__(self) -> None:
         self.cancelled_projects: list[str] = []
 
+    def is_monitoring(self, project_id: ProjectId) -> bool:
+        return True
+
     def cancel_monitoring(self, project_id: ProjectId) -> bool:
         self.cancelled_projects.append(str(project_id))
         return True
@@ -154,6 +157,8 @@ def _make_uc(
     deployment_client: Any | None = None,
     deployment_worker: Any | None = None,
     cipher: Any | None = None,
+    delete_deployment: Any | None = None,
+    delete_github_repo: Any | None = None,
 ) -> DeleteProjectUseCase:
     return DeleteProjectUseCase(
         project_repo=project_repo,
@@ -174,6 +179,8 @@ def _make_uc(
         deployment_client=deployment_client,
         deployment_worker=deployment_worker,
         cipher=cipher,
+        delete_deployment=delete_deployment,
+        delete_github_repo=delete_github_repo,
     )
 
 
@@ -609,4 +616,78 @@ async def test_delete_project_resilient_when_workspace_cleanup_fails() -> None:
     await use_case.execute(DeleteProjectInput(project_id=project.id, owner_id=_OWNER))
 
     # Assert — El proyecto sí se eliminó de la base de datos
+    assert await project_repo.by_id(project.id) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_delete_project_delegates_to_injected_delete_deployment() -> None:
+    project = _a_project("prj_delegation")
+    project_repo = InMemoryProjectRepository()
+    await project_repo.save(project)
+
+    class _DeleteDeploymentSpy:
+        def __init__(self) -> None:
+            self.executed_commands: list[tuple[Any, Any]] = []
+
+        async def execute(self, principal: Any, cmd: Any) -> bool:
+            self.executed_commands.append((principal, cmd))
+            return True
+
+    delete_deployment_spy = _DeleteDeploymentSpy()
+    use_case = _make_uc(
+        project_repo,
+        InMemoryFeatureRepository(),
+        InMemoryRequirementRepository(),
+        InMemoryActivityDiagramRepository(),
+        InMemoryDocumentRepository(),
+        InMemoryChatRepository(),
+        InMemoryConsistencyEvaluationRepository(),
+        InMemoryTraceabilityRepository(),
+        delete_deployment=delete_deployment_spy,
+    )
+
+    await use_case.execute(DeleteProjectInput(project_id=project.id, owner_id=_OWNER))
+
+    assert len(delete_deployment_spy.executed_commands) == 1
+    principal, cmd = delete_deployment_spy.executed_commands[0]
+    assert principal.subject == str(_OWNER)
+    assert cmd.project_id == project.id
+    assert await project_repo.by_id(project.id) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_delete_project_delegates_to_injected_delete_github_repo() -> None:
+    project = _a_project("prj_delegation_gh")
+    project_repo = InMemoryProjectRepository()
+    await project_repo.save(project)
+
+    class _DeleteGitHubRepoSpy:
+        def __init__(self) -> None:
+            self.executed_commands: list[Any] = []
+
+        async def execute(self, cmd: Any) -> bool:
+            self.executed_commands.append(cmd)
+            return True
+
+    delete_github_spy = _DeleteGitHubRepoSpy()
+    use_case = _make_uc(
+        project_repo,
+        InMemoryFeatureRepository(),
+        InMemoryRequirementRepository(),
+        InMemoryActivityDiagramRepository(),
+        InMemoryDocumentRepository(),
+        InMemoryChatRepository(),
+        InMemoryConsistencyEvaluationRepository(),
+        InMemoryTraceabilityRepository(),
+        delete_github_repo=delete_github_spy,
+    )
+
+    await use_case.execute(DeleteProjectInput(project_id=project.id, owner_id=_OWNER))
+
+    assert len(delete_github_spy.executed_commands) == 1
+    cmd = delete_github_spy.executed_commands[0]
+    assert cmd.project_id == project.id
+    assert cmd.owner_id == _OWNER
     assert await project_repo.by_id(project.id) is None

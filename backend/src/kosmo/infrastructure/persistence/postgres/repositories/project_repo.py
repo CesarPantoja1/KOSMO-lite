@@ -65,11 +65,16 @@ class SqlAlchemyProjectRepository(ProjectRepository):
                 return None
             return self._to_entity(model)
 
-    async def list_by_owner(self, owner_id: str) -> list[Project]:
+    async def list_by_owner(self, owner_id: str, *, limit: int = 100) -> list[Project]:
         async with self._session_ctx() as session:
             from sqlalchemy import select
 
-            stmt = select(ProjectModel).where(ProjectModel.owner_id == owner_id)
+            stmt = (
+                select(ProjectModel)
+                .where(ProjectModel.owner_id == owner_id)
+                .order_by(ProjectModel.created_at.desc())
+                .limit(limit)
+            )
             result = await session.execute(stmt)
             models = result.scalars().all()
             return [self._to_entity(m) for m in models]

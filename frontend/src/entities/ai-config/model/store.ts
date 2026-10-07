@@ -7,7 +7,6 @@ import type {
 	TestAIConnectionRequest,
 	TestAIConnectionResult,
 } from './types';
-import { DEFAULT_AI_PROVIDER, DEFAULT_AI_MODEL } from './types';
 
 export interface AiConfigState {
 	config: AIConfigView | null;
@@ -75,8 +74,8 @@ export const useAiConfigStore = create<AiConfigState>()((set) => ({
 			await aiConfigApi.deleteConfig();
 			set({
 				config: {
-					provider: DEFAULT_AI_PROVIDER,
-					model: DEFAULT_AI_MODEL,
+					provider: null,
+					model: null,
 					is_custom: false,
 					has_api_key: false,
 					masked_key: null,
@@ -109,8 +108,8 @@ export const useAiConfigStore = create<AiConfigState>()((set) => ({
 	},
 
 	getDefaultConfig: (): AIConfigView => ({
-		provider: DEFAULT_AI_PROVIDER,
-		model: DEFAULT_AI_MODEL,
+		provider: null,
+		model: null,
 		is_custom: false,
 		has_api_key: false,
 		masked_key: null,

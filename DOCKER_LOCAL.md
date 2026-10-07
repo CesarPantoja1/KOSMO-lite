@@ -31,6 +31,12 @@ Copy `.env.example` to `.env` only when you need to change ports, passwords, or 
 cp .env.example .env
 ```
 
+Para generar `FERNET_MASTER_KEY` (requerida cuando la autenticación está habilitada):
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
 The committed defaults are enough for normal local development.
 
 Generación de código con opencode y DeepSeek:

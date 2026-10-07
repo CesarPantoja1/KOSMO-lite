@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from kosmo.contracts.sdd.ids import FeatureId, RequirementId
@@ -55,34 +55,46 @@ class SqlAlchemyTraceabilityRepository:
             session.add(model)
             await self._commit(session)
 
-    async def get_impact(self, artifact_id: str) -> dict[str, list[dict[str, str]]]:
-        upstream: list[dict[str, str]] = []
-        downstream: list[dict[str, str]] = []
+    async def get_impact_batch(self, artifact_ids: list[str]) -> dict[str, dict[str, list[dict[str, str]]]]:
+        if not artifact_ids:
+            return {}
+
+        results: dict[str, dict[str, list[dict[str, str]]]] = {
+            aid: {"upstream": [], "downstream": []} for aid in artifact_ids
+        }
+        artifact_set = set(artifact_ids)
 
         async with self._session_ctx() as session:
-            up_stmt = select(TraceabilityEdgeModel).where(TraceabilityEdgeModel.target_id == artifact_id)
-            up_result = await session.execute(up_stmt)
-            for edge in up_result.scalars().all():
-                upstream.append(
-                    {
-                        "type": edge.source_type,
-                        "id": edge.source_id,
-                        "origin": edge.origin,
-                    }
+            stmt = select(TraceabilityEdgeModel).where(
+                or_(
+                    TraceabilityEdgeModel.target_id.in_(artifact_ids),
+                    TraceabilityEdgeModel.source_id.in_(artifact_ids),
                 )
+            )
+            result = await session.execute(stmt)
+            for edge in result.scalars().all():
+                if edge.target_id in artifact_set:
+                    results[edge.target_id]["upstream"].append(
+                        {
+                            "type": edge.source_type,
+                            "id": edge.source_id,
+                            "origin": edge.origin,
+                        }
+                    )
+                if edge.source_id in artifact_set:
+                    results[edge.source_id]["downstream"].append(
+                        {
+                            "type": edge.target_type,
+                            "id": edge.target_id,
+                            "origin": edge.origin,
+                        }
+                    )
 
-            down_stmt = select(TraceabilityEdgeModel).where(TraceabilityEdgeModel.source_id == artifact_id)
-            down_result = await session.execute(down_stmt)
-            for edge in down_result.scalars().all():
-                downstream.append(
-                    {
-                        "type": edge.target_type,
-                        "id": edge.target_id,
-                        "origin": edge.origin,
-                    }
-                )
+        return results
 
-        return {"upstream": upstream, "downstream": downstream}
+    async def get_impact(self, artifact_id: str) -> dict[str, list[dict[str, str]]]:
+        batch = await self.get_impact_batch([artifact_id])
+        return batch.get(artifact_id, {"upstream": [], "downstream": []})
 
     async def add_feature_requirement_edges(self, feature_id: FeatureId, requirement_ids: list[RequirementId]) -> None:
         async with self._session_ctx() as session:
@@ -101,15 +113,11 @@ class SqlAlchemyTraceabilityRepository:
 
     async def delete_by_entity_id(self, entity_id: str) -> None:
         async with self._session_ctx() as session:
-            from sqlalchemy import or_
-
-            stmt = select(TraceabilityEdgeModel).where(
+            stmt = delete(TraceabilityEdgeModel).where(
                 or_(
                     TraceabilityEdgeModel.source_id == entity_id,
                     TraceabilityEdgeModel.target_id == entity_id,
                 )
             )
-            result = await session.execute(stmt)
-            for edge in result.scalars().all():
-                await session.delete(edge)
+            await session.execute(stmt)
             await self._commit(session)

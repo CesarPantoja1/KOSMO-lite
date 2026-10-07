@@ -504,7 +504,7 @@ async def test_evaluate_empty_changes_uses_automatic_diff() -> None:
 
     # Assert: el diff automático se usó y la evaluación se ejecutó
     assert result.affected_artifact_ids == ["feat_diff"]
-    assert "consistency_evaluate" in agent.skill_names
+    assert any(s in agent.skill_names for s in ("consistency_evaluate_discovery_features", "consistency_evaluate"))
     assert isinstance(agent.last_context, ConsistencyPhaseContext)
     assert len(agent.last_context.applied_changes) == 1
     assert "producto X" in agent.last_context.applied_changes[0].diff.before
@@ -1091,7 +1091,7 @@ async def test_evaluate_runs_with_chat_change_despite_cosmetic_diff() -> None:
 
     # Assert
     assert result.affected_artifact_ids == ["feat_cos2"]
-    assert "consistency_evaluate" in agent.skill_names
+    assert any(s in agent.skill_names for s in ("consistency_evaluate_discovery_features", "consistency_evaluate"))
 
 
 @pytest.mark.unit
@@ -1230,6 +1230,71 @@ async def test_enrich_impact_requirements_with_actor_subphrase_fragment() -> Non
         "field": "statement",
         "before": "el colaborador de tienda",
         "after": "el encargado de despacho",
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enrich_impact_requirements_direct_match_by_display_id() -> None:
+    """Cuando suggested_field coincide con el display_id (REQ-X.Y), se asocia directamente."""
+    from kosmo.application.consistency.enrich_impact import enrich_impact_items
+    from kosmo.contracts.ai.consistency import (
+        ArtifactAction,
+        ConsistencyEvaluationOutput,
+        ConsistencyStatus,
+    )
+
+    feature_repo = InMemoryFeatureRepository()
+    feat = _make_feature("feat_pedidos3", "prj_01", "Gestión de pedidos", number=6)
+    await feature_repo.save(feat)
+
+    req_md = (
+        "### REQ-6.1 Descuento automático de stock\n\n"
+        "**Basado en eventos**\n\n"
+        "CUANDO el colaborador de tienda confirma un pedido, "
+        "el sistema debe descontar automáticamente las cantidades.\n\n"
+        "### REQ-6.2 Notificación al cliente\n\n"
+        "**Ubicuo**\n\n"
+        "El sistema debe notificar al cliente cuando el pedido se envíe.\n"
+    )
+    requirement_repo = InMemoryRequirementRepository()
+    await requirement_repo.save(FeatureId("feat_pedidos3"), req_md)
+    diagram_repo = InMemoryActivityDiagramRepository()
+
+    result = ConsistencyEvaluationOutput(
+        report_id="cnr_req_direct",
+        status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
+        affected_artifact_ids=["feat_pedidos3"],
+        actions=[
+            ArtifactAction(
+                artifact_id="feat_pedidos3",
+                action="update",
+                rationale="Renombrar actor en requisito REQ-6.1",
+                suggested_field="REQ-6.1",
+                suggested_before="CUANDO el colaborador de tienda confirma un pedido",
+                suggested_after="CUANDO Milkventario confirma un pedido",
+            )
+        ],
+    )
+
+    items = await enrich_impact_items(
+        result,
+        SpecPhase.REQUISITOS,
+        SpecPhase.DESCUBRIMIENTO,
+        feature_repo,
+        requirement_repo,
+        diagram_repo,
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.target_display_id == "REQ-6.1"
+    assert item.target_title == "Descuento automático de stock"
+    assert item.action == "update"
+    assert item.diff == {
+        "field": "statement",
+        "before": "CUANDO el colaborador de tienda confirma un pedido",
+        "after": "CUANDO Milkventario confirma un pedido",
     }
 
 
@@ -1390,3 +1455,267 @@ async def test_cascading_consistency_end_to_end_actor_removal() -> None:
     assert req_impacts[0]["targetDisplayId"] == "REQ-6.1"
     assert req_impacts[0]["targetTitle"] == "Descuento automático de stock"
     assert "colaborador de tienda" in str(req_impacts[0]["diff"]["before"])
+
+
+@pytest.mark.unit
+def test_validate_action_allows_truncated_artifact_content() -> None:
+    from kosmo.application.consistency.evaluate_consistency import _validate_action
+
+    # Un artefacto largo cuyo contenido termina en truncado
+    desc = "## Sección inicial\nTexto del inicio.\n[…contenido truncado…]"
+    # El LLM sugiere un before que estaba en la parte truncada (no aparece en desc)
+    is_valid = _validate_action(
+        artifact_id="feat_01",
+        action="update",
+        suggested_before="Texto lejano que no está en el resumen",
+        suggested_after="Texto corregido",
+        artifact_desc=desc,
+        artifact_type="EARSRequirement",
+    )
+
+    # Debe ser permitido y no rechazado falsamente
+    assert is_valid is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_evaluate_implementation_marks_status_requires_review() -> None:
+    from datetime import UTC, datetime
+
+    from kosmo.contracts.sdd.codegen import FeatureImplementation, FeatureImplementationStatus
+    from kosmo.contracts.sdd.ids import ImplementationId
+    from tests.unit.fakes import InMemoryFeatureImplementationRepository
+
+    project = _make_project("prj_impl_eval")
+    project_repo = InMemoryProjectRepository()
+    await project_repo.save(project)
+
+    feature_repo = InMemoryFeatureRepository()
+    feature = _make_feature("feat_impl", "prj_impl_eval", "Gestión de pedidos", number=1)
+    await feature_repo.save(feature)
+
+    requirement_repo = InMemoryRequirementRepository()
+    diagram_repo = InMemoryActivityDiagramRepository()
+    document_repo = InMemoryDocumentRepository()
+
+    impl_repo = InMemoryFeatureImplementationRepository()
+    now = datetime.now(UTC)
+    impl = FeatureImplementation(
+        id=ImplementationId("impl_feat_01"),
+        feature_id=feature.id,
+        project_id=project.id,
+        status=FeatureImplementationStatus.IMPLEMENTED,
+        attempt_count=1,
+        max_attempts=3,
+        generated_files=("src/orders.ts",),
+        created_at=now,
+        updated_at=now,
+    )
+    await impl_repo.save(impl)
+
+    agent = StubConsistencyAgent(affected_ids=[str(feature.id)])
+    uc = EvaluateConsistencyUseCase(
+        agent=agent,
+        feature_repo=feature_repo,
+        requirement_repo=requirement_repo,
+        diagram_repo=diagram_repo,
+        document_repo=document_repo,
+        implementation_repo=impl_repo,
+    )
+
+    result = await uc.evaluate(
+        source_phase=SpecPhase.REQUISITOS,
+        target_phase=SpecPhase.IMPLEMENTACION,
+        project_id=project.id,
+        applied_changes=[_applied_change("chg_req", before="REQ-1", after="REQ-1 modificado")],
+    )
+
+    assert str(feature.id) in result.affected_artifact_ids
+    assert len(result.actions) == 1
+    action = result.actions[0]
+    assert action.artifact_id == str(feature.id)
+    assert action.action == "update"
+    assert action.suggested_field == "status"
+    assert action.suggested_after == "requires_review"
+
+
+@pytest.mark.asyncio
+async def test_fetch_downstream_artifacts_does_not_truncate_large_documents() -> None:
+    feature_repo = InMemoryFeatureRepository()
+    requirement_repo = InMemoryRequirementRepository()
+    diagram_repo = InMemoryActivityDiagramRepository()
+    document_repo = InMemoryDocumentRepository()
+
+    project = _make_project("prj_large_doc")
+    feature = _make_feature("feat_large", "prj_large_doc", "Feature Grande", number=1)
+    await feature_repo.save(feature)
+
+    # Requisitos de 30,000 caracteres (antes truncados a 20,000)
+    large_req_md = "## Requisitos EARS\n" + ("- REQ: El sistema shall registrar logs detallados.\n" * 600)
+    assert len(large_req_md) > 25000
+    await requirement_repo.save(feature.id, large_req_md)
+
+    # Documento de descubrimiento de 12,000 caracteres (antes truncado a 8,000)
+    from kosmo.contracts.sdd.document import DocumentNode, RichTextDocument, SectionHeading
+
+    nodes = [
+        DocumentNode(
+            type="heading",
+            heading=SectionHeading(text="Visión", level=1, slug="vision"),
+            content="Inicio de la visión",
+        )
+    ]
+    for i in range(50):
+        nodes.append(
+            DocumentNode(
+                type="paragraph",
+                content=f"Detalle extendido de descubrimiento paso {i}: " + ("x" * 200),
+            )
+        )
+    large_doc = RichTextDocument(nodes=nodes)
+
+    await document_repo.save_discovery(project.id, large_doc)
+
+    uc = EvaluateConsistencyUseCase(
+        agent=StubConsistencyAgent(),
+        feature_repo=feature_repo,
+        requirement_repo=requirement_repo,
+        diagram_repo=diagram_repo,
+        document_repo=document_repo,
+    )
+
+    # Descubrimiento downstream
+    disc_artifacts = await uc._fetch_downstream_artifacts(SpecPhase.DESCUBRIMIENTO, project.id)
+    assert len(disc_artifacts) == 1
+    assert "[…contenido truncado…]" not in disc_artifacts[0].description
+    assert len(disc_artifacts[0].description) > 9000
+
+    # Requisitos downstream
+    req_artifacts = await uc._fetch_downstream_artifacts(SpecPhase.REQUISITOS, project.id)
+    assert len(req_artifacts) == 1
+    assert "[…contenido truncado…]" not in req_artifacts[0].description
+    assert len(req_artifacts[0].description) == len(large_req_md)
+
+    # Requisitos como fuente upstream
+    source_content = await uc._fetch_source_content(SpecPhase.REQUISITOS, project.id)
+    assert "[…contenido truncado…]" not in source_content
+    assert len(source_content) > 25000
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enrich_impact_concurrent_preloading_and_deduplication() -> None:
+    """Verifica que enrich_impact_items precargue features y requisitos concurrentemente y deduplique llamadas."""
+    from kosmo.application.consistency.enrich_impact import enrich_impact_items
+    from kosmo.contracts.ai.consistency import (
+        ArtifactAction,
+        ConsistencyEvaluationOutput,
+        ConsistencyStatus,
+    )
+
+    feature_repo = InMemoryFeatureRepository()
+    feat1 = _make_feature("feat_batch_1", "prj_batch", "Característica 1", number=1)
+    feat2 = _make_feature("feat_batch_2", "prj_batch", "Característica 2", number=2)
+    await feature_repo.save(feat1)
+    await feature_repo.save(feat2)
+
+    req_md1 = "### REQ-1.1 Paso 1\n\nEl sistema debe ejecutar paso 1.\n"
+    req_md2 = "### REQ-2.1 Paso 2\n\nEl sistema debe ejecutar paso 2.\n"
+
+    requirement_repo = InMemoryRequirementRepository()
+    await requirement_repo.save(FeatureId("feat_batch_1"), req_md1)
+    await requirement_repo.save(FeatureId("feat_batch_2"), req_md2)
+    diagram_repo = InMemoryActivityDiagramRepository()
+
+    original_by_id = feature_repo.by_id
+    by_id_calls: list[str] = []
+
+    async def spied_by_id(fid: FeatureId, *, for_update: bool = False):
+        by_id_calls.append(str(fid))
+        return await original_by_id(fid, for_update=for_update)
+
+    feature_repo.by_id = spied_by_id  # type: ignore[assignment]
+
+    result = ConsistencyEvaluationOutput(
+        report_id="cnr_batch",
+        status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
+        affected_artifact_ids=["feat_batch_1", "feat_batch_2", "feat_batch_1"],
+        actions=[
+            ArtifactAction(
+                artifact_id="feat_batch_1",
+                action="update",
+                rationale="Cambio 1",
+            ),
+            ArtifactAction(
+                artifact_id="feat_batch_2",
+                action="update",
+                rationale="Cambio 2",
+            ),
+        ],
+    )
+
+    items = await enrich_impact_items(
+        result,
+        SpecPhase.REQUISITOS,
+        SpecPhase.DESCUBRIMIENTO,
+        feature_repo,
+        requirement_repo,
+        diagram_repo,
+    )
+
+    # Solo debe haber consultado 2 veces por ID único a pesar de tener 3 IDs en affected_artifact_ids
+    assert len(by_id_calls) == 2
+    assert set(by_id_calls) == {"feat_batch_1", "feat_batch_2"}
+    # Los items enriquecidos preservan el orden y multiplicidad de affected_artifact_ids
+    assert len(items) == 3
+    assert items[0].target_id == "feat_batch_1"
+    assert items[1].target_id == "feat_batch_2"
+    assert items[2].target_id == "feat_batch_1"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enrich_impact_modelo_concurrent_preloading() -> None:
+    """Verifica que enrich_impact_items para modelo verifique existencia concurrentemente."""
+    from kosmo.application.consistency.enrich_impact import enrich_impact_items
+    from kosmo.contracts.ai.consistency import (
+        ArtifactAction,
+        ConsistencyEvaluationOutput,
+        ConsistencyStatus,
+    )
+    from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
+    from kosmo.contracts.sdd.ids import ActivityDiagramId
+
+    feature_repo = InMemoryFeatureRepository()
+    feat = _make_feature("feat_m1", "prj_m", "Modelo Feature", number=1)
+    await feature_repo.save(feat)
+
+    diagram_repo = InMemoryActivityDiagramRepository()
+    await diagram_repo.save(
+        DiagramaActividad(
+            id=ActivityDiagramId("feat_m1"),
+            feature_id=FeatureId("feat_m1"),
+            diagram_syntax="@startuml\nstart\nstop\n@enduml",
+        )
+    )
+    requirement_repo = InMemoryRequirementRepository()
+
+    result = ConsistencyEvaluationOutput(
+        report_id="cnr_m",
+        status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
+        affected_artifact_ids=["feat_m1"],
+        actions=[ArtifactAction(artifact_id="feat_m1", action="update", rationale="Cambio UML")],
+    )
+
+    items = await enrich_impact_items(
+        result,
+        SpecPhase.MODELO,
+        SpecPhase.REQUISITOS,
+        feature_repo,
+        requirement_repo,
+        diagram_repo,
+    )
+
+    assert len(items) == 1
+    assert items[0].artifact_type == "ActivityDiagram"
+    assert items[0].target_id == "feat_m1"

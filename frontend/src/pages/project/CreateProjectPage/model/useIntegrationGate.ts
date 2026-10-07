@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getIntegrationStatus } from '@/entities/integration';
+import { useAiConfigStore } from '@/entities/ai-config';
 
 export function useIntegrationGate() {
 	const router = useRouter();
 	const [isReady, setIsReady] = useState(false);
 	const [githubConnected, setGithubConnected] = useState(false);
 	const [railwayConnected, setRailwayConnected] = useState(false);
+	const fetchConfig = useAiConfigStore((s) => s.fetchConfig);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -18,10 +20,13 @@ export function useIntegrationGate() {
 				const [github, railway] = await Promise.all([
 					getIntegrationStatus('github'),
 					getIntegrationStatus('railway'),
+					fetchConfig(),
 				]);
 				if (cancelled) return;
 
-				if (!github.is_connected || !railway.is_connected) {
+				const currentConfig = useAiConfigStore.getState().config;
+
+				if (!currentConfig?.has_api_key || !github.is_connected || !railway.is_connected) {
 					router.replace('/onboarding');
 					return;
 				}
@@ -40,7 +45,7 @@ export function useIntegrationGate() {
 		return () => {
 			cancelled = true;
 		};
-	}, [router]);
+	}, [router, fetchConfig]);
 
 	return { isReady, githubConnected, railwayConnected };
 }

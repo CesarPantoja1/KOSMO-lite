@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import base64
+import contextlib
+import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any, Self, cast
 
 import httpx
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from kosmo.contracts.sdd.codegen import (
     OpenCodeClientPort,
@@ -44,10 +47,10 @@ class OpenCodeHttpClient(OpenCodeClientPort):
         server_username: str = "opencode",
         server_password: str | None = None,
         model: str | None = None,
-        timeout_seconds: float = 600.0,
-        connect_timeout_seconds: float = 10.0,
-        read_timeout_seconds: float = 300.0,
-        write_timeout_seconds: float = 30.0,
+        timeout_seconds: float = 900.0,
+        connect_timeout_seconds: float = 30.0,
+        read_timeout_seconds: float | None = 900.0,
+        write_timeout_seconds: float = 60.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -111,6 +114,30 @@ class OpenCodeHttpClient(OpenCodeClientPort):
         except Exception:
             return False
 
+    async def validate_model(self, provider: str, model: str) -> None:
+        """Fail before opening a session if the pinned OpenCode catalog lacks the user's model."""
+        try:
+            response = await self._client.get("/provider", headers=self._get_auth_headers(), timeout=30.0)
+            response.raise_for_status()
+            raw_data: object = response.json()
+            data: dict[str, Any] = cast(dict[str, Any], raw_data) if isinstance(raw_data, dict) else {}
+            raw_providers: object = data.get("all", [])
+            providers: list[object] = cast(list[object], raw_providers) if isinstance(raw_providers, list) else []
+        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+            raise OpenCodeClientError("No se pudo consultar el catálogo de modelos de OpenCode.") from exc
+        for entry in providers:
+            if isinstance(entry, dict):
+                provider_entry: dict[str, Any] = cast(dict[str, Any], entry)
+                if provider_entry.get("id") != provider:
+                    continue
+                models: object = provider_entry.get("models")
+                if isinstance(models, dict) and model in models:
+                    return
+        raise OpenCodeClientError(
+            f"El modelo '{model}' de {provider} no está disponible en OpenCode. "
+            "Selecciona otro modelo en Preferencias de IA."
+        )
+
     async def create_session(
         self,
         workspace_dir: str,
@@ -120,37 +147,47 @@ class OpenCodeHttpClient(OpenCodeClientPort):
         """Crea una nueva sesión en el servidor OpenCode para el workspace especificado."""
         headers = self._get_auth_headers()
         payload: dict[str, object] = {"title": title}
-        try:
-            response = await self._client.post(
-                "/session",
-                params={"directory": workspace_dir},
-                json=payload,
-                headers=headers,
-            )
-            if not response.is_success:
-                raise OpenCodeClientError(
-                    f"No se pudo iniciar la generación (HTTP {response.status_code}): {response.text}"
-                )
-            data: dict[str, Any] = response.json()
-            session_id = data.get("id") or data.get("session_id")
-            if not session_id:
-                raise OpenCodeClientError(f"La respuesta del asistente de generación es inválida: {data}")
 
-            resolved_dir = str(data.get("workspace_dir") or data.get("directory") or workspace_dir)
-            resolved_title = str(data.get("title") or title)
+        async for attempt in AsyncRetrying(
+            retry=retry_if_exception_type((httpx.ConnectError, httpx.TransportError)),
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=1, max=4),
+            reraise=True,
+        ):
+            with attempt:
+                try:
+                    response = await self._client.post(
+                        "/session",
+                        params={"directory": workspace_dir},
+                        json=payload,
+                        headers=headers,
+                    )
+                    if not response.is_success:
+                        raise OpenCodeClientError(
+                            f"No se pudo iniciar la generación (HTTP {response.status_code}): {response.text}"
+                        )
+                    data: dict[str, Any] = response.json()
+                    session_id = data.get("id") or data.get("session_id")
+                    if not session_id:
+                        raise OpenCodeClientError(f"La respuesta del asistente de generación es inválida: {data}")
 
-            return OpenCodeSession(
-                session_id=str(session_id),
-                workspace_dir=resolved_dir,
-                title=resolved_title,
-                created_at=datetime.now(UTC),
-            )
-        except OpenCodeClientError:
-            raise
-        except httpx.TimeoutException as exc:
-            raise OpenCodeTimeoutError(f"Tiempo de espera agotado al crear sesión OpenCode: {exc}") from exc
-        except httpx.HTTPError as exc:
-            raise OpenCodeConnectionError(f"Error HTTP al conectar con OpenCode: {exc}") from exc
+                    resolved_dir = str(data.get("workspace_dir") or data.get("directory") or workspace_dir)
+                    resolved_title = str(data.get("title") or title)
+
+                    return OpenCodeSession(
+                        session_id=str(session_id),
+                        workspace_dir=resolved_dir,
+                        title=resolved_title,
+                        created_at=datetime.now(UTC),
+                    )
+                except OpenCodeClientError:
+                    raise
+                except httpx.TimeoutException as exc:
+                    raise OpenCodeTimeoutError(f"Tiempo de espera agotado al crear sesión OpenCode: {exc}") from exc
+                except httpx.HTTPError as exc:
+                    raise OpenCodeConnectionError(f"Error HTTP al conectar con OpenCode: {exc}") from exc
+
+        raise OpenCodeConnectionError("No se pudo crear la sesión OpenCode tras reintentos")
 
     def _model_payload(self) -> dict[str, str] | None:
         """Convierte el modelo configurado (provider/model) al objeto que espera la API."""
@@ -247,7 +284,8 @@ class OpenCodeHttpClient(OpenCodeClientPort):
                     raw_path: object = part_dict.get("path") or file_obj.get("path")
                     if raw_path is not None:
                         path_str = str(raw_path)
-                        files.append(path_str)
+                        if path_str not in files:
+                            files.append(path_str)
                         content_val: object = (
                             part_dict.get("content") or part_dict.get("text") or file_obj.get("content")
                         )
@@ -274,6 +312,42 @@ class OpenCodeHttpClient(OpenCodeClientPort):
                         },
                         timestamp=datetime.now(UTC),
                     )
+                    raw_args = part_dict.get("args") or part_dict.get("parameters") or part_dict.get("input")
+                    if isinstance(raw_args, str) and raw_args.strip().startswith("{"):
+                        with contextlib.suppress(Exception):
+                            raw_args = json.loads(raw_args)
+                    args_dict: dict[str, Any] = cast(dict[str, Any], raw_args) if isinstance(raw_args, dict) else {}
+                    raw_path = (
+                        part_dict.get("path")
+                        or args_dict.get("path")
+                        or args_dict.get("filePath")
+                        or args_dict.get("file")
+                        or args_dict.get("target_file")
+                    )
+                    file_tools = (
+                        "write",
+                        "write_file",
+                        "edit",
+                        "edit_file",
+                        "patch",
+                        "apply_patch",
+                        "create_file",
+                        "save_file",
+                    )
+                    if raw_path and (tool_name.lower() in file_tools or "file" in tool_name.lower()):
+                        path_str = str(raw_path)
+                        if path_str not in files:
+                            files.append(path_str)
+                        content_val = args_dict.get("content") or args_dict.get("text") or args_dict.get("patch")
+                        yield OpenCodeEvent(
+                            event_type=OpenCodeEventType.FILE_EDIT,
+                            session_id=session_id,
+                            data={
+                                "path": path_str,
+                                "content": content_val,
+                            },
+                            timestamp=datetime.now(UTC),
+                        )
                 elif part_type == "text":
                     raw_text: object = part_dict.get("text")
                     text = str(raw_text or "").strip()
@@ -293,11 +367,22 @@ class OpenCodeHttpClient(OpenCodeClientPort):
             )
 
         except httpx.TimeoutException as exc:
+            detail = str(exc).strip()
+            msg = (
+                f"Tiempo de espera agotado al comunicar con OpenCode: {detail}"
+                if detail
+                else (
+                    f"Tiempo de espera agotado al comunicar con OpenCode "
+                    f"(tiempo límite: {self._read_timeout_seconds:.0f}s)"
+                    if self._read_timeout_seconds is not None
+                    else "Tiempo de espera agotado al comunicar con OpenCode"
+                )
+            )
             yield OpenCodeEvent(
                 event_type=OpenCodeEventType.ERROR,
                 session_id=session_id,
                 data={
-                    "error": f"Tiempo de espera agotado al comunicar con OpenCode: {exc}",
+                    "error": msg,
                     "timeout": True,
                 },
                 timestamp=datetime.now(UTC),

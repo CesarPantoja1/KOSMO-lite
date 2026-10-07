@@ -38,14 +38,14 @@ class LLMClient(Protocol):
         self,
         prompt: PromptTemplate,
         temperature: float = 0.3,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> LLMResponse: ...
 
     async def complete_json(
         self,
         prompt: PromptTemplate,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> LLMResponse: ...
 
     async def complete_typed[T](
@@ -53,7 +53,7 @@ class LLMClient(Protocol):
         prompt: PromptTemplate,
         output_type: type[T],
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> T: ...
 
     @property

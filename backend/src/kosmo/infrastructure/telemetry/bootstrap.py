@@ -2,7 +2,7 @@
 
 Es el único punto donde se conecta la telemetría: ``configure_telemetry`` se
 invoca en el ``lifespan`` para inicializar structlog y logfire, e
-``instrument_app`` adjunta la auto-instrumentación a FastAPI/SQLAlchemy/Redis
+``instrument_app`` adjunta la auto-instrumentación a SQLAlchemy/Redis
 una vez que los componentes IO están construidos.
 
 Ningún caso de uso depende de este módulo: la telemetría se observa a través
@@ -11,14 +11,18 @@ del API público en :mod:`kosmo.contracts.telemetry`.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import logfire
 import structlog
 from opentelemetry import trace
 from structlog.typing import EventDict, Processor, WrappedLogger
+
+from kosmo.contracts.telemetry import set_telemetry_provider
+from kosmo.infrastructure.telemetry.otel import OpenTelemetryProvider
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -80,17 +84,21 @@ def configure_telemetry(settings: Settings) -> None:
 
     _configure_structlog(settings)
     _configure_logfire(settings)
+    set_telemetry_provider(OpenTelemetryProvider())
 
 
 def instrument_prometheus(app: FastAPI) -> None:
-    """Instrumenta FastAPI con prometheus-fastapi-instrumentator antes del startup."""
+    """Instrumenta FastAPI con prometheus-fastapi-instrumentator antes del startup de manera idempotente."""
+    if getattr(app.state, "_kosmo_prometheus_instrumented", False):
+        return
     try:
         from prometheus_fastapi_instrumentator import (  # pyright: ignore[reportMissingImports]
             Instrumentator,  # pyright: ignore[reportUnknownVariableType]
         )
 
         Instrumentator().instrument(app).expose(app)  # pyright: ignore[reportUnknownMemberType]
-    except ImportError:
+        app.state._kosmo_prometheus_instrumented = True
+    except (ImportError, Exception):
         pass
 
 
@@ -100,10 +108,15 @@ def instrument_app(
     app: FastAPI,
     db_engine: AsyncEngine,
 ) -> None:
-    """Aplica auto-instrumentación a los componentes IO en lifespan."""
+    """Aplica auto-instrumentación a los componentes IO en lifespan de manera idempotente."""
 
     del settings
-    fastapi_kwargs: dict[str, Any] = {"capture_headers": False}
-    logfire.instrument_fastapi(app, **fastapi_kwargs)
-    logfire.instrument_sqlalchemy(engine=db_engine)
-    logfire.instrument_redis(capture_statement=False)
+    if getattr(app.state, "_kosmo_instrumented", False):
+        return
+
+    with contextlib.suppress(Exception):
+        logfire.instrument_sqlalchemy(engine=db_engine)
+    with contextlib.suppress(Exception):
+        logfire.instrument_redis(capture_statement=False)
+
+    app.state._kosmo_instrumented = True

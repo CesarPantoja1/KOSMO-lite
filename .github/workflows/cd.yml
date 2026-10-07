@@ -187,7 +187,6 @@ jobs:
     outputs:
       opencode_image: ${{ steps.images.outputs.opencode }}
       code_runner_image: ${{ steps.images.outputs.code_runner }}
-      preview_image: ${{ steps.images.outputs.preview }}
 
     steps:
       - name: Checkout merged source
@@ -204,7 +203,6 @@ jobs:
           {
             echo "opencode=${REGISTRY}/${owner}/kosmo-opencode:sha-${{ needs.wait-for-ci.outputs.candidate_sha }}"
             echo "code_runner=${REGISTRY}/${owner}/kosmo-code-runner:sha-${{ needs.wait-for-ci.outputs.candidate_sha }}"
-            echo "preview=${REGISTRY}/${owner}/kosmo-preview:sha-${{ needs.wait-for-ci.outputs.candidate_sha }}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
@@ -225,7 +223,6 @@ jobs:
         run: |
           docker buildx imagetools inspect "${{ steps.images.outputs.opencode }}"
           docker buildx imagetools inspect "${{ steps.images.outputs.code_runner }}"
-          docker buildx imagetools inspect "${{ steps.images.outputs.preview }}"
 
   deploy-production:
     name: Deploy Production
@@ -286,8 +283,7 @@ jobs:
             "KOSMO_WEB_IMAGE=${{ needs.build-frontend.outputs.web_image }}" \
             "KOSMO_API_IMAGE=${{ needs.build-backend.outputs.api_image }}" \
             "KOSMO_OPENCODE_IMAGE=${{ needs.build-opencode.outputs.opencode_image }}" \
-            "KOSMO_PREVIEW_IMAGE=${{ needs.build-opencode.outputs.preview_image }}" > "$work_dir/runtime.env"
-          printf '%s\n' "KOSMO_CODE_RUNNER_IMAGE=${{ needs.build-opencode.outputs.code_runner_image }}" >> "$work_dir/runtime.env"
+            "KOSMO_CODE_RUNNER_IMAGE=${{ needs.build-opencode.outputs.code_runner_image }}" > "$work_dir/runtime.env"
           chmod 600 "$work_dir/application.env" "$work_dir/runtime.env"
 
           # Staging below the destination keeps promotion as an atomic rename
@@ -355,6 +351,9 @@ jobs:
              cat application.env runtime.env > .env
              chmod 600 .env
              rm -f application.env runtime.env
+             if ! grep -q "^OPENCODE_LAUNCHER_TOKEN=." .env; then
+               printf "OPENCODE_LAUNCHER_TOKEN=%s\n" "$(openssl rand -hex 32)" >> .env
+             fi
              for key in DATABASE_URL REDIS_URL REDIS_PASSWORD FERNET_MASTER_KEY CORS_ALLOWED_ORIGINS GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET RAILWAY_CLIENT_ID RAILWAY_CLIENT_SECRET NEXT_PUBLIC_GITHUB_CLIENT_ID NEXT_PUBLIC_RAILWAY_CLIENT_ID NEXT_PUBLIC_DOMAIN_APP; do
                if ! grep -q "^${key}=." .env; then
                  echo "Missing required authentication variable: ${key}" >&2
@@ -374,13 +373,13 @@ jobs:
                fi
              done
              grep -q '^CLOUDFLARE_TUNNEL_TOKEN=.' .env
-             for key in KOSMO_WEB_IMAGE KOSMO_API_IMAGE KOSMO_OPENCODE_IMAGE KOSMO_CODE_RUNNER_IMAGE KOSMO_PREVIEW_IMAGE; do
+             for key in KOSMO_WEB_IMAGE KOSMO_API_IMAGE KOSMO_OPENCODE_IMAGE KOSMO_CODE_RUNNER_IMAGE; do
                if ! grep -q "^${key}=." .env; then
                  echo "Missing generated deployment variable: ${key}" >&2
                  exit 1
                fi
              done
-             for key in OPENCODE_SERVER_PASSWORD OPENCODE_MODEL DEEPSEEK_API_KEY CODE_RUNNER_TOKEN PREVIEW_PUBLIC_HOST_SUFFIX; do
+             for key in CODE_RUNNER_TOKEN OPENCODE_LAUNCHER_TOKEN; do
                if ! grep -q "^${key}=." .env; then
                  echo "Missing required code-generation variable: ${key}" >&2
                  exit 1
@@ -406,7 +405,10 @@ jobs:
                -v "$PWD/secrets/jwt_private.pem:/run/kosmo-secrets/jwt_private.pem:ro" \
                -v "$PWD/secrets/jwt_public.pem:/run/kosmo-secrets/jwt_public.pem:ro" \
                --entrypoint alembic "${{ needs.build-backend.outputs.api_image }}" upgrade head
-             docker compose -p kosmo -f compose.yaml up -d
+             docker compose -p kosmo -f compose.yaml up -d --remove-orphans
+             # Health only checks Docker access; verify the launcher can actually
+             # traverse the 0750 project workspace before declaring deployment healthy.
+             docker exec kosmo-opencode-launcher node -e "require(\"node:fs\").readdirSync(\"/workspaces\")"
              # Reload the transferred Nginx configuration after app containers
              # have been recreated. --no-deps prevents an unnecessary restart
              # of frontend or backend.
@@ -426,17 +428,20 @@ jobs:
                docker compose -p kosmo -f compose.yaml logs --tail=100 backend
                exit 1
              fi
+             # Exercise the full create → secret-stdin → OpenCode health path
+             # with a temporary project and fake key; no prompt is submitted.
+             docker exec kosmo-opencode-launcher node /usr/local/bin/opencode-smoke.js
              for attempt in $(seq 1 15); do
                if docker exec kosmo-nginx wget -q -O /dev/null \
                     --header="Host: kosmo.cespan.dev" http://127.0.0.1/ && \
                   docker exec kosmo-nginx wget -q -O /dev/null \
-                    --header="Host: kosmo.cespan.dev" http://127.0.0.1/api/v1/openapi.json; then
+                    --header="Host: kosmo.cespan.dev" http://127.0.0.1/api/v1/ai-config/providers; then
                  docker compose -p kosmo -f compose.yaml ps
                  exit 0
                fi
                sleep 2
              done
-             docker compose -p kosmo -f compose.yaml logs --tail=100 nginx backend opencode
+             docker compose -p kosmo -f compose.yaml logs --tail=100 nginx backend opencode-launcher
              exit 1
              '
 
@@ -455,7 +460,7 @@ jobs:
 
           for endpoint in \
             'https://kosmo.cespan.dev/' \
-            'https://kosmo.cespan.dev/api/v1/openapi.json'; do
+            'https://kosmo.cespan.dev/api/v1/ai-config/providers'; do
             echo "Checking ${endpoint}"
             curl --fail --show-error --silent --location \
               --retry 12 --retry-all-errors --retry-delay 5 --max-time 20 \

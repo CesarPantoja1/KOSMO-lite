@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/entities/user';
 import { AiConfigTab } from './AiConfigTab';
 import { CuentaTab } from './CuentaTab';
@@ -11,10 +11,20 @@ type TabType = 'cuenta' | 'ia';
 function ProfilePage() {
 	const user = useAuthStore((state) => state.user);
 	const [activeTab, setActiveTab] = useState<TabType>('cuenta');
+	const hasHandledRef = useRef(false);
+
+	const isOAuthPopup =
+		typeof window !== 'undefined' &&
+		Boolean(window.opener && window.opener !== window) &&
+		(() => {
+			const params = new URLSearchParams(window.location.search);
+			return Boolean(params.get('code') || params.get('error') || params.get('error_description'));
+		})();
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		if (!window.opener || window.opener === window) return;
+		if (hasHandledRef.current) return;
 
 		const params = new URLSearchParams(window.location.search);
 		const code = params.get('code');
@@ -23,6 +33,7 @@ function ProfilePage() {
 		const provider = state.toLowerCase().startsWith('railway') ? 'railway' : 'github';
 
 		if (code || error) {
+			hasHandledRef.current = true;
 			const type = provider === 'railway' ? 'railway-oauth-code' : 'github-oauth-code';
 			try {
 				if (code) {
@@ -39,6 +50,14 @@ function ProfilePage() {
 			window.close();
 		}
 	}, []);
+
+	if (isOAuthPopup) {
+		return (
+			<div className='flex h-screen w-full items-center justify-center bg-neutral-50'>
+				<p className='text-sm text-neutral-500'>Completando autorización…</p>
+			</div>
+		);
+	}
 
 	return (
 		<>

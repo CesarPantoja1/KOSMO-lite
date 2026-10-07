@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import Request
 
+from kosmo.application.integrations.delete_deployment import DeleteDeploymentUseCase
 from kosmo.application.integrations.execute_ephemeral_validation import (
     ExecuteEphemeralValidationUseCase,
 )
@@ -49,6 +50,10 @@ def get_link_deployment_platform_use_case(request: Request) -> LinkDeploymentPla
 
 def get_handle_deployment_failure_use_case(request: Request) -> HandleDeploymentFailureUseCase:
     return get_container(request).integrations.handle_deployment_failure
+
+
+def get_delete_deployment_use_case(request: Request) -> DeleteDeploymentUseCase:
+    return get_container(request).integrations.delete_deployment
 
 
 def get_deployment_worker(request: Request) -> DeploymentPollingWorker:

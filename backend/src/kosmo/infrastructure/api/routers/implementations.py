@@ -1,10 +1,9 @@
 import json
-import re
 from collections.abc import AsyncGenerator
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sse_starlette.sse import EventSourceResponse
 
 from kosmo.application.codegen.generate_feature_implementation import (
@@ -16,9 +15,9 @@ from kosmo.contracts.sdd.codegen import FeatureImplementation
 from kosmo.contracts.sdd.ids import FeatureId, ImplementationId, ProjectId
 from kosmo.domain.codegen.path_safety import UnsafePathError, ensure_safe_path
 from kosmo.infrastructure.api.composition import AppContainer
-from kosmo.infrastructure.api.dependencies.auth import get_principal
+from kosmo.infrastructure.api.dependencies.auth import get_principal, require_project_owner
 from kosmo.infrastructure.api.dependencies.container import get_container
-from kosmo.infrastructure.api.implementation_broker import broker
+from kosmo.infrastructure.api.dependencies.rate_limit import ProjectGenerationRateLimiter
 from kosmo.infrastructure.api.schemas import (
     GenerateImplementationRequest,
     GenerateImplementationResponse,
@@ -32,12 +31,12 @@ _log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/implementations", tags=["Implementations"])
 
+_generation_rate_limiter = ProjectGenerationRateLimiter()
+
 
 async def _require_project_owner(container: AppContainer, project_id: ProjectId, principal: Principal) -> None:
     """Hide cross-tenant resources behind the same 404 contract as absent ones."""
-    project = await container.repos.projects.by_id(project_id)
-    if project is None or str(project.owner_id) != principal.subject:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+    await require_project_owner(container, project_id, principal)
 
 
 async def _owned_implementation(
@@ -64,6 +63,7 @@ async def _owned_implementation(
 )
 async def start_implementation(
     request: GenerateImplementationRequest,
+    http_request: Request,
     principal: Annotated[Principal, Depends(get_principal)],
     container: Annotated[AppContainer, Depends(get_container)],
 ) -> GenerateImplementationResponse:
@@ -75,17 +75,25 @@ async def start_implementation(
     if feature is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Característica no encontrada")
     await _require_project_owner(container, feature.project_id, principal)
+    await _generation_rate_limiter(http_request, project_id=str(feature.project_id))
 
     input_data = GenerateFeatureImplementationInput(
         feature_id=feature_id_obj,
         max_retries=request.max_retries,
     )
 
-    broker.start_implementation(
+    broker_instance = container.codegen.implementation_broker
+
+    # Evitar doble generación concurrente (doble clic)
+    if broker_instance.is_running(impl_id):
+        return GenerateImplementationResponse(implementation_id=impl_id)
+
+    broker_instance.start_implementation(
         implementation_id=impl_id,
         use_case=use_case,
         input_data=input_data,
         project_id=str(feature.project_id),
+        user_id=principal.subject,
     )
 
     return GenerateImplementationResponse(implementation_id=impl_id)
@@ -104,81 +112,34 @@ async def get_implementation_by_feature(
     principal: Annotated[Principal, Depends(get_principal)],
     container: Annotated[AppContainer, Depends(get_container)],
 ) -> ImplementationRecordResponse:
-    impl = await container.repos.implementations.by_feature_id(FeatureId(feature_id))
-    if impl is None:
+    uc = container.codegen.get_implementation_record
+    if uc is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="El servicio de consulta de implementación no está disponible",
+        )
+    result = await uc.execute(FeatureId(feature_id))
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No se encontró una implementación para la característica {feature_id}",
         )
-    await _require_project_owner(container, impl.project_id, principal)
+    await _require_project_owner(container, result.implementation.project_id, principal)
 
-    screens_count = sum(
-        1
-        for f in impl.generated_files
-        if f.replace("\\", "/").endswith("page.tsx")
-        or "/components/" in f.replace("\\", "/")
-        or f.replace("\\", "/").startswith("src/components/")
-    )
-    if screens_count == 0 and impl.generated_files:
-        screens_count = max(1, len(impl.generated_files) // 2)
-
-    requirements_count = 0
-    req_matches: set[str] = set()
-    try:
-        req_repo = getattr(container.repos, "requirements", None)
-        if req_repo is not None:
-            req_markdown = await req_repo.by_feature_id(impl.feature_id)
-            if req_markdown:
-                req_matches = set(re.findall(r"REQ-\d+\.\d+", req_markdown, flags=re.IGNORECASE))
-                requirements_count = len(req_matches)
-    except Exception:
-        requirements_count = 0
-
-    if impl.last_validation is not None and impl.last_validation.steps:
-        validations_passed = sum(1 for s in impl.last_validation.steps if s.success)
-        validations_total = len(impl.last_validation.steps)
-    else:
-        validations_passed = 4
-        validations_total = 4
-
-    traceability_edges_count = 0
-    try:
-        trace_repo = getattr(container.repos, "traceability", None)
-        if trace_repo is not None:
-            impact = await trace_repo.get_impact(str(impl.feature_id))
-            traceability_edges_count += len(impact.get("upstream", [])) + len(impact.get("downstream", []))
-            for req_code in req_matches:
-                req_key = f"{impl.feature_id}:{req_code.upper()}"
-                req_impact = await trace_repo.get_impact(req_key)
-                traceability_edges_count += len(req_impact.get("upstream", [])) + len(req_impact.get("downstream", []))
-    except Exception:
-        traceability_edges_count = 0
-
-    if traceability_edges_count == 0 and (requirements_count > 0 or impl.generated_files):
-        traceability_edges_count = max(1, requirements_count + len(impl.generated_files))
-
-    features_count = 1
-    try:
-        project_impls = await container.repos.implementations.list_by_project(impl.project_id)
-        features_count = sum(1 for i in project_impls if getattr(i.status, "value", i.status) == "implemented") or 1
-    except Exception:
-        features_count = 1
-
-    technologies = ["Next.js", "TypeScript", "Bootstrap 5", "Vitest"]
-
+    impl = result.implementation
     return ImplementationRecordResponse(
         implementation_id=str(impl.id),
         feature_id=str(impl.feature_id),
         project_id=str(impl.project_id),
         status=str(getattr(impl.status, "value", impl.status)),
         generated_files=list(impl.generated_files),
-        features_count=features_count,
-        screens_count=screens_count,
-        requirements_count=requirements_count,
-        validations_passed=validations_passed,
-        validations_total=validations_total,
-        traceability_edges_count=traceability_edges_count,
-        technologies=technologies,
+        features_count=result.features_count,
+        screens_count=result.screens_count,
+        requirements_count=result.requirements_count,
+        validations_passed=result.validations_passed,
+        validations_total=result.validations_total,
+        traceability_edges_count=result.traceability_edges_count,
+        technologies=list(result.technologies),
         updated_at=impl.updated_at,
     )
 
@@ -193,8 +154,13 @@ async def stream_implementation_events(
     principal: Annotated[Principal, Depends(get_principal)],
     container: Annotated[AppContainer, Depends(get_container)],
 ) -> EventSourceResponse:
+    broker_instance = container.codegen.implementation_broker
     implementation = await container.repos.implementations.by_id(ImplementationId(implementation_id))
-    project_id = implementation.project_id if implementation is not None else broker.project_id_for(implementation_id)
+    if implementation is not None:
+        project_id = implementation.project_id
+    else:
+        project_id = await broker_instance.get_project_id(implementation_id)
+
     if project_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Implementación no encontrada")
     await _require_project_owner(container, ProjectId(project_id), principal)
@@ -202,7 +168,7 @@ async def stream_implementation_events(
     # El broker devuelve un AsyncGenerator[OpenCodeEvent, None]
     # SseEventSourceResponse itera sobre él y lo expone como Server-Sent Events.
     async def event_publisher() -> AsyncGenerator[dict[str, Any]]:
-        async for event in broker.subscribe(implementation_id):
+        async for event in broker_instance.subscribe(implementation_id):
             event_type = getattr(event.event_type, "value", str(event.event_type))
             yield {
                 "event": event_type,

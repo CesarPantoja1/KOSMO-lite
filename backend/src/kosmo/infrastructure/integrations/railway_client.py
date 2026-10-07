@@ -813,7 +813,12 @@ class RailwayHttpClient(DeploymentProviderPort):
         except httpx.RequestError as exc:
             raise DeploymentApiError(f"Error de red al conectar con Railway: {exc}") from exc
 
-    async def trigger_deployment(self, token: str, service_id: str) -> None:
+    async def trigger_deployment(
+        self,
+        token: str,
+        service_id: str,
+        commit_sha: str | None = None,
+    ) -> None:
         """Dispara la construcción y despliegue del servicio en Railway.
 
         Primero consulta el environmentId del servicio (requerido por la API de Railway).
@@ -874,18 +879,40 @@ class RailwayHttpClient(DeploymentProviderPort):
 
                 if environment_id:
                     gql_deploy = """
-                    mutation ServiceInstanceDeployV2($serviceId: String!, $environmentId: String!) {
-                        serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId)
+                    mutation ServiceInstanceDeployV2(
+                        $serviceId: String!
+                        $environmentId: String!
+                        $commitSha: String
+                    ) {
+                        serviceInstanceDeployV2(
+                            serviceId: $serviceId
+                            environmentId: $environmentId
+                            commitSha: $commitSha
+                        )
                     }
                     """
                     variables: dict[str, object] = {"serviceId": service_id, "environmentId": environment_id}
+                    if commit_sha:
+                        variables["commitSha"] = commit_sha
                 else:
                     gql_deploy = """
-                    mutation ServiceInstanceDeploy($serviceId: String!) {
-                        serviceInstanceDeploy(serviceId: $serviceId)
+                    mutation ServiceInstanceDeploy(
+                        $serviceId: String!
+                        $commitSha: String
+                        $latestCommit: Boolean
+                    ) {
+                        serviceInstanceDeploy(
+                            serviceId: $serviceId
+                            commitSha: $commitSha
+                            latestCommit: $latestCommit
+                        )
                     }
                     """
                     variables = {"serviceId": service_id}
+                    if commit_sha:
+                        variables["commitSha"] = commit_sha
+                    else:
+                        variables["latestCommit"] = True
 
                 try:
                     await self._execute_graphql(token, gql_deploy, variables)
@@ -896,12 +923,30 @@ class RailwayHttpClient(DeploymentProviderPort):
                         return
                     if "serviceinstancedeployv2" in gql_deploy.lower() and environment_id:
                         gql_fallback = """
-                        mutation ServiceInstanceDeploy($serviceId: String!, $environmentId: String!) {
-                            serviceInstanceDeploy(serviceId: $serviceId, environmentId: $environmentId)
+                        mutation ServiceInstanceDeploy(
+                            $serviceId: String!
+                            $environmentId: String!
+                            $commitSha: String
+                            $latestCommit: Boolean
+                        ) {
+                            serviceInstanceDeploy(
+                                serviceId: $serviceId
+                                environmentId: $environmentId
+                                commitSha: $commitSha
+                                latestCommit: $latestCommit
+                            )
                         }
                         """
+                        fallback_vars: dict[str, object] = {
+                            "serviceId": service_id,
+                            "environmentId": environment_id,
+                        }
+                        if commit_sha:
+                            fallback_vars["commitSha"] = commit_sha
+                        else:
+                            fallback_vars["latestCommit"] = True
                         with contextlib.suppress(Exception):
-                            await self._execute_graphql(token, gql_fallback, variables)
+                            await self._execute_graphql(token, gql_fallback, fallback_vars)
                             return
                     raise
                 return
@@ -918,6 +963,8 @@ class RailwayHttpClient(DeploymentProviderPort):
         # Fallback REST — solo cuando GraphQL no está disponible (HTTP 404 en /graphql/v2 y /graphql)
         headers = self._headers_for_token(token)
         payload: dict[str, object] = {"service_id": service_id}
+        if commit_sha:
+            payload["commit_sha"] = commit_sha
 
         try:
             response = await self._client.post(
@@ -1032,7 +1079,17 @@ class RailwayHttpClient(DeploymentProviderPort):
                                     if domain_obj.get("domain"):
                                         public_url = f"https://{domain_obj['domain']}"
 
-                    return (status, public_url, None)
+                    build_logs_url: str | None = None
+                    if status == DeploymentStatus.FAILED and project_id:
+                        dep_id = str(latest_dep.get("id") or "")
+                        if dep_id:
+                            build_logs_url = (
+                                f"https://railway.com/project/{project_id}/service/{service_id}?id={dep_id}"
+                            )
+                        else:
+                            build_logs_url = f"https://railway.com/project/{project_id}/service/{service_id}"
+
+                    return (status, public_url, build_logs_url)
                 return (DeploymentStatus.NOT_CREATED, None, None)
         except (
             DeploymentAuthenticationError,

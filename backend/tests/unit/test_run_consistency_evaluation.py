@@ -272,3 +272,98 @@ async def test_run_evaluation_skips_when_no_target_artifacts() -> None:
     # Assert
     assert evaluator.calls == []
     assert await evaluations.list_unresolved(ProjectId("prj_01"), SpecPhase.CARACTERISTICAS) == []
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_evaluation_propagates_user_context_from_payload() -> None:
+    from kosmo.contracts.auth.context import current_user_id
+
+    captured_user_ids: list[str | None] = []
+
+    class _ContextSpyEvaluator:
+        async def evaluate(self, **_kwargs: Any) -> ConsistencyEvaluationOutput:
+            captured_user_ids.append(current_user_id.get())
+            return ConsistencyEvaluationOutput(report_id="rpt_ctx", status=ConsistencyStatus.ANALIZADO_SIN_IMPACTO)
+
+    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    payload = _payload()
+    payload["user_id"] = "usr_explicit_123"
+
+    assert current_user_id.get() is None
+    await run_consistency_evaluation(
+        payload,
+        project_repo=projects,
+        feature_repo=features,
+        requirement_repo=requirements,
+        diagram_repo=diagrams,
+        document_repo=documents,
+        evaluator=_ContextSpyEvaluator(),  # type: ignore[reportArgumentType]
+        evaluation_repo=evaluations,
+    )
+
+    assert captured_user_ids == ["usr_explicit_123"]
+    assert current_user_id.get() is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_evaluation_falls_back_to_project_owner_id() -> None:
+    from kosmo.contracts.auth.context import current_user_id
+
+    captured_user_ids: list[str | None] = []
+
+    class _ContextSpyEvaluator:
+        async def evaluate(self, **_kwargs: Any) -> ConsistencyEvaluationOutput:
+            captured_user_ids.append(current_user_id.get())
+            return ConsistencyEvaluationOutput(report_id="rpt_ctx", status=ConsistencyStatus.ANALIZADO_SIN_IMPACTO)
+
+    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    payload = _payload()
+    # No user_id in payload, project.owner_id is usr_01
+    assert current_user_id.get() is None
+
+    await run_consistency_evaluation(
+        payload,
+        project_repo=projects,
+        feature_repo=features,
+        requirement_repo=requirements,
+        diagram_repo=diagrams,
+        document_repo=documents,
+        evaluator=_ContextSpyEvaluator(),  # type: ignore[reportArgumentType]
+        evaluation_repo=evaluations,
+    )
+
+    assert captured_user_ids == ["usr_01"]
+    assert current_user_id.get() is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_evaluation_handles_analisis_fallido_status() -> None:
+    class _FailedStatusEvaluator:
+        async def evaluate(self, **_kwargs: Any) -> ConsistencyEvaluationOutput:
+            return ConsistencyEvaluationOutput(
+                report_id="rpt_fail",
+                status=ConsistencyStatus.ANALISIS_FALLIDO,
+                failure_reason="API key inválida o cuota agotada",
+            )
+
+    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    payload = _payload()
+
+    await run_consistency_evaluation(
+        payload,
+        project_repo=projects,
+        feature_repo=features,
+        requirement_repo=requirements,
+        diagram_repo=diagrams,
+        document_repo=documents,
+        evaluator=_FailedStatusEvaluator(),  # type: ignore[reportArgumentType]
+        evaluation_repo=evaluations,
+    )
+
+    rows = await evaluations.list_unresolved(ProjectId("prj_01"), SpecPhase.CARACTERISTICAS)
+    assert len(rows) == 1
+    assert rows[0].status == ConsistencyEvaluationStatus.FAILED
+    assert "API key inválida" in (rows[0].failure_reason or "")

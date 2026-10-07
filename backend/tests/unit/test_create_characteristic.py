@@ -200,3 +200,35 @@ async def test_create_characteristic_rejects_when_inconsistent_with_discovery() 
     assert "alcance" in output.inconsistency_reason.lower()
     saved = await repository.list_by_project(ProjectId("prj_guard"))
     assert saved == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_create_characteristic_emits_warning_on_capability_overlap() -> None:
+    repository: Any = InMemoryFeatureRepository()
+    use_case = CreateCharacteristicUseCase(feature_repo=repository)
+    project_id = ProjectId("prj_overlap")
+
+    await repository.save(
+        Feature(
+            id=FeatureId("feat_1"),
+            number=1,
+            title="Registro de usuarios",
+            slug="registro-de-usuarios",
+            description="Permite registrar nuevos usuarios con verificacion y datos personales",
+            project_id=project_id,
+        )
+    )
+
+    output = await use_case.execute(
+        CreateCharacteristicInput(
+            project_id=project_id,
+            title="Aceptar terminos y condiciones",
+            description="Confirmacion de politicas y consentimiento para registro de usuarios",
+        )
+    )
+
+    assert output.is_saved is True
+    assert output.characteristic is not None
+    assert len(output.warnings) > 0
+    assert any("solapamiento" in w.lower() or "sub-capacidad" in w.lower() for w in output.warnings)

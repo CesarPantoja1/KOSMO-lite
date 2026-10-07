@@ -65,11 +65,16 @@ services:
       RAILWAY_CLIENT_SECRET: ${RAILWAY_CLIENT_SECRET:-}
 
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-kosmo}:${POSTGRES_PASSWORD:-kosmo}@postgres:5432/${POSTGRES_DB:-kosmo_dev}}
-      REDIS_URL: redis://redis:6379/0
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-60}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-40}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-kosmo_dev_redis_secret}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-kosmo_dev_redis_secret}@redis:6379/0
+      REDIS_MAX_CONNECTIONS: ${REDIS_MAX_CONNECTIONS:-150}
+      LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-100}
 
       JWT_PRIVATE_KEY_PATH: /tmp/kosmo-secrets/jwt_private.pem
       JWT_PUBLIC_KEY_PATH: /tmp/kosmo-secrets/jwt_public.pem
-      FERNET_MASTER_KEY: ${FERNET_MASTER_KEY:-qn9GZmTM--RH5MVh3kLmyS-oeHYCmnYCVPW9BRFLuik=}
+      FERNET_MASTER_KEY: ${FERNET_MASTER_KEY}
       JWT_ALGORITHM: RS256
       JWT_ISSUER: ${JWT_ISSUER:-kosmo}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-kosmo-api}
@@ -89,7 +94,10 @@ services:
 
       OPENCODE_BASE_URL: http://opencode:4096
       OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-kosmo-dev-password}
-      OPENCODE_MODEL: ${OPENCODE_MODEL:-deepseek/deepseek-v4-flash}
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-deepseek/deepseek-flash}
+      OPENCODE_TIMEOUT_SECONDS: ${OPENCODE_TIMEOUT_SECONDS:-900.0}
+      OPENCODE_READ_TIMEOUT_SECONDS: ${OPENCODE_READ_TIMEOUT_SECONDS:-900.0}
+      OPENCODE_CONNECT_TIMEOUT_SECONDS: ${OPENCODE_CONNECT_TIMEOUT_SECONDS:-30.0}
       KOSMO_WORKSPACES_DIR: /workspaces
       KOSMO_MCP_BASE_URL: ${KOSMO_MCP_BASE_URL:-http://backend:8000/mcp}
 
@@ -137,6 +145,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-${LLM_API_KEY:-}}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENCODE_PERMISSION: '{"read":{"*":"allow"},"edit":{"*":"allow"},"bash":"deny","external_directory":"deny","websearch":"allow"}'
     volumes:
       - kosmo_workspaces:/workspaces
     # Configura el password del servidor (clave server.password), el modelo LLM y
@@ -145,42 +154,24 @@ services:
     command: >
       sh -c 'npm install -g --prefix /home/node/opencode opencode-ai@latest &&
             mkdir -p /home/node/.config/opencode &&
-            printf "{\"server\":{\"password\":\"%s\",\"model\":\"deepseek/deepseek-v4-flash\"}}\n" "$${OPENCODE_SERVER_PASSWORD}" > /home/node/.config/opencode/opencode.json &&
+            printf "{\"server\":{\"password\":\"%s\",\"model\":\"deepseek/deepseek-flash\"},\"permission\":{\"read\":{\"*\":\"allow\"},\"edit\":{\"*\":\"allow\"},\"bash\":\"deny\",\"external_directory\":\"deny\",\"websearch\":\"allow\"}}\n" "$${OPENCODE_SERVER_PASSWORD}" > /home/node/.config/opencode/opencode.json &&
             export PATH=/home/node/opencode/bin:$$PATH &&
             opencode serve --hostname 0.0.0.0 --port 4096'
-    restart: unless-stopped
-
-  # Preview: un servidor por proyecto activo (sigue los markers de
-  # /workspaces/.preview-active que escribe el backend tras cada implementación
-  # exitosa). Cada proyecto obtiene un puerto propio del rango.
-  preview:
-    image: node:22
-    container_name: kosmo-preview
-    init: true
-    user: '1000:1000'
-    ports:
-      - '${PREVIEW_PORTS:-3001-3016}:3000-3015'
-    environment:
-      HOME: /home/node
-      CONTAINER_BASE: '3000'
-      HOST_BASE: '3001'
-      # Polling de archivos: sin esto, next dev no detecta borrados/creaciones
-      # en volúmenes Docker Desktop y sirve páginas obsoletas.
-      WATCHPACK_USE_POLLING: 'true'
-      CHOKIDAR_USEPOLLING: 'true'
-    volumes:
-      - kosmo_workspaces:/workspaces
-      - ./docker/preview/run.sh:/run-preview.sh:ro
-    command: ['sh', '/run-preview.sh']
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: kosmo-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-kosmo_dev_redis_secret}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --appendfsync everysec --requirepass "$$REDIS_PASSWORD"
     ports:
       - '${REDIS_PORT:-6379}:6379'
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -190,6 +181,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     container_name: kosmo-postgres
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-kosmo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kosmo}

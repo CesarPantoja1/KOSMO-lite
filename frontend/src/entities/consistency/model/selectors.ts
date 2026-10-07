@@ -4,12 +4,14 @@ export const CONSISTENCY_PHASE_ORDER: ConsistencyTargetPhase[] = [
 	'features',
 	'requirements',
 	'model',
+	'implementation',
 ];
 
 export const CONSISTENCY_REVIEW_ROUTES: Record<ConsistencyTargetPhase, string> = {
 	features: '/proyecto/caracteristicas/consistencia',
 	requirements: '/proyecto/requisitos/consistencia',
 	model: '/proyecto/modelo/consistencia',
+	implementation: '/proyecto/codigo/consistencia',
 };
 
 export function sumPhaseStatus(

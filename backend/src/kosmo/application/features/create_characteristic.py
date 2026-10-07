@@ -10,6 +10,7 @@ from kosmo.contracts.llm.ports import LLMClient, PromptTemplate
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import DocumentRepository, FeatureRepository
+from kosmo.domain.codegen.integration_rules import detect_capability_overlap
 from kosmo.domain.sdd.document_converters import document_to_markdown, slugify_spanish
 from kosmo.domain.sdd.id_generator import IdGenerator
 
@@ -17,49 +18,57 @@ _log = structlog.get_logger(__name__)
 
 _VALIDATE_SYSTEM_PROMPT = (
     "Eres un analista estricto de trazabilidad de software.\n"
-    "Tu tarea es analizar un documento de Descubrimiento y una nueva caracteristica "
+    "Tu tarea es analizar un documento de Descubrimiento y una nueva característica "
     "propuesta, realizando DOS tareas en una sola respuesta:\n\n"
     "## 1. DERIVA EL ORIGEN\n\n"
-    "Identifica las 2-3 secciones MAS ESPECIFICAS del Descubrimiento que fundamentan "
-    "esta caracteristica. Debes ser preciso y concreto.\n\n"
+    "Identifica las 2-3 secciones MÁS ESPECÍFICAS del Descubrimiento que fundamentan "
+    "esta característica. Debes ser preciso y concreto.\n\n"
     "REGLAS:\n"
-    "- MAXIMO 3 secciones. NO enumeres todas las secciones del documento. Si la "
-    "caracteristica se relaciona con muchas, selecciona solo las MAS ESPECIFICAS.\n"
-    "- Cuando sea posible, cita el contenido concreto de la seccion (ej: 'la regla "
+    "- MÁXIMO 3 secciones. NO enumeres todas las secciones del documento. Si la "
+    "característica se relaciona con muchas, selecciona solo las MÁS ESPECÍFICAS.\n"
+    "- Cuando sea posible, cita el contenido concreto de la sección (ej: 'la regla "
     "de precios en moneda local definida en Reglas de negocio').\n"
-    "- Si la caracteristica NO tiene relacion semantica real con ninguna seccion, "
-    "usa EXACTAMENTE: 'Sin relacion directa con las secciones del descubrimiento.' "
-    "y DEBES marcar is_consistent=false explicando por que no encaja.\n"
+    "- Si la característica NO tiene relación semántica real con ninguna sección, "
+    "usa EXACTAMENTE: 'Sin relación directa con las secciones del descubrimiento.' "
+    "y DEBES marcar is_consistent=false explicando por qué no encaja.\n"
     "- No uses la palabra 'Derivado de' al inicio. Usa un formato descriptivo.\n\n"
     "EJEMPLOS BUENOS:\n"
-    "- 'Regla de calculo de impuestos en Reglas de negocio y Actor Administrador en Actores.'\n"
-    "- 'Meta Reduccion de errores en Metas del producto y la descripcion del problema "
+    "- 'Regla de cálculo de impuestos en Reglas de negocio y Actor Administrador en Actores.'\n"
+    "- 'Meta Reducción de errores en Metas del producto y la descripción del problema "
     "de errores manuales en Espacio del problema.'\n"
-    "- 'Sin relacion directa con las secciones del descubrimiento.'\n\n"
+    "- 'Sin relación directa con las secciones del descubrimiento.'\n\n"
     "EJEMPLOS MALOS (NUNCA hagas esto):\n"
-    "- 'Derivado de Actores, Propuesta de valor, Metas, Reglas de negocio, Vision y Alcance.' "
-    "(demasiado generico, no aporta trazabilidad real)\n"
+    "- 'Derivado de Actores, Propuesta de valor, Metas, Reglas de negocio, Visión y Alcance.' "
+    "(demasiado genérico, no aporta trazabilidad real)\n"
     "- 'Derivado del descubrimiento.' (no especifica secciones)\n\n"
     "## 2. VERIFICA COHERENCIA\n\n"
-    "Determina si la caracteristica es CONSISTENTE con el contenido de TODAS las "
-    "secciones del Descubrimiento. Se EXIGENTE:\n\n"
-    "- Si la caracteristica introduce conceptos, tecnologias, actores o reglas que "
-    "NO aparecen en ninguna seccion del descubrimiento, NO es consistente.\n"
-    "- Si la caracteristica contradice una regla de negocio explicita, NO es "
+    "Determina si la característica es CONSISTENTE con el contenido de TODAS las "
+    "secciones del Descubrimiento. Sé EXIGENTE:\n\n"
+    "- Si la característica introduce conceptos, tecnologías, actores o reglas que "
+    "NO aparecen en ninguna sección del descubrimiento, NO es consistente.\n"
+    "- Si la característica contradice una regla de negocio explícita, NO es "
     "consistente.\n"
-    "- Si la caracteristica amplia el alcance mas alla de lo declarado, NO es "
+    "- Si la característica amplía el alcance más allá de lo declarado, NO es "
     "consistente.\n"
-    "- Solo si la caracteristica encaja naturalmente en el contexto del "
+    "- Solo si la característica encaja naturalmente en el contexto del "
     "descubrimiento sin contradicciones, es consistente.\n"
     "- Si marcas is_consistent=false, el campo 'reason' DEBE explicar "
-    "CONCRETAMENTE que contradiccion encontraste y en que seccion.\n\n"
+    "CONCRETAMENTE qué contradicción encontraste y en qué sección.\n\n"
+    "## REGLAS DE REDACCIÓN Y ORTOGRAFÍA\n\n"
+    "- Redacta en español formal y profesional con impecable ortografía, gramática y acentuación.\n"
+    "- Usa obligatoriamente todas las tildes normativas en mayúsculas y minúsculas (á, é, í, ó, ú, Á, É, Í, Ó, Ú), "
+    "diéresis (ü) y eñes (ñ).\n"
+    "- Presta especial atención a palabras clave: 'característica', 'descripción', 'sección', 'relación', "
+    "'semántica', 'propósito', 'inyección', 'además', 'amplía', 'más allá', 'explícita', 'contradicción'.\n"
+    "- Emplea puntuación correcta: inicia con mayúscula y concluye con punto final.\n\n"
     "## FORMATO DE SALIDA\n\n"
-    "Responde UNICAMENTE con JSON. Sin markdown, sin texto adicional.\n\n"
+    "Responde ÚNICAMENTE con JSON. Sin markdown, sin texto adicional.\n\n"
     "Si es consistente:\n"
-    '{"origin": "<origen preciso, max 3 secciones>", "is_consistent": true, "reason": ""}\n\n'
+    '{"origin": "<origen preciso, máx 3 secciones>", "is_consistent": true, "reason": ""}\n\n'
     "Si NO es consistente:\n"
-    '{"origin": "<origen preciso>", "is_consistent": false, "reason": "<explicacion concreta de la contradiccion>"}\n\n'
-    "IMPORTANTE: Siempre incluye el campo origin. No uses guion largo (—). Se estricto."
+    '{"origin": "<origen preciso>", "is_consistent": false, '
+    '"reason": "<explicación concreta de la contradicción con redacción y ortografía impecables>"}\n\n'
+    "IMPORTANTE: Siempre incluye el campo origin. No uses guion largo (—). Sé estricto."
 )
 
 
@@ -78,6 +87,7 @@ class CreateCharacteristicOutput:
     origin: str = ""
     is_consistent: bool = True
     inconsistency_reason: str = ""
+    warnings: tuple[str, ...] = ()
 
 
 class CreateCharacteristicUseCase:
@@ -120,6 +130,7 @@ class CreateCharacteristicUseCase:
         if not origin:
             origin = "Definicion manual"
 
+        existing_features = await self._feature_repo.list_by_project(input_data.project_id)
         next_number = await self._feature_repo.next_number(input_data.project_id)
 
         feature = Feature(
@@ -132,8 +143,16 @@ class CreateCharacteristicUseCase:
             origin=origin,
         )
 
+        overlaps = detect_capability_overlap(feature, existing_features)
+        warnings = tuple(o.message for o in overlaps if o.message)
+
         saved = await self._feature_repo.save(feature)
-        return CreateCharacteristicOutput(is_saved=True, characteristic=saved, origin=origin)
+        return CreateCharacteristicOutput(
+            is_saved=True,
+            characteristic=saved,
+            origin=origin,
+            warnings=warnings,
+        )
 
     async def _derive_origin(self, project_id: ProjectId, title: str, description: str) -> dict[str, object]:
         doc = await self._document_repo.get_discovery(project_id)  # type: ignore[union-attr]
@@ -143,9 +162,9 @@ class CreateCharacteristicUseCase:
         discovery_md = document_to_markdown(doc)
         user_prompt = (
             f"### Documento de Descubrimiento:\n{discovery_md[:20000]}\n\n"
-            f"### Nueva caracteristica propuesta:\n"
-            f"Titulo: {title}\n"
-            f"Descripcion: {description}\n"
+            f"### Nueva característica propuesta:\n"
+            f"Título: {title}\n"
+            f"Descripción: {description}\n"
         )
 
         try:

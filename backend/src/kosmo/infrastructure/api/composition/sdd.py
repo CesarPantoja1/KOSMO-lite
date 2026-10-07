@@ -31,6 +31,7 @@ from kosmo.application.features.check_feature_consistency import CheckFeatureCon
 from kosmo.application.features.delete_feature import DeleteFeatureUseCase
 from kosmo.application.features.get_feature_chat_history import GetFeatureChatHistoryUseCase
 from kosmo.application.features.list_features import ListFeaturesUseCase
+from kosmo.application.integrations.delete_deployment import DeleteDeploymentUseCase
 from kosmo.application.modelo import (
     DeleteActivityDiagramUseCase,
     GenerateActivityDiagramUseCase,
@@ -83,6 +84,7 @@ def build_project_components(
     railway_client: DeploymentProviderPort | None = None,
     deployment_worker: DeploymentWorkerPort | None = None,
     cipher: SecretCipher | None = None,
+    delete_deployment: DeleteDeploymentUseCase | None = None,
 ) -> ProjectComponents:
     return ProjectComponents(
         create_project=CreateProjectUseCase(project_repository=repos.projects),
@@ -107,6 +109,7 @@ def build_project_components(
             deployment_client=railway_client,
             deployment_worker=deployment_worker,
             cipher=cipher,
+            delete_deployment=delete_deployment,
         ),
     )
 
@@ -336,6 +339,7 @@ def build_consistency_components(
         feature_repo=repos.features,
         requirement_repo=repos.requirements,
         diagram_repo=repos.diagrams,
+        implementation_repo=repos.implementations,
     )
     discard_evaluation = DiscardConsistencyEvaluationUseCase(evaluation_repo=evaluation_repo)
 
@@ -369,6 +373,7 @@ def build_consistency_components(
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
             diagram_repo=repos.diagrams,
+            implementation_repo=repos.implementations,
         ),
         apply_consistency_evaluation=apply_evaluation,
         discard_consistency_evaluation=discard_evaluation,

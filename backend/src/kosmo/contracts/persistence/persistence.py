@@ -4,6 +4,7 @@ from typing import Any, Protocol, Self
 
 from kosmo.contracts.ai.chat import ChatRepository
 from kosmo.contracts.ai.consistency import TraceabilityRepository
+from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.repositories import (
     ActivityDiagramRepository,
     DocumentRepository,
@@ -25,14 +26,32 @@ class UnitOfWork(Protocol):
     explicitamente via ``commit()``. Ante una excepcion se hace rollback.
     """
 
-    projects: ProjectRepository
-    documents: DocumentRepository
-    features: FeatureRepository
-    requirements: RequirementRepository
-    diagrams: ActivityDiagramRepository
-    chat: ChatRepository
-    traceability: TraceabilityRepository
-    outbox: OutboxPort
+    @property
+    def projects(self) -> ProjectRepository: ...
+
+    @property
+    def documents(self) -> DocumentRepository: ...
+
+    @property
+    def features(self) -> FeatureRepository: ...
+
+    @property
+    def requirements(self) -> RequirementRepository: ...
+
+    @property
+    def diagrams(self) -> ActivityDiagramRepository: ...
+
+    @property
+    def implementations(self) -> FeatureImplementationRepository: ...
+
+    @property
+    def chat(self) -> ChatRepository: ...
+
+    @property
+    def traceability(self) -> TraceabilityRepository: ...
+
+    @property
+    def outbox(self) -> OutboxPort: ...
 
     async def __aenter__(self) -> Self: ...
 

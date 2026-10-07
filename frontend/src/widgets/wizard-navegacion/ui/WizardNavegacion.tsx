@@ -71,7 +71,7 @@ const phaseItems: {
 		Icon: Implementation,
 		label: 'IMPLEMENTACIÓN',
 		subtitle: 'Generar código',
-		consistencyPhase: null,
+		consistencyPhase: 'implementation',
 	},
 ];
 
@@ -138,7 +138,7 @@ export function WizardNavegacion() {
 
 	return (
 		<div>
-			<nav className='relative flex items-center justify-center gap-2 px-8 py-3  overflow-x-auto bg-linear-to-b from-neutral-50 to-neutral-0 border-b border-neutral-200'>
+			<nav className='relative flex items-center justify-center gap-2 px-8 py-3 bg-linear-to-b from-neutral-50 to-neutral-0 border-b border-neutral-200'>
 				{phaseItems.map(({ href, Icon, label, subtitle, consistencyPhase }, index) => {
 					let status: ProjectStatus = 'disable';
 					if (activeIndex !== -1) {

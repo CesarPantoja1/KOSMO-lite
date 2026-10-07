@@ -139,3 +139,25 @@ async def test_recover_zombie_implementations_skips_close_when_no_session() -> N
     assert repo.saved[0].status == FeatureImplementationStatus.FAILED
     assert opencode_client.closed == []
     assert "prj_01" in workspace_manager.released
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_recovery_does_not_interrupt_job_running_on_another_worker() -> None:
+    impl = _an_implementation(session_id="oc_sess_active")
+    repo = InMemoryImplementationRepo([impl])
+    opencode_client = FakeOpenCodeClient()
+    workspace_manager = FakeWorkspaceManager()
+    checked: list[str] = []
+
+    async def is_active(implementation_id: str) -> bool:
+        checked.append(implementation_id)
+        return True
+
+    recovered = await recover_zombie_implementations(repo, opencode_client, workspace_manager, is_active=is_active)
+
+    assert recovered == 0
+    assert checked == ["impl_feat_01"]
+    assert repo.saved == []
+    assert opencode_client.closed == []
+    assert workspace_manager.released == []

@@ -13,6 +13,7 @@ from kosmo.contracts.auth.tokens import (
     IssuedToken,
     RefreshConsumeResult,
     TokenClaims,
+    TokenPair,
     TokenType,
 )
 from kosmo.contracts.auth.users import User
@@ -44,6 +45,16 @@ class TokenRevocationStore(Protocol):
     ) -> None: ...
 
     async def consume_refresh(self, *, jti: str) -> RefreshConsumeResult | None: ...
+
+    async def store_grace_period(
+        self,
+        *,
+        old_jti: str,
+        token_pair: TokenPair,
+        ttl_seconds: int = 30,
+    ) -> None: ...
+
+    async def get_grace_period(self, *, old_jti: str) -> TokenPair | None: ...
 
     async def revoke_access(self, *, jti: str, ttl_seconds: int) -> None: ...
 

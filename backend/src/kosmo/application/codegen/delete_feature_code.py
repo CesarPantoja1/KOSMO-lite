@@ -63,129 +63,161 @@ class DeleteFeatureCodeUseCase:
         run_id = ULID().hex
         feature = input_data.feature
 
-        yield OpenCodeEvent(
-            event_type=OpenCodeEventType.PLAN_PROGRESS,
-            session_id="",
-            data={"delta": f"Eliminando la funcionalidad '{feature.title}' del código...", "stage": "deleting"},
-            run_id=run_id,
-        )
-
-        workspace = await self._workspace_manager.get_workspace(feature.project_id)
-        if workspace is None or not workspace.workspace_dir:
-            await self._implementation_repo.delete(feature.id)
-            yield OpenCodeEvent(
-                event_type=OpenCodeEventType.DONE,
-                session_id="",
-                data={"status": "deleted", "delta": "La funcionalidad se eliminó correctamente."},
-                run_id=run_id,
-            )
-            return
-
-        removed = await self._workspace_manager.remove_feature_paths(feature.project_id, feature.slug)
-        await self._workspace_manager.update_text_file(
-            feature.project_id,
-            "src/lib/feature-registry.ts",
-            lambda content: remove_feature_from_registry(content, feature.slug),
-        )
-
-        commit_hash: str | None = None
-        if removed:
-            commit_hash = await self._workspace_manager.commit_workspace(
-                feature.project_id,
-                f"feat({feature.slug}): remove feature {feature.display_id} - {feature.title}",
-            )
-
-        await self._implementation_repo.delete(feature.id)
-
-        if not removed:
-            yield OpenCodeEvent(
-                event_type=OpenCodeEventType.DONE,
-                session_id="",
-                data={
-                    "status": "deleted",
-                    "delta": "La funcionalidad se eliminó y la aplicación sigue funcionando correctamente.",
-                },
-                run_id=run_id,
-            )
-            return
-
-        session_id: str | None = None
+        await self._workspace_manager.acquire_lock(feature.project_id)
         try:
-            for attempt in range(1, input_data.max_fix_attempts + 2):
-                if attempt == 1:
-                    delta = "Validando la aplicación después de la eliminación..."
-                else:
-                    delta = (
-                        f"Corrigiendo la aplicación para que funcione sin la funcionalidad (intento {attempt - 1})..."
+            yield OpenCodeEvent(
+                event_type=OpenCodeEventType.PLAN_PROGRESS,
+                session_id="",
+                data={"delta": f"Eliminando la funcionalidad '{feature.title}' del código...", "stage": "deleting"},
+                run_id=run_id,
+            )
+
+            workspace = await self._workspace_manager.get_workspace(feature.project_id)
+            if workspace is None or not workspace.workspace_dir:
+                await self._implementation_repo.delete(feature.id)
+                yield OpenCodeEvent(
+                    event_type=OpenCodeEventType.DONE,
+                    session_id="",
+                    data={"status": "deleted", "delta": "La funcionalidad se eliminó correctamente."},
+                    run_id=run_id,
+                )
+                return
+
+            removed = await self._workspace_manager.remove_feature_paths(feature.project_id, feature.slug)
+            await self._workspace_manager.update_text_file(
+                feature.project_id,
+                "src/lib/feature-registry.ts",
+                lambda content: remove_feature_from_registry(content, feature.slug),
+            )
+
+            commit_hash: str | None = None
+            if removed:
+                commit_hash = await self._workspace_manager.commit_workspace(
+                    feature.project_id,
+                    f"feat({feature.slug}): remove feature {feature.display_id} - {feature.title}",
+                )
+
+            await self._implementation_repo.delete(feature.id)
+
+            if not removed:
+                yield OpenCodeEvent(
+                    event_type=OpenCodeEventType.DONE,
+                    session_id="",
+                    data={
+                        "status": "deleted",
+                        "delta": "La funcionalidad se eliminó y la aplicación sigue funcionando correctamente.",
+                    },
+                    run_id=run_id,
+                )
+                return
+
+            session_id: str | None = None
+            job_started = False
+            try:
+                for attempt in range(1, input_data.max_fix_attempts + 2):
+                    if attempt == 1:
+                        delta = "Validando la aplicación después de la eliminación..."
+                    else:
+                        delta = (
+                            "Corrigiendo la aplicación para que funcione sin la funcionalidad "
+                            f"(intento {attempt - 1})..."
+                        )
+                    yield OpenCodeEvent(
+                        event_type=OpenCodeEventType.BUILD_PROGRESS,
+                        session_id=session_id or "",
+                        data={"delta": delta, "stage": "validating", "attempt": attempt},
+                        run_id=run_id,
+                    )
+
+                    validation = await self._code_runner.run_pipeline(workspace.workspace_dir, run_id=run_id)
+                    if validation.all_passed:
+                        yield OpenCodeEvent(
+                            event_type=OpenCodeEventType.DONE,
+                            session_id=session_id or "",
+                            data={
+                                "status": "deleted",
+                                "delta": "La funcionalidad se eliminó y la aplicación sigue funcionando correctamente.",
+                            },
+                            run_id=run_id,
+                        )
+                        return
+
+                    if attempt > input_data.max_fix_attempts:
+                        break
+
+                    if not job_started:
+                        start_job = getattr(self._opencode_client, "start_job", None)
+                        if start_job is not None:
+                            await start_job(workspace.workspace_dir)
+                            job_started = True
+
+                    if not await self._opencode_client.health_check():
+                        _log.warning(
+                            "delete_feature_code.opencode_unavailable",
+                            feature_id=str(feature.id),
+                            run_id=run_id,
+                        )
+                        break
+
+                    if session_id is None:
+                        session = await self._opencode_client.create_session(
+                            workspace_dir=workspace.workspace_dir,
+                            title=f"Fix app after removing feature: {feature.title}",
+                        )
+                        session_id = session.session_id
+
+                    error_feedback = truncate_error_output(
+                        "\n".join(validation.error_summary),
+                        max_chars=2000,
+                    )
+                    async for ev in self._opencode_client.send_prompt(
+                        session_id,
+                        _build_fix_prompt(feature, error_feedback),
+                        agent="build",
+                    ):
+                        yield ev
+
+                # Último recurso: la aplicación debe quedar funcional siempre
+                if commit_hash is not None:
+                    await self._workspace_manager.revert_commit(feature.project_id, commit_hash)
+                    _log.warning(
+                        "delete_feature_code.reverted",
+                        feature_id=str(feature.id),
+                        commit=commit_hash,
+                        run_id=run_id,
                     )
                 yield OpenCodeEvent(
-                    event_type=OpenCodeEventType.BUILD_PROGRESS,
+                    event_type=OpenCodeEventType.ERROR,
                     session_id=session_id or "",
-                    data={"delta": delta, "stage": "validating", "attempt": attempt},
+                    data={
+                        "error": "No se pudo eliminar la funcionalidad. La aplicación volvió a su estado anterior.",
+                        "status": "delete_reverted",
+                    },
                     run_id=run_id,
                 )
-
-                validation = await self._code_runner.run_pipeline(workspace.workspace_dir, run_id=run_id)
-                if validation.all_passed:
-                    yield OpenCodeEvent(
-                        event_type=OpenCodeEventType.DONE,
-                        session_id=session_id or "",
-                        data={
-                            "status": "deleted",
-                            "delta": "La funcionalidad se eliminó y la aplicación sigue funcionando correctamente.",
-                        },
-                        run_id=run_id,
-                    )
-                    return
-
-                if attempt > input_data.max_fix_attempts:
-                    break
-
-                if not await self._opencode_client.health_check():
-                    _log.warning(
-                        "delete_feature_code.opencode_unavailable",
-                        feature_id=str(feature.id),
-                        run_id=run_id,
-                    )
-                    break
-
-                if session_id is None:
-                    session = await self._opencode_client.create_session(
-                        workspace_dir=workspace.workspace_dir,
-                        title=f"Fix app after removing feature: {feature.title}",
-                    )
-                    session_id = session.session_id
-
-                error_feedback = truncate_error_output(
-                    "\n".join(validation.error_summary),
-                    max_chars=2000,
-                )
-                async for ev in self._opencode_client.send_prompt(
-                    session_id,
-                    _build_fix_prompt(feature, error_feedback),
-                    agent="build",
-                ):
-                    yield ev
-
-            # Último recurso: la aplicación debe quedar funcional siempre
-            if commit_hash is not None:
-                await self._workspace_manager.revert_commit(feature.project_id, commit_hash)
-                _log.warning(
-                    "delete_feature_code.reverted",
-                    feature_id=str(feature.id),
-                    commit=commit_hash,
+            except Exception as exc:
+                if commit_hash is not None:
+                    with contextlib.suppress(Exception):
+                        await self._workspace_manager.revert_commit(feature.project_id, commit_hash)
+                _log.exception("delete_feature_code.failed", feature_id=str(feature.id), run_id=run_id)
+                yield OpenCodeEvent(
+                    event_type=OpenCodeEventType.ERROR,
+                    session_id=session_id or "",
+                    data={
+                        "error": f"No se pudo reparar la aplicación tras eliminar la funcionalidad: {exc}",
+                        "status": "delete_reverted",
+                    },
                     run_id=run_id,
                 )
-            yield OpenCodeEvent(
-                event_type=OpenCodeEventType.ERROR,
-                session_id=session_id or "",
-                data={
-                    "error": "No se pudo eliminar la funcionalidad. La aplicación volvió a su estado anterior.",
-                    "status": "delete_reverted",
-                },
-                run_id=run_id,
-            )
+            finally:
+                if session_id is not None:
+                    with contextlib.suppress(Exception):
+                        await self._opencode_client.close_session(session_id)
+                if job_started:
+                    stop_job = getattr(self._opencode_client, "stop_job", None)
+                    if stop_job is not None:
+                        with contextlib.suppress(Exception):
+                            await stop_job()
         finally:
-            if session_id is not None:
-                with contextlib.suppress(Exception):
-                    await self._opencode_client.close_session(session_id)
+            with contextlib.suppress(Exception):
+                await self._workspace_manager.release_lock(feature.project_id)

@@ -211,7 +211,7 @@ async def test_get_repository_returns_none_when_not_found() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_create_repository_success_private_default() -> None:
+async def test_create_repository_success_public_default() -> None:
     # Arrange
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/user/repos"
@@ -219,7 +219,7 @@ async def test_create_repository_success_private_default() -> None:
         body = json.loads(request.content.decode("utf-8"))
         assert body["name"] == "kosmo-gestion-inventarios"
         assert body["description"] == "App generada por KOSMO"
-        assert body["private"] is True
+        assert body["private"] is False
         assert body["auto_init"] is False
 
         return httpx.Response(
@@ -231,7 +231,7 @@ async def test_create_repository_success_private_default() -> None:
                 "owner": {"login": "octocat"},
                 "html_url": "https://github.com/octocat/kosmo-gestion-inventarios",
                 "clone_url": "https://github.com/octocat/kosmo-gestion-inventarios.git",
-                "private": True,
+                "private": False,
                 "default_branch": "main",
                 "description": "App generada por KOSMO",
             },
@@ -245,7 +245,6 @@ async def test_create_repository_success_private_default() -> None:
         token="gho_token",
         name="kosmo-gestion-inventarios",
         description="App generada por KOSMO",
-        is_private=True,
     )
 
     # Assert
@@ -255,7 +254,7 @@ async def test_create_repository_success_private_default() -> None:
     assert repo.owner == "octocat"
     assert repo.html_url == "https://github.com/octocat/kosmo-gestion-inventarios"
     assert repo.clone_url == "https://github.com/octocat/kosmo-gestion-inventarios.git"
-    assert repo.is_private is True
+    assert repo.is_private is False
     assert repo.description == "App generada por KOSMO"
 
 
@@ -324,7 +323,6 @@ async def test_create_repository_raises_when_name_already_exists() -> None:
         await github_client.create_repository(
             token="gho_token",
             name="existing-repo",
-            is_private=True,
         )
 
     assert "existing-repo" in str(exc_info.value)

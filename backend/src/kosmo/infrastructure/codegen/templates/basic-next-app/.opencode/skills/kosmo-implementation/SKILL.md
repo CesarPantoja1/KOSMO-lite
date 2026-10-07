@@ -25,7 +25,8 @@ El proyecto organiza el código en capas concéntricas con regla de dependencia 
 └────────────────────────────────────────────────────────┘
 ```
 
-1. **Dominio / Lógica Pura (`src/lib/`, `src/services/`)**:
+1. **Dominio Compartido & Lógica Pura (`src/domain/`, `src/lib/`, `src/services/`)**:
+   - Entidades de negocio centrales compartidas entre múltiples características (`src/domain/<entidad>/`).
    - Funciones puras, cálculo de reglas de negocio, validaciones y transformaciones de datos.
    - Sin dependencias de Next.js, React ni hooks de cliente.
    - Diseñado para ser probado de forma 100% aislada con Vitest en memoria.
@@ -35,10 +36,11 @@ El proyecto organiza el código en capas concéntricas con regla de dependencia 
    - Consultas SQL tipadas encapsuladas en funciones auxiliares o repositorios.
    - Nunca expone SQL crudo a las capas superiores.
 
-3. **Presentación & Rutas (`src/app/`, `src/components/`)**:
-   - Server Components por defecto para obtener datos directamente.
-   - Client Components (`'use client'`) únicamente en hojas interactivas.
-   - Componentes modulares con responsabilidad única en `src/components/`.
+3. **Presentación & Rutas (`src/app/`, `src/components/`, `src/features/`)**:
+   - Server Components por defecto para obtener datos directamente (`src/app/<slug>/page.tsx`).
+   - Server Actions (`src/features/<slug>/actions.ts` con `"use server"`): ejecutan mutaciones en `src/db/` usando Drizzle, coordinan con `logic.ts` y revalidan vistas con `revalidatePath`.
+   - Client Components (`'use client'`) únicamente en hojas interactivas que llaman a las Server Actions.
+   - Componentes modulares con responsabilidad única en `src/components/` o `src/features/<slug>/components/`.
 
 ---
 
@@ -56,7 +58,9 @@ El proyecto organiza el código en capas concéntricas con regla de dependencia 
 | Anti-patrón | Por qué está prohibido | Solución requerida |
 |-------------|------------------------|-------------------|
 | **Lógica en Componentes UI** | Rompe la testabilidad y mezcla presentación con negocio | Extraer reglas a funciones puras en `src/lib/` o `src/services/` |
-| **SQL en Vistas de Cliente** | Inseguro y no compila en el cliente | Mover consultas a Server Components o Rutas de API |
+| **Mocks en memoria o `useState` simulado** | Causa pérdida total de datos al recargar o desplegar | Persistir en SQLite con Drizzle ORM mediante Server Actions (`actions.ts`) |
+| **Duplicación de Entidades** | Fragmenta el modelo y crea tablas inconsistentes | Mover entidades y tipos compartidos a `src/domain/<entidad>/` |
+| **SQL o `@/db` en Vistas de Cliente** | Inseguro y no compila por módulos nativos de Node | Mover consultas a Server Components y mutaciones a Server Actions (`actions.ts`) |
 | **Monolito en `page.tsx`** | Dificulta mantenimiento y testing | Dividir en subcomponentes modulares en `src/components/` |
 | **Mutaciones Globales** | Provoca efectos secundarios no deterministas | Funciones puras que retornan nuevos estados |
 | **Silenciar errores de compilación (`@ts-ignore`)** | Oculta bugs críticos | Corregir los tipos exactos hasta que `tsc --noEmit` pase limpio |

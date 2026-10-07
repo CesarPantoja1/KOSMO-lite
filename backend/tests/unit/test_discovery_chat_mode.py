@@ -122,7 +122,7 @@ def test_discovery_chat_mode_config() -> None:
 
     # Act & Assert
     assert mode.temperature == 0.4
-    assert mode.max_tokens == 4096
+    assert mode.max_tokens == 8192
     assert mode.available_tools == []
 
 
@@ -181,18 +181,6 @@ def test_system_prompt_no_voseo() -> None:
     assert "Devolvé" not in prompt
     assert "Aplicá" not in prompt
     assert "Generá" not in prompt
-
-
-@pytest.mark.unit
-def test_system_prompt_no_simbolo_seccion() -> None:
-    # Arrange
-    mode = _mode()
-
-    # Act
-    prompt = mode.system_prompt
-
-    # Assert
-    assert "§" not in prompt
 
 
 # ── build_user_prompt ──

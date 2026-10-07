@@ -11,8 +11,8 @@ from kosmo.application.pipeline.tool_resolver import ToolResolver
 from kosmo.contracts.pipeline.phase_contexts import DiscoveryPhaseContext
 from kosmo.contracts.pipeline.phase_outputs import DiscoveryPhaseOutput
 from kosmo.contracts.sdd.ids import ProjectId
-from kosmo.infrastructure.persistence.memory.in_memory_store import InMemoryAgentSessionStore
 from tests.unit.conftest import DISCOVERY_VALID, StubStructuredLLMClient, make_discovery_document, make_discovery_mode
+from tests.unit.fakes import InMemoryAgentSessionStore
 
 
 class _FailingLLM:

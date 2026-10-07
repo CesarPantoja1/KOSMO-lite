@@ -13,6 +13,7 @@ from kosmo.application.chat.process_chat_message import (
 from kosmo.application.chat.validate_phase_context import (
     ValidatePhaseContextUseCase,
 )
+from kosmo.application.pipeline.context_builder import ContextBuilder
 from kosmo.contracts.ai.chat import ChatRole, MensajeChat, ModificacionChat
 from kosmo.contracts.auth import Principal
 from kosmo.contracts.pipeline.phase_contexts import DiscoveryChatContext, FeatureChatContext
@@ -21,7 +22,6 @@ from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.errors import FeatureNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import ChatMessageId, FeatureId, ProjectId
-from kosmo.domain.pipeline.context_builder import ContextBuilder
 from kosmo.domain.sdd.document_converters import markdown_to_document
 from kosmo.domain.sdd.id_generator import IdGenerator
 from kosmo.infrastructure.api.routers.discovery import process_chat_message as discovery_chat

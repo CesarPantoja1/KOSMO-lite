@@ -30,9 +30,18 @@ const ConfirmacionVisibilidadRepositorio = ({
 		document.addEventListener('keydown', handleKeyDown);
 		return () => document.removeEventListener('keydown', handleKeyDown);
 	}, [onCancel]);
-
 	return (
-		<div className='warning-popup' onClick={onCancel}>
+		<div
+			role='button'
+			tabIndex={-1}
+			className='warning-popup'
+			onClick={onCancel}
+			onKeyDown={(e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					onCancel();
+				}
+			}}
+		>
 			<div
 				role='dialog'
 				aria-modal='true'

@@ -349,3 +349,112 @@ async def test_run_pipeline_comprehensive_diagnostics_executes_checks_and_skips_
             ValidationStep.LINT,
             ValidationStep.TESTS,
         ]
+
+
+@pytest.mark.unit
+def test_docker_args_with_container_name() -> None:
+    # Arrange
+    runner = EphemeralDockerCodeRunner()
+    workspace = "/tmp/test-workspace"
+
+    # Act
+    args = runner._build_docker_args(workspace, "npx tsc --noEmit", container_name="kosmo_val_custom123")
+
+    # Assert
+    assert "--name" in args
+    name_idx = args.index("--name") + 1
+    assert args[name_idx] == "kosmo_val_custom123"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_step_timeout_executes_docker_rm_orphan_cleanup() -> None:
+    # Arrange
+    runner = EphemeralDockerCodeRunner()
+    mock_run_proc = MagicMock()
+    mock_run_proc.kill = MagicMock()
+    mock_run_proc.wait = AsyncMock(return_value=0)
+
+    async def slow_communicate() -> tuple[bytes, bytes]:
+        await asyncio.sleep(5)
+        return (b"", b"")
+
+    mock_run_proc.communicate = AsyncMock(side_effect=slow_communicate)
+
+    mock_cleanup_proc = MagicMock()
+    mock_cleanup_proc.wait = AsyncMock(return_value=0)
+
+    exec_calls: list[tuple[object, ...]] = []
+
+    async def mock_subprocess_exec(*args: object, **_kwargs: object) -> MagicMock:
+        exec_calls.append(args)
+        if len(exec_calls) == 1:
+            return mock_run_proc
+        return mock_cleanup_proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess_exec):
+        # Act
+        result = await runner.run_step("/tmp/workspace", ValidationStep.TESTS, timeout_seconds=1)
+
+        # Assert
+        assert result.success is False
+        assert result.exit_code == -1
+        assert "excedió el tiempo límite" in result.raw_output
+        mock_run_proc.kill.assert_called_once()
+        mock_run_proc.wait.assert_awaited_once()
+
+        # Debe haber 2 llamadas: 1 para 'docker run' y 1 para 'docker rm -f'
+        assert len(exec_calls) == 2
+        run_args = exec_calls[0]
+        cleanup_args = exec_calls[1]
+
+        # Verificar que el container se creó con --name kosmo_val_*
+        assert "--name" in run_args
+        container_name = run_args[run_args.index("--name") + 1]
+        assert isinstance(container_name, str)
+        assert container_name.startswith("kosmo_val_")
+
+        # Verificar que docker rm -f fue invocado con el mismo nombre de contenedor
+        assert cleanup_args == ("docker", "rm", "-f", container_name)
+        mock_cleanup_proc.wait.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_step_cancelled_executes_docker_rm_orphan_cleanup() -> None:
+    # Arrange
+    runner = EphemeralDockerCodeRunner()
+    mock_run_proc = MagicMock()
+    mock_run_proc.kill = MagicMock()
+    mock_run_proc.wait = AsyncMock(return_value=0)
+
+    async def cancelled_communicate() -> tuple[bytes, bytes]:
+        raise asyncio.CancelledError()
+
+    mock_run_proc.communicate = AsyncMock(side_effect=cancelled_communicate)
+
+    mock_cleanup_proc = MagicMock()
+    mock_cleanup_proc.wait = AsyncMock(return_value=0)
+
+    exec_calls: list[tuple[object, ...]] = []
+
+    async def mock_subprocess_exec(*args: object, **_kwargs: object) -> MagicMock:
+        exec_calls.append(args)
+        if len(exec_calls) == 1:
+            return mock_run_proc
+        return mock_cleanup_proc
+
+    with patch("asyncio.create_subprocess_exec", side_effect=mock_subprocess_exec):
+        # Act & Assert
+        with pytest.raises(asyncio.CancelledError):
+            await runner.run_step("/tmp/workspace", ValidationStep.TESTS, timeout_seconds=10)
+
+        # Assert cleanup
+        mock_run_proc.kill.assert_called_once()
+        assert len(exec_calls) == 2
+        run_args = exec_calls[0]
+        cleanup_args = exec_calls[1]
+        assert "--name" in run_args
+        container_name = run_args[run_args.index("--name") + 1]
+        assert cleanup_args == ("docker", "rm", "-f", container_name)
+        mock_cleanup_proc.wait.assert_awaited_once()

@@ -1,4 +1,4 @@
-export type ImplementationStatus = 'idle' | 'generating' | 'completed' | 'failed';
+export type ImplementationStatus = 'idle' | 'generating' | 'completed' | 'failed' | 'requires_review';
 
 export interface ImplementationMetric {
 	value: string;

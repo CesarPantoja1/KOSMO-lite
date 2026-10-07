@@ -113,4 +113,30 @@ describe('GateReviewCard', () => {
 		expect(screen.queryAllByTestId('plantuml-viewer')).toHaveLength(0);
 		expect(screen.getByText('antes')).toBeInTheDocument();
 	});
+
+	it('renderiza los botones Descartar y Aplicar arriba y llama a los callbacks al pulsarlos', () => {
+		const handleApply = vi.fn();
+		const handleDiscard = vi.fn();
+
+		render(
+			<GateReviewCard
+				card={makeCard()}
+				busy={false}
+				onApply={handleApply}
+				onDiscard={handleDiscard}
+			/>,
+		);
+
+		const applyBtn = screen.getByRole('button', { name: 'Aplicar' });
+		const discardBtn = screen.getByRole('button', { name: 'Descartar' });
+
+		expect(applyBtn).toBeInTheDocument();
+		expect(discardBtn).toBeInTheDocument();
+
+		applyBtn.click();
+		expect(handleApply).toHaveBeenCalledTimes(1);
+
+		discardBtn.click();
+		expect(handleDiscard).toHaveBeenCalledTimes(1);
+	});
 });

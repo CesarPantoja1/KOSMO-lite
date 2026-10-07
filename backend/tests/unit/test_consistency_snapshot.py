@@ -17,10 +17,16 @@ def test_trace_downstream_phases_follows_rightward_chain() -> None:
     model_targets = trace_downstream_phases(SpecPhase.MODELO)
 
     # Assert
-    assert discovery_targets == [SpecPhase.CARACTERISTICAS, SpecPhase.REQUISITOS, SpecPhase.MODELO]
-    assert features_targets == [SpecPhase.REQUISITOS, SpecPhase.MODELO]
-    assert requirements_targets == [SpecPhase.MODELO]
-    assert model_targets == []
+    assert discovery_targets == [
+        SpecPhase.CARACTERISTICAS,
+        SpecPhase.REQUISITOS,
+        SpecPhase.MODELO,
+        SpecPhase.IMPLEMENTACION,
+    ]
+    assert features_targets == [SpecPhase.REQUISITOS, SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
+    assert requirements_targets == [SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
+    assert model_targets == [SpecPhase.IMPLEMENTACION]
+    assert trace_downstream_phases(SpecPhase.IMPLEMENTACION) == []
 
 
 @pytest.mark.unit

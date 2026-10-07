@@ -210,7 +210,7 @@ class GitHubHttpClient(GitHubClientPort):
         token: str,
         name: str,
         description: str = "",
-        is_private: bool = True,
+        is_private: bool = False,
         auto_init: bool = False,
     ) -> GitHubRepository:
         """Crea un nuevo repositorio en la cuenta del usuario autenticado."""

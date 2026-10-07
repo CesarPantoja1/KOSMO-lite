@@ -14,17 +14,15 @@ let mockDeployStatus: ProjectDeployStatusResponse = {
 	error_log_url: null,
 };
 
-const mockGetStatus = async (projectId: string): Promise<ProjectDeployStatusResponse> => {
-	void projectId;
+const mockGetStatus = async (_projectId: string): Promise<ProjectDeployStatusResponse> => {
 	await delay(300);
 	return { ...mockDeployStatus };
 };
 
 const mockStartRailway = async (
-	projectId: string,
+	_projectId: string,
 	_body?: DeployRailwayRequest,
 ): Promise<ProjectDeployStatusResponse> => {
-	void projectId;
 	await delay(800);
 	mockDeployStatus = {
 		service_id: 'srv_mock_123',
@@ -67,3 +65,10 @@ export const startDeployRailway = (
 	body?: DeployRailwayRequest,
 ): Promise<ProjectDeployStatusResponse> =>
 	USE_MOCKS ? mockStartRailway(projectId, body) : realStartRailway(projectId, body);
+
+export const deleteDeployment = async (projectId: string): Promise<void> => {
+	await apiClient<void>(`/api/v1/projects/${projectId}/deploy`, {
+		method: 'DELETE',
+	});
+};
+

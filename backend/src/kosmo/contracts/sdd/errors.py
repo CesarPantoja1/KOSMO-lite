@@ -238,3 +238,26 @@ class ConsistencyEvaluationNotFoundError(SpecError):
             instance=f"{instance}/evaluations/{evaluation_id}",
         )
         super().__init__(problem)
+
+
+class ChatSessionNotFoundError(SpecError):
+    def __init__(
+        self,
+        *,
+        session_id: str,
+        project_id: str | None = None,
+        instance: str = "/api/v1/chat-sessions",
+    ) -> None:
+        detail = (
+            f"La sesión de chat '{session_id}' no existe o no pertenece al proyecto '{project_id}'."
+            if project_id
+            else f"La sesión de chat '{session_id}' no existe o no pertenece al proyecto."
+        )
+        problem = ProblemDetail(
+            type="urn:kosmo:chat:session-not-found",
+            title="Sesión de chat no encontrada",
+            status=404,
+            detail=detail,
+            instance=instance,
+        )
+        super().__init__(problem)

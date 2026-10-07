@@ -8,4 +8,4 @@ export type {
 export { useDeployStatus } from './model/use-deploy-status';
 export type { UseDeployStatusReturn } from './model/use-deploy-status';
 
-export { getDeployStatus, startDeployRailway } from './api/api';
+export { getDeployStatus, startDeployRailway, deleteDeployment } from './api/api';

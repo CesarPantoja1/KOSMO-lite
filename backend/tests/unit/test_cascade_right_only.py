@@ -27,10 +27,15 @@ def test_downstream_targets_are_right_only() -> None:
     model_targets = DOWNSTREAM_TARGETS[SpecPhase.MODELO]
 
     # Assert
-    assert discovery_targets == [SpecPhase.CARACTERISTICAS, SpecPhase.REQUISITOS, SpecPhase.MODELO]
-    assert features_targets == [SpecPhase.REQUISITOS, SpecPhase.MODELO]
-    assert requirements_targets == [SpecPhase.MODELO]
-    assert model_targets == []
+    assert discovery_targets == [
+        SpecPhase.CARACTERISTICAS,
+        SpecPhase.REQUISITOS,
+        SpecPhase.MODELO,
+        SpecPhase.IMPLEMENTACION,
+    ]
+    assert features_targets == [SpecPhase.REQUISITOS, SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
+    assert requirements_targets == [SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
+    assert model_targets == [SpecPhase.IMPLEMENTACION]
 
 
 @pytest.mark.unit
@@ -86,7 +91,7 @@ async def test_evaluate_consistency_defaults_to_right_phases_of_origin() -> None
 
     # Assert
     input_data = uc.execute.await_args.args[0]
-    assert input_data.target_phases == [SpecPhase.MODELO]
+    assert input_data.target_phases == [SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
 
 
 @pytest.mark.unit

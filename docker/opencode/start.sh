@@ -12,7 +12,20 @@ export OPENCODE_CONFIG_PATH="$config_dir/opencode.json"
 node -e '
   const fs = require("fs");
   const config = { server: { password: process.env.OPENCODE_SERVER_PASSWORD } };
-  if (process.env.OPENCODE_MODEL) config.model = process.env.OPENCODE_MODEL;
+  if (process.env.OPENCODE_MODEL) {
+    config.model = process.env.OPENCODE_MODEL;
+    config.small_model = process.env.OPENCODE_MODEL;
+  }
+  if (process.env.KOSMO_AI_PROVIDER) {
+    config.provider = {
+      [process.env.KOSMO_AI_PROVIDER]: {
+        options: {
+          apiKey: "{file:/run/kosmo-secrets/provider-key}",
+          timeout: false,
+        },
+      },
+    };
+  }
   fs.writeFileSync(process.env.OPENCODE_CONFIG_PATH, JSON.stringify(config));
 '
 

@@ -260,7 +260,7 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 							<div className='flex gap-2'>
 								<div className='h-2 w-2 rounded-full bg-neutral-200' />
 								<div className='h-2 w-2 rounded-full bg-neutral-200' />
-								<div className='h-2 w-2 rounded-full bg-ai-500' />
+								<div className='h-2 w-2 rounded-full bg-base-950' />
 							</div>
 						</div>
 
@@ -277,7 +277,7 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 										onClick={() => goToStep(index)}
 										className={`inline-flex items-center mb-1 w-full rounded-lg px-1 py-2 text-left text-xs transition-colors ${
 											activeStep === index
-												? 'bg-ai-50'
+												? 'bg-base-100'
 												: 'text-neutral-500 hover:bg-neutral-50'
 										}`}
 									>
@@ -334,8 +334,8 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 													La IA analiza y refina tu idea.
 												</p>
 											</div>
-											<div className='flex h-9 w-9 items-center justify-center rounded-full border border-ai-100 bg-ai-50'>
-												<Ai size={16} color='text-ai-500' />
+											<div className='flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-neutral-100'>
+												<Ai size={16} color='text-neutral-500' />
 											</div>
 										</div>
 
@@ -542,8 +542,8 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 													App lista para usar.
 												</p>
 											</div>
-											<div className='flex h-9 w-9 items-center justify-center rounded-full border border-primary-200 bg-primary-50'>
-												<ArrowRight size={16} color='text-primary-500' />
+											<div className='flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-neutral-100'>
+												<ArrowRight size={16} color='text-neutral-500' />
 											</div>
 										</div>
 

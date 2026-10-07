@@ -144,7 +144,7 @@ def test_requirement_messages_preserve_context():
 @pytest.mark.asyncio
 async def test_inmemory_chat_repository_requirement_isolation():
     # Arrange
-    from kosmo.infrastructure.persistence.memory.in_memory_store import InMemoryChatRepository
+    from tests.unit.fakes import InMemoryChatRepository
 
     repo = InMemoryChatRepository()
     project_id = ProjectId("prj_001")

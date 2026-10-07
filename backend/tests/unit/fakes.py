@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from datetime import UTC, datetime
 from typing import Any
 
 from kosmo.contracts.ai.ai_config import UserAiConfig, UserAiConfigRepository
@@ -18,11 +19,19 @@ from kosmo.contracts.ai.consistency import (
     ConsistencyEvaluationStatus,
 )
 from kosmo.contracts.audit.events import AuditEvent
-from kosmo.contracts.auth import AuthorizationCode, RefreshConsumeResult, User, UserAlreadyExistsError
+from kosmo.contracts.auth import AuthorizationCode, RefreshConsumeResult, TokenPair, User, UserAlreadyExistsError
+from kosmo.contracts.memory.agent_memory import (
+    AgentMemoryPort,
+    AgentSession,
+    AgentSessionSummary,
+    KnowledgePattern,
+    ProjectMemoryContext,
+)
 from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.document import RichTextDocument, SpecPhase
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
+    AgentMemoryId,
     ChatSessionId,
     ConsistencyEvaluationId,
     FeatureId,
@@ -50,8 +59,9 @@ class InMemoryProjectRepository:
     async def find_by_slug(self, slug: str) -> Project | None:
         return next((p for p in self.projects.values() if p.slug == slug), None)
 
-    async def list_by_owner(self, owner_id: str) -> list[Project]:
-        return [p for p in self.projects.values() if str(p.owner_id) == owner_id]
+    async def list_by_owner(self, owner_id: str, *, limit: int = 100) -> list[Project]:
+        projects = [p for p in self.projects.values() if str(p.owner_id) == owner_id]
+        return projects[:limit]
 
     async def save(self, project: Project) -> Project:  # type: ignore[override]
         self.projects[str(project.id)] = project
@@ -316,6 +326,7 @@ class InMemoryStore:
         self.refresh: dict[str, tuple[str, str | None]] = {}
         self.revoked_access: set[str] = set()
         self.families: set[str] = set()
+        self.grace: dict[str, Any] = {}
 
     async def register_refresh(
         self,
@@ -335,7 +346,32 @@ class InMemoryStore:
         entry = self.refresh.pop(jti, None)
         if entry is None:
             return None
+        self.grace[jti] = "ROTATING"
         return RefreshConsumeResult(subject=entry[0], family_id=entry[1])
+
+    async def store_grace_period(
+        self,
+        *,
+        old_jti: str,
+        token_pair: TokenPair,
+        ttl_seconds: int = 30,  # noqa: ARG002
+    ) -> None:
+        self.grace[old_jti] = token_pair
+
+    async def get_grace_period(self, *, old_jti: str) -> TokenPair | None:
+        import asyncio
+
+        for _ in range(20):
+            entry = self.grace.get(old_jti)
+            if entry is None:
+                return None
+            if entry == "ROTATING":
+                await asyncio.sleep(0.01)
+                continue
+            if isinstance(entry, TokenPair):
+                return entry
+            return None
+        return None
 
     async def revoke_access(self, *, jti: str, ttl_seconds: int) -> None:
         if ttl_seconds <= 0:
@@ -362,18 +398,21 @@ class InMemoryTraceabilityRepository:
     def __init__(self) -> None:
         self.edges: list[tuple[str, str, str, str, str]] = []
 
+    async def get_impact_batch(self, artifact_ids: list[str]) -> dict[str, dict[str, list[dict[str, str]]]]:
+        results: dict[str, dict[str, list[dict[str, str]]]] = {
+            aid: {"upstream": [], "downstream": []} for aid in artifact_ids
+        }
+        artifact_set = set(artifact_ids)
+        for source_type, source_id, target_type, target_id, origin in self.edges:
+            if target_id in artifact_set:
+                results[target_id]["upstream"].append({"type": source_type, "id": source_id, "origin": origin})
+            if source_id in artifact_set:
+                results[source_id]["downstream"].append({"type": target_type, "id": target_id, "origin": origin})
+        return results
+
     async def get_impact(self, artifact_id: str) -> dict[str, list[dict[str, str]]]:
-        upstream = [
-            {"type": source_type, "id": source_id, "origin": origin}
-            for source_type, source_id, _target_type, target_id, origin in self.edges
-            if target_id == artifact_id
-        ]
-        downstream = [
-            {"type": target_type, "id": target_id, "origin": origin}
-            for _source_type, source_id, target_type, target_id, origin in self.edges
-            if source_id == artifact_id
-        ]
-        return {"upstream": upstream, "downstream": downstream}
+        batch = await self.get_impact_batch([artifact_id])
+        return batch.get(artifact_id, {"upstream": [], "downstream": []})
 
     async def add_edge(
         self,
@@ -463,6 +502,7 @@ class InMemoryUnitOfWork:
         features: InMemoryFeatureRepository | None = None,
         requirements: InMemoryRequirementRepository | None = None,
         diagrams: InMemoryActivityDiagramRepository | None = None,
+        implementations: InMemoryFeatureImplementationRepository | None = None,
         chat: InMemoryChatRepository | None = None,
         traceability: InMemoryTraceabilityRepository | None = None,
         outbox: InMemoryOutbox | None = None,
@@ -472,6 +512,7 @@ class InMemoryUnitOfWork:
         self.features = features or InMemoryFeatureRepository()
         self.requirements = requirements or InMemoryRequirementRepository()
         self.diagrams = diagrams or InMemoryActivityDiagramRepository()
+        self.implementations = implementations or InMemoryFeatureImplementationRepository()
         self.chat = chat or InMemoryChatRepository()
         self.traceability = traceability or InMemoryTraceabilityRepository()
         self.outbox = outbox or InMemoryOutbox()
@@ -498,87 +539,108 @@ class InMemoryChatRepository:
     def __init__(self) -> None:
         self.messages: list[MensajeChat] = []
         self.sessions: list[ChatSession] = []
-        self._message_sessions: list[tuple[MensajeChat, ChatSessionId | None]] = []
+        self._message_sessions: list[tuple[MensajeChat, ChatSessionId | None, str | None, ProjectId, SpecPhase]] = []
 
     async def save_message(
         self,
-        project_id: ProjectId,  # noqa: ARG002
-        phase: SpecPhase,  # noqa: ARG002
+        project_id: ProjectId,
+        phase: SpecPhase,
         message: MensajeChat,
-        context_id: str | None = None,  # noqa: ARG002
+        context_id: str | None = None,
         session_id: ChatSessionId | None = None,
     ) -> MensajeChat:
         self.messages.append(message)
-        self._message_sessions.append((message, session_id))
+        self._message_sessions.append((message, session_id, context_id, project_id, phase))
         return message
 
     async def get_history(
         self,
-        project_id: ProjectId,  # noqa: ARG002
-        phase: SpecPhase,  # noqa: ARG002
-        context_id: str | None = None,  # noqa: ARG002
-        limit: int = 200,  # noqa: ARG002
+        project_id: ProjectId,
+        phase: SpecPhase,
+        context_id: str | None = None,
+        limit: int = 200,
         before: str | None = None,  # noqa: ARG002
         session_id: ChatSessionId | None = None,
     ) -> HistorialChat | None:
         selected = [
             msg
-            for msg, sid in self._message_sessions
-            if (session_id is None and sid is None) or (session_id is not None and sid == session_id)
+            for msg, sid, cid, pid, ph in self._message_sessions
+            if (
+                ((session_id is None and sid is None) or (session_id is not None and sid == session_id))
+                and (context_id is None or cid == context_id)
+                and (str(project_id) == str(pid))
+                and (phase == ph)
+            )
         ]
         if not selected:
             return None
+        hist_id = (
+            f"{project_id}_{phase.value}_s_{session_id}"
+            if session_id is not None
+            else f"{project_id}_{phase.value}_{context_id or ''}"
+        )
         return HistorialChat(
-            id=ChatHistoryId("hist_test"),
+            id=ChatHistoryId(hist_id),
             project_id=project_id,
             phase=phase,
             context_id=context_id,
             session_id=session_id,
-            messages=tuple(selected),
+            messages=tuple(selected[-limit:]),
         )
-
-    async def save_history(self, history: HistorialChat) -> HistorialChat:
-        self.messages = list(history.messages)
-        return history
 
     async def create_session(self, session: ChatSession) -> ChatSession:
         self.sessions.append(session)
         return session
 
-    async def delete_session(self, session_id: ChatSessionId) -> None:
+    async def delete_session(self, session_id: ChatSessionId, project_id: ProjectId) -> bool:
+        session = next(
+            (s for s in self.sessions if s.id == session_id and str(s.project_id) == str(project_id)),
+            None,
+        )
+        if session is None:
+            return False
         self.sessions = [s for s in self.sessions if s.id != session_id]
-        self._message_sessions = [(msg, sid) for msg, sid in self._message_sessions if sid != session_id]
+        self._message_sessions = [
+            (msg, sid, cid, pid, ph) for msg, sid, cid, pid, ph in self._message_sessions if sid != session_id
+        ]
+        self.messages = [msg for msg, *_ in self._message_sessions]
+        return True
 
     async def delete_by_project(self, project_id: ProjectId) -> None:
         project_sessions = {s.id for s in self.sessions if str(s.project_id) == str(project_id)}
         self.sessions = [s for s in self.sessions if s.id not in project_sessions]
         self._message_sessions = [
-            (msg, sid) for msg, sid in self._message_sessions if sid is None or sid not in project_sessions
+            (msg, sid, cid, pid, ph)
+            for msg, sid, cid, pid, ph in self._message_sessions
+            if str(pid) != str(project_id) and (sid is None or sid not in project_sessions)
         ]
-        self.messages = [msg for msg, _sid in self._message_sessions]
+        self.messages = [msg for msg, *_ in self._message_sessions]
 
     async def list_sessions(
         self,
-        project_id: ProjectId,  # noqa: ARG002
+        project_id: ProjectId,
         phase: SpecPhase,
         *,
-        context_id: str | None = None,  # noqa: ARG002
+        context_id: str | None = None,
+        limit: int = 100,
     ) -> list[ChatSessionSummary]:
         summaries: list[ChatSessionSummary] = []
-        for session in self.sessions:
-            if session.phase != phase:
+        for s in self.sessions:
+            if str(s.project_id) != str(project_id) or s.phase != phase:
                 continue
-            count = sum(1 for _msg, sid in self._message_sessions if sid == session.id)
+            if context_id is not None and s.context_id != context_id:
+                continue
+            count = sum(1 for _msg, sid, *_ in self._message_sessions if sid == s.id)
             summaries.append(
                 ChatSessionSummary(
-                    id=session.id,
-                    phase=session.phase,
-                    context_id=session.context_id,
-                    created_at=session.created_at,
+                    id=s.id,
+                    phase=s.phase,
+                    context_id=s.context_id,
+                    created_at=s.created_at,
                     message_count=count,
                 )
             )
-        return summaries
+        return summaries[:limit]
 
 
 class FakeConsistencyEvaluator:
@@ -776,3 +838,269 @@ class InMemoryUserDeploymentIntegrationRepository:
         existed = key in self.integrations
         self.integrations.pop(key, None)
         return existed
+
+
+class InMemoryFeatureImplementationRepository:
+    def __init__(self) -> None:
+        self.implementations: dict[str, Any] = {}
+
+    async def by_feature_id(self, feature_id: Any) -> Any:
+        return self.implementations.get(str(feature_id))
+
+    async def by_id(self, implementation_id: Any) -> Any:
+        for impl in self.implementations.values():
+            if str(impl.id) == str(implementation_id):
+                return impl
+        return None
+
+    async def list_by_project(self, project_id: Any) -> list[Any]:
+        return [impl for impl in self.implementations.values() if str(impl.project_id) == str(project_id)]
+
+    async def list_by_status(self, status: Any) -> list[Any]:
+        return [impl for impl in self.implementations.values() if impl.status == status]
+
+    async def save(self, implementation: Any) -> Any:
+        self.implementations[str(implementation.feature_id)] = implementation
+        return implementation
+
+    async def delete(self, feature_id: Any) -> None:
+        self.implementations.pop(str(feature_id), None)
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(y * y for y in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _to_summary(session: AgentSession) -> AgentSessionSummary:
+    return AgentSessionSummary(
+        session_id=session.session_id,
+        project_id=session.project_id,
+        session_type=session.session_type,
+        phase=session.phase,
+        skill_name=session.skill_name,
+        is_completed=session.is_completed,
+        total_llm_calls=session.total_llm_calls,
+        validation_errors=session.validation_errors,
+        user_instructions=session.user_instructions,
+        created_at=session.created_at,
+        reflection=session.reflection,
+    )
+
+
+class InMemoryAgentSessionStore(AgentMemoryPort):
+    def __init__(self) -> None:
+        self._store: dict[str, AgentSession] = {}
+
+    async def save_session(self, session: AgentSession) -> None:
+        self._store[session.session_id] = session
+
+    async def update_reflection(self, session_id: AgentMemoryId, reflection: str) -> None:
+        session = self._store.get(session_id)
+        if session is not None:
+            self._store[session_id] = AgentSession(
+                session_id=session.session_id,
+                project_id=session.project_id,
+                session_type=session.session_type,
+                phase=session.phase,
+                skill_name=session.skill_name,
+                conversation=session.conversation,
+                reasoning_log=list(session.reasoning_log) + [f"reflexion: {reflection}"],
+                tool_results=session.tool_results,
+                current_iteration=session.current_iteration,
+                max_iterations=session.max_iterations,
+                is_completed=session.is_completed,
+                output_json=session.output_json,
+                validation_is_valid=session.validation_is_valid,
+                validation_errors=session.validation_errors,
+                validation_error_messages=session.validation_error_messages,
+                total_llm_calls=session.total_llm_calls,
+                user_instructions=session.user_instructions,
+                embedding=session.embedding,
+                embedding_model=session.embedding_model,
+                reflection=reflection,
+                created_at=session.created_at,
+                updated_at=datetime.now(UTC),
+            )
+
+    async def load_session(self, session_id: AgentMemoryId) -> AgentSession | None:
+        return self._store.get(session_id)
+
+    async def list_sessions(
+        self,
+        project_id: ProjectId,
+        *,
+        phase: SpecPhase | None = None,
+    ) -> list[AgentSessionSummary]:
+        results: list[AgentSessionSummary] = []
+        for session in self._store.values():
+            if session.project_id != project_id:
+                continue
+            if phase is not None and session.phase != phase:
+                continue
+            results.append(_to_summary(session))
+        results.sort(key=lambda s: s.created_at, reverse=True)
+        return results
+
+    async def get_latest_session(
+        self,
+        project_id: ProjectId,
+        phase: SpecPhase,
+    ) -> AgentSession | None:
+        latest: AgentSession | None = None
+        for session in self._store.values():
+            if session.project_id != project_id:
+                continue
+            if session.phase != phase:
+                continue
+            if latest is None or session.created_at > latest.created_at:
+                latest = session
+        return latest
+
+    async def get_project_context(self, project_id: ProjectId) -> ProjectMemoryContext:
+        summaries = await self.list_sessions(project_id)
+        latest: dict[str, AgentSessionSummary] = {}
+        for s in summaries:
+            key = f"{s.session_type}:{s.phase.value}"
+            if key not in latest or s.created_at > latest[key].created_at:
+                latest[key] = s
+
+        reflections: list[str] = []
+        error_counter: dict[str, int] = {}
+        failed_sessions = [
+            s
+            for s in self._store.values()
+            if s.project_id == project_id and not s.is_completed and s.validation_error_messages
+        ]
+        failed_sessions.sort(key=lambda s: s.created_at, reverse=True)
+        for s in failed_sessions[:20]:
+            for msg in s.validation_error_messages:
+                error_counter[msg] = error_counter.get(msg, 0) + 1
+
+        for session in self._store.values():
+            if session.project_id != project_id:
+                continue
+            if session.reflection and session.reflection.strip():
+                reflections.append(session.reflection)
+        reflections.sort(
+            key=lambda _r: next(
+                (s.created_at for s in self._store.values() if s.reflection == _r),
+                datetime.min.replace(tzinfo=UTC),
+            ),
+            reverse=True,
+        )
+        reflections = reflections[:5]
+
+        common_errors = [f"{msg} (x{count})" for msg, count in sorted(error_counter.items(), key=lambda x: -x[1])[:5]]
+
+        return ProjectMemoryContext(
+            project_id=project_id,
+            latest_sessions=latest,
+            total_sessions=len(summaries),
+            common_validation_errors=common_errors,
+            recent_reflections=reflections,
+        )
+
+    async def get_similar_sessions(
+        self,
+        embedding: list[float],
+        *,
+        limit: int = 5,
+        exclude_project_id: ProjectId | None = None,
+        model: str | None = None,
+    ) -> list[AgentSessionSummary]:
+        scored: list[tuple[float, AgentSessionSummary]] = []
+        for session in self._store.values():
+            if exclude_project_id is not None and session.project_id == exclude_project_id:
+                continue
+            if session.embedding is None:
+                continue
+            if model is not None and session.embedding_model != model:
+                continue
+            sim = _cosine_similarity(embedding, session.embedding)
+            scored.append((sim, _to_summary(session)))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [s for _, s in scored[:limit]]
+
+    async def list_recent_sessions_global(
+        self,
+        *,
+        limit: int = 50,
+    ) -> list[AgentSessionSummary]:
+        sessions = sorted(self._store.values(), key=lambda s: s.created_at, reverse=True)
+        return [_to_summary(s) for s in sessions[:limit]]
+
+    async def count_completed_by_phase(
+        self,
+        *,
+        since_session_id: AgentMemoryId | None = None,
+        project_id: ProjectId | None = None,
+    ) -> dict[str, int]:
+        cutoff: datetime | None = None
+        if since_session_id is not None:
+            ref = self._store.get(since_session_id)
+            if ref is not None:
+                cutoff = ref.created_at
+        counts: dict[str, int] = {}
+        for s in self._store.values():
+            if not s.is_completed:
+                continue
+            if cutoff is not None and s.created_at <= cutoff:
+                continue
+            if project_id is not None and s.project_id != project_id:
+                continue
+            key = s.phase.value
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    async def delete_by_project(self, project_id: ProjectId) -> None:
+        for session_id in list(self._store):
+            if self._store[session_id].project_id == project_id:
+                del self._store[session_id]
+
+    async def purge_stale_sessions(
+        self,
+        *,
+        older_than_days: int = 7,
+        incomplete_only: bool = True,
+    ) -> int:
+        from datetime import UTC, datetime, timedelta
+
+        cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
+        to_delete: list[str] = []
+        for sid, sess in self._store.items():
+            if sess.updated_at < cutoff and (not incomplete_only or not sess.is_completed):
+                to_delete.append(sid)
+        for sid in to_delete:
+            del self._store[sid]
+        return len(to_delete)
+
+
+class InMemoryKnowledgePatternStore:
+    def __init__(self) -> None:
+        self._patterns: dict[str, list[KnowledgePattern]] = {}
+
+    async def replace_patterns(
+        self,
+        phase: SpecPhase,
+        patterns: list[KnowledgePattern],
+    ) -> None:
+        self._patterns[phase.value] = patterns
+
+    async def list_patterns(
+        self,
+        phase: SpecPhase | None = None,
+        *,
+        limit: int = 10,
+    ) -> list[KnowledgePattern]:
+        results: list[KnowledgePattern] = []
+        for phase_key, pats in self._patterns.items():
+            if phase is not None and phase_key != phase.value:
+                continue
+            results.extend(pats)
+        results.sort(key=lambda p: p.support_count, reverse=True)
+        return results[:limit]

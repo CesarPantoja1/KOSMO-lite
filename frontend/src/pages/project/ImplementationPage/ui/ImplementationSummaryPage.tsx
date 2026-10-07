@@ -2,16 +2,8 @@
 
 import { useCharacteristicStore } from '@/entities/characteristic';
 import type { ImplementationMetric } from '@/entities/implementation';
-import { fetchPreviewUrl, useImplementationStore } from '@/entities/implementation';
-import { connectIntegration, getIntegrationStatus } from '@/entities/integration';
-import {
-	buildRailwayAuthUrl,
-	consumeOAuthCodeVerifier,
-	consumeOAuthState,
-	createOAuthAuthorization,
-	getDefaultRedirectUri,
-} from '@/entities/integration';
-import { formatApiError } from '@/shared/api';
+import { useImplementationStore } from '@/entities/implementation';
+import { useRailwayOAuth } from '@/entities/integration';
 import { useProjectStore } from '@/entities/project';
 import { useProjectGithubRepo, type ProjectGithubViewState } from '@/features/github-sync';
 import {
@@ -21,20 +13,19 @@ import {
 	EntitiesIcon,
 	FlowIcon,
 	GitHub,
-	Load,
 	RulesIcon,
 	ScreensIcon,
 	ShieldCheckIcon,
 	SmallCheckIcon,
 	SparkleIcon,
 	StarIcon,
-	toast,
 	WarningIcon,
 } from '@/shared/ui';
 import { GestionRepositorioGitHub } from '@/widgets';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
+
 import type { PreconditionState } from '@/entities/deploy';
 import { useDeployStatus } from '@/entities/deploy';
 import { DeployPreconditionPanel } from './DeployPreconditionPanel';
@@ -107,140 +98,53 @@ const heroMeta: Record<
 const ImplementationSummaryPage = () => {
 	const router = useRouter();
 	const summary = useImplementationStore((s) => s.summary);
-	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-	const [previewLoading, setPreviewLoading] = useState(false);
-	const [railwayConnected, setRailwayConnected] = useState<boolean | null>(null);
+	const requiresReviewByFeature = useImplementationStore((s) => s.requiresReviewByFeature);
 
 	const currentProjectId = useProjectStore((s) => s.currentProject?.id ?? null);
 	const github = useProjectGithubRepo(currentProjectId);
 	const deploy = useDeployStatus(currentProjectId);
+	const railway = useRailwayOAuth();
 
 	const loadImplementation = useImplementationStore((s) => s.loadImplementation);
+	const currentCharacteristics = useCharacteristicStore((s) => s.currentCharacteristics);
 	const selectedCharacteristic = useCharacteristicStore(
 		(s) => s.currentCharacteristics.find((c) => c.id === s.selectedId) ?? null,
 	);
 
 	useEffect(() => {
-		if (summary || !selectedCharacteristic) return;
+		if (summary) return;
+		const target = selectedCharacteristic ?? currentCharacteristics[0] ?? null;
+		if (!target) return;
 		loadImplementation(
-			selectedCharacteristic.id,
-			selectedCharacteristic.title,
-			selectedCharacteristic.display_id,
+			target.id,
+			target.title,
+			target.display_id,
 		);
-	}, [summary, selectedCharacteristic, loadImplementation]);
+	}, [summary, selectedCharacteristic, currentCharacteristics, loadImplementation]);
 
+	const refreshRailway = railway.refresh;
+	const refreshDeploy = deploy.refresh;
 	useEffect(() => {
-		const project = useProjectStore.getState().currentProject;
-		if (!project) return;
-		let cancelled = false;
-		fetchPreviewUrl(project.id)
-			.then((url) => {
-				if (!cancelled) setPreviewUrl(url);
-			})
-			.catch(() => {
-				if (!cancelled) setPreviewUrl(null);
-			})
-			.finally(() => {
-				if (!cancelled) setPreviewLoading(false);
-			});
-		return () => {
-			cancelled = true;
+		const handleFocus = () => {
+			void refreshRailway();
+			void refreshDeploy();
 		};
-	}, []);
-
-	const [connectingRailway, setConnectingRailway] = useState(false);
-
-	const refreshRailwayStatus = useCallback(() => {
-		getIntegrationStatus('railway')
-			.then((s) => setRailwayConnected(s.is_connected))
-			.catch(() => setRailwayConnected(false));
-	}, []);
-
-	const handleConnectRailway = useCallback(() => {
-		setConnectingRailway(true);
-		const redirectUri = getDefaultRedirectUri();
-		const popup = window.open(
-			'',
-			'oauth-railway',
-			'width=600,height=700',
-		);
-		if (!popup) {
-			setConnectingRailway(false);
-			router.push('/perfil');
-			return;
-		}
-		void createOAuthAuthorization('railway')
-			.then(({ state, codeChallenge }) =>
-				popup.location.assign(buildRailwayAuthUrl(redirectUri, state, codeChallenge)),
-			)
-			.catch(() => {
-				popup.close();
-				setConnectingRailway(false);
-				toast.error('No se pudo iniciar la autorización de Railway. Intenta de nuevo.');
-			});
-	}, [router]);
-
-	useEffect(() => {
-		refreshRailwayStatus();
-
-		const handleFocus = () => refreshRailwayStatus();
 		window.addEventListener('focus', handleFocus);
 		document.addEventListener('visibilitychange', handleFocus);
-
-		const handleMessage = (event: MessageEvent) => {
-			if (event.origin !== window.location.origin) return;
-			if (event.data?.type === 'railway-oauth-code') {
-				if (!consumeOAuthState('railway', event.data.state)) {
-					setConnectingRailway(false);
-					toast.error('La respuesta de autorización de Railway no es válida. Intenta de nuevo.');
-					return;
-				}
-				const codeVerifier = consumeOAuthCodeVerifier('railway');
-				if (!codeVerifier) {
-					setConnectingRailway(false);
-					toast.error('La respuesta de autorización de Railway no es válida. Intenta de nuevo.');
-					return;
-				}
-				const code = event.data.code as string;
-				if (code) {
-					connectIntegration('railway', {
-						code,
-						redirect_uri: getDefaultRedirectUri(),
-						code_verifier: codeVerifier,
-					})
-						.then((result) => {
-							setRailwayConnected(result.is_connected);
-							toast.success(
-								`Cuenta de Railway vinculada como @${result.username ?? 'desconocido'}.`,
-							);
-						})
-						.catch((err) => {
-							toast.error(
-								formatApiError(err, 'Error al vincular la cuenta de Railway.'),
-							);
-						})
-						.finally(() => {
-							setConnectingRailway(false);
-						});
-				}
-			}
-		};
-		window.addEventListener('message', handleMessage);
 
 		return () => {
 			window.removeEventListener('focus', handleFocus);
 			document.removeEventListener('visibilitychange', handleFocus);
-			window.removeEventListener('message', handleMessage);
 		};
-	}, [refreshRailwayStatus]);
+	}, [refreshRailway, refreshDeploy]);
 
 	const precondition: PreconditionState = (() => {
-		if (github.loading || railwayConnected === null) return 'loading';
+		if (github.loading || railway.loading) return 'loading';
 		if (!github.status?.has_repository) {
 			if (github.viewState === 'not-linked') return 'github-not-linked';
 			return 'github-not-synced';
 		}
-		if (!railwayConnected) return 'railway-not-linked';
+		if (!railway.isConnected) return 'railway-not-linked';
 		return 'ready';
 	})();
 
@@ -259,6 +163,10 @@ const ImplementationSummaryPage = () => {
 	}
 
 	const meta = heroMeta[github.viewState] ?? heroMeta.synced;
+	const activeFeatureId = selectedCharacteristic?.id ?? summary.featureId;
+	const isRequiresReview =
+		summary.status === 'requires_review' ||
+		(activeFeatureId ? !!requiresReviewByFeature[activeFeatureId] : false);
 
 	return (
 		<div className='page-container'>
@@ -277,6 +185,27 @@ const ImplementationSummaryPage = () => {
 						Volver
 					</button>
 				</div>
+
+				{isRequiresReview && (
+					<div className='mb-6 flex items-center justify-between gap-4 rounded-xl border border-warning-200 bg-warning-50 p-4'>
+						<div className='flex items-center gap-3'>
+							<div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-warning-100'>
+								<WarningIcon size={20} color='text-warning-700' />
+							</div>
+							<div>
+								<h3 className='text-sm font-semibold text-warning-900'>
+									Implementación desactualizada
+								</h3>
+								<p className='text-xs text-warning-700'>
+									Las especificaciones de esta funcionalidad cambiaron en fases anteriores. El código actual no está sincronizado con la última versión de los requisitos.
+								</p>
+							</div>
+						</div>
+						<Link href='/proyecto/codigo' className='btn btn-ai btn-sm shrink-0'>
+							Regenerar código
+						</Link>
+					</div>
+				)}
 
 				<div className='grid lg:grid-cols-2 gap-6'>
 					<div className='flex flex-col gap-6'>
@@ -357,33 +286,7 @@ const ImplementationSummaryPage = () => {
 								<p className='mt-2 max-w-sm text-sm text-neutral-500 leading-relaxed'>
 									{meta.subtitle}
 								</p>
-								{previewLoading ? (
-									<button
-										type='button'
-										disabled
-										className='btn btn-primary mt-4 py-2.5 px-6'
-									>
-										<Load size={16} />
-										Preparando vista previa…
-									</button>
-								) : previewUrl ? (
-									<a
-										href={previewUrl}
-										target='_blank'
-										rel='noopener noreferrer'
-										className='btn btn-primary mt-4 py-2.5 px-6 inline-flex items-center gap-2'
-									>
-										Ver aplicación
-									</a>
-								) : (
-									<button
-										type='button'
-										disabled
-										className='btn btn-primary mt-4 py-2.5 px-6 opacity-60'
-									>
-										Vista previa no disponible
-									</button>
-								)}
+
 							</div>
 						</div>
 
@@ -405,18 +308,22 @@ const ImplementationSummaryPage = () => {
 						{currentProjectId &&
 							(deploy.status && deploy.status.status !== 'idle' ? (
 								<DeployResultPanel
+									projectId={currentProjectId}
 									status={deploy.status}
 									error={deploy.error}
 									onRedeploy={() => deploy.deploy()}
 									deploying={deploy.deploying}
+									onDeleteSuccess={deploy.refresh}
+									onRefresh={deploy.refresh}
+									refreshing={deploy.loading}
 								/>
 							) : (
 								<DeployPreconditionPanel
 									precondition={precondition}
 									onDeploy={() => deploy.deploy()}
 									deploying={deploy.deploying}
-									onConnectRailway={handleConnectRailway}
-									connectingRailway={connectingRailway}
+									onConnectRailway={railway.handleConnect}
+									connectingRailway={railway.actionLoading}
 									deployError={deploy.error}
 								/>
 							))}

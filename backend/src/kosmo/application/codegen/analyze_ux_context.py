@@ -14,6 +14,7 @@ from kosmo.contracts.sdd.ux_context import (
     UXAnalysisOutput,
     UXContext,
 )
+from kosmo.domain.codegen.palette_generator import generate_domain_tokens
 from kosmo.domain.sdd.document_converters import document_to_markdown
 
 ARCHETYPE_KEYWORDS: dict[BusinessArchetype, frozenset[str]] = {
@@ -114,61 +115,11 @@ ARCHETYPE_KEYWORDS: dict[BusinessArchetype, frozenset[str]] = {
 }
 
 THEME_TOKENS_BY_ARCHETYPE: dict[BusinessArchetype, BootstrapDesignTokens] = {
-    BusinessArchetype.DASHBOARD: BootstrapDesignTokens(
-        primary_color="#4f46e5",
-        primary_rgb="79, 70, 229",
-        font_family_sans='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-        border_radius="0.375rem",
-        border_radius_sm="0.25rem",
-        border_radius_lg="0.5rem",
-        card_shadow="0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
-        table_density_class="table-sm",
-        body_bg="#f8fafc",
-    ),
-    BusinessArchetype.STOREFRONT: BootstrapDesignTokens(
-        primary_color="#0f766e",
-        primary_rgb="15, 118, 110",
-        font_family_sans='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-        border_radius="0.5rem",
-        border_radius_sm="0.25rem",
-        border_radius_lg="0.75rem",
-        card_shadow="0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.04)",
-        table_density_class="table",
-        body_bg="#ffffff",
-    ),
-    BusinessArchetype.WORKFLOW: BootstrapDesignTokens(
-        primary_color="#2563eb",
-        primary_rgb="37, 99, 235",
-        font_family_sans='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-        border_radius="0.375rem",
-        border_radius_sm="0.25rem",
-        border_radius_lg="0.5rem",
-        card_shadow="0 1px 3px rgba(0,0,0,0.05)",
-        table_density_class="table-sm",
-        body_bg="#f8fafc",
-    ),
-    BusinessArchetype.CONTENT: BootstrapDesignTokens(
-        primary_color="#7c3aed",
-        primary_rgb="124, 58, 237",
-        font_family_sans='Georgia, Cambria, "Times New Roman", Times, serif',
-        border_radius="0.5rem",
-        border_radius_sm="0.25rem",
-        border_radius_lg="0.75rem",
-        card_shadow="0 2px 4px rgba(0,0,0,0.05)",
-        table_density_class="table",
-        body_bg="#fafafa",
-    ),
-    BusinessArchetype.SAAS_TOOL: BootstrapDesignTokens(
-        primary_color="#0f766e",
-        primary_rgb="15, 118, 110",
-        font_family_sans='system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-        border_radius="0.5rem",
-        border_radius_sm="0.25rem",
-        border_radius_lg="0.75rem",
-        card_shadow="0 1px 3px rgba(0,0,0,0.05)",
-        table_density_class="table",
-        body_bg="#f8fafc",
-    ),
+    BusinessArchetype.DASHBOARD: generate_domain_tokens(BusinessArchetype.DASHBOARD),
+    BusinessArchetype.STOREFRONT: generate_domain_tokens(BusinessArchetype.STOREFRONT),
+    BusinessArchetype.WORKFLOW: generate_domain_tokens(BusinessArchetype.WORKFLOW),
+    BusinessArchetype.CONTENT: generate_domain_tokens(BusinessArchetype.CONTENT),
+    BusinessArchetype.SAAS_TOOL: generate_domain_tokens(BusinessArchetype.SAAS_TOOL),
 }
 
 
@@ -193,7 +144,7 @@ def classify_archetype(discovery_text: str, feature_title: str = "", feature_des
 
 
 class UXAnalyzerUseCase:
-    """Analizador determinista de UX y arquitectura de información contextual."""
+    """Analizador determinista y enriquecedor de UX y tokens de diseño visual."""
 
     def __init__(
         self,
@@ -225,7 +176,9 @@ class UXAnalyzerUseCase:
             archetype, feature_title, feature_desc
         )
 
-        tokens = THEME_TOKENS_BY_ARCHETYPE.get(archetype, THEME_TOKENS_BY_ARCHETYPE[BusinessArchetype.SAAS_TOOL])
+        # Generación de tokens visuales adaptativos según el arquetipo y texto de descubrimiento
+        seed_context = f"{discovery_md} {feature_title} {feature_desc}".strip()
+        tokens = generate_domain_tokens(archetype, seed_text=seed_context)
 
         ux_context = UXContext(
             archetype=archetype,
@@ -283,7 +236,19 @@ class UXAnalyzerUseCase:
             return (
                 ShellPattern.SIDEBAR,
                 DataDensity.HIGH,
-                ["PageHeader", "Stat", "Table", "Card", "BadgeStatus", "Select", "Button"],
+                [
+                    "PageHeader",
+                    "Stat",
+                    "DataTable",
+                    "Table",
+                    "Card",
+                    "Dropdown",
+                    "BadgeStatus",
+                    "Select",
+                    "Button",
+                    "Toast",
+                    "Skeleton",
+                ],
                 [
                     "Grid de cards como vista de datos principal",
                     "Hero banner publicitario",
@@ -291,14 +256,27 @@ class UXAnalyzerUseCase:
                     "Navegación horizontal exclusiva",
                 ],
                 "Usa PageHeader con acciones principales a la derecha, fila de KPIs (Stat) arriba, "
-                "y Table estructurada con filtros (Select / Input) para los registros. Evita Cards repetitivas.",
+                "y DataTable / Table estructurada con filtros (Select / Input) para los registros. "
+                "Evita Cards repetitivas.",
                 "El dominio contiene métricas, balances o reportes operativos con alta densidad de información.",
             )
         if archetype == BusinessArchetype.STOREFRONT:
             return (
                 ShellPattern.TOP_NAV,
                 DataDensity.LOW,
-                ["PageHeader", "Card", "Badge", "Button", "Input", "Modal", "EmptyState"],
+                [
+                    "PageHeader",
+                    "Card",
+                    "CardGrid",
+                    "Drawer",
+                    "Badge",
+                    "Button",
+                    "Input",
+                    "Modal",
+                    "Pagination",
+                    "Toast",
+                    "EmptyState",
+                ],
                 [
                     "Tablas densas de backoffice sin imágenes ni resúmenes",
                     "Sidebar abrumador de administración",
@@ -312,40 +290,66 @@ class UXAnalyzerUseCase:
             return (
                 ShellPattern.SIDEBAR,
                 DataDensity.MEDIUM,
-                ["PageHeader", "Steps", "Card", "BadgeStatus", "Input", "Select", "Textarea", "Button", "Alert"],
+                [
+                    "PageHeader",
+                    "Steps",
+                    "Card",
+                    "Timeline",
+                    "BadgeStatus",
+                    "Input",
+                    "Select",
+                    "Switch",
+                    "Textarea",
+                    "Button",
+                    "Alert",
+                    "Toast",
+                ],
                 [
                     "Formularios largos en una sola columna sin pasos ni agrupamiento",
                     "Ausencia de feedback visual de estado (BadgeStatus)",
                     "Ocultar el progreso de la tarea",
                 ],
                 "Estructura la pantalla con Steps si es un flujo secuencial, usa Card agrupadas con títulos "
-                "claros para cada sección de datos y BadgeStatus para indicar el estado del proceso.",
+                "claros para cada sección de datos, Timeline para auditoría y BadgeStatus para indicar el estado.",
                 "El dominio requiere ejecución de trámites, aprobaciones o etapas con trazabilidad de estado.",
             )
         if archetype == BusinessArchetype.CONTENT:
             return (
                 ShellPattern.MINIMAL,
                 DataDensity.LOW,
-                ["PageHeader", "Card", "Tabs", "Badge", "Button", "EmptyState"],
+                ["PageHeader", "Card", "Tabs", "Accordion", "Breadcrumb", "Separator", "Badge", "Button", "EmptyState"],
                 [
                     "Tablas compactas de datos numéricos",
                     "Exceso de botones y controles por pantalla",
                 ],
                 "Prioriza la legibilidad tipográfica en un contenedor centrado (col-lg-8 mx-auto), "
-                "organiza el contenido por Tabs o secciones limpias.",
+                "organiza el contenido por Tabs, Accordion o secciones limpias.",
                 "El dominio es de documentación, artículos o contenido informativo.",
             )
 
         return (
             ShellPattern.TOP_NAV,
             DataDensity.MEDIUM,
-            ["PageHeader", "Card", "Table", "Input", "Button", "Badge", "Alert", "EmptyState"],
+            [
+                "PageHeader",
+                "Card",
+                "DataTable",
+                "Table",
+                "CommandPalette",
+                "Dropdown",
+                "Input",
+                "Button",
+                "Badge",
+                "Alert",
+                "Toast",
+                "EmptyState",
+            ],
             [
                 "Diseños sobrecargados",
                 "Textos de bienvenida genéricos",
             ],
-            "Estructura funcional directa: PageHeader con título, formulario conciso o listado de registros "
-            "con acciones claras y validación visible.",
+            "Estructura funcional directa: PageHeader con título, formulario o listado de registros con DataTable, "
+            "acciones claras y validación visible.",
             "Aplicación SaaS con herramientas y utilidades interactivas.",
         )
 
@@ -356,8 +360,14 @@ class UXAnalyzerUseCase:
         return (
             "## Directivas de UX y Arquitectura de UI (NON-NEGOTIABLE)\n"
             f"- **Arquetipo de negocio:** `{ctx.archetype.value}`\n"
+            f"- **Personalidad visual:** `{ctx.tokens.brand_personality}`\n"
             f"- **Navegación / Shell:** `{ctx.shell_pattern.value}`\n"
             f"- **Densidad de datos requerida:** `{ctx.data_density.value}`\n"
+            f"- **Design Tokens:** Definidos en `src/lib/design-tokens.ts` e inyectados en `src/app/globals.css`. "
+            f"Color primario: `{ctx.tokens.primary_color}`, secundario: `{ctx.tokens.secondary_color}`, "
+            f"acento: `{ctx.tokens.accent_color}`. "
+            "Usa clases semánticas de Bootstrap (`text-primary`, `bg-success`, `btn-primary`) o "
+            "variables CSS (`var(--app-*)`). PROHIBIDO inventar colores hex arbitrarios.\n"
             f"- **Componentes del Design System recomendados:** `{components_list}`\n"
             f"- **Pauta de Layout:** {ctx.layout_guideline}\n"
             f"- **Fundamento de Diseño:** 100% Bootstrap 5 (clases `container`, `row`, `col-*`, `d-flex`, `gap-*`). "

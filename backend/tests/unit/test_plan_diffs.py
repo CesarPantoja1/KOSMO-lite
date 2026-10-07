@@ -82,3 +82,45 @@ def test_append_to_empty_markdown() -> None:
     result = apply_change_diff("", before="", after="Nueva sección")
 
     assert result == "\n\nNueva sección"
+
+
+@pytest.mark.unit
+def test_replace_with_crlf_newlines() -> None:
+    text_crlf = "## Actores\r\n\r\n- Administrador: Gestiona.\r\n"
+    result = apply_change_diff(text_crlf, before="- Administrador: Gestiona.\n", after="- Jefe: Gestiona.\n")
+
+    assert result is not None
+    assert "Jefe: Gestiona." in result
+    assert "Administrador" not in result
+
+
+@pytest.mark.unit
+def test_delete_with_leading_and_trailing_newlines() -> None:
+    markdown = "## Actores\n\n- Administrador: Gestiona el sistema.\n- Operador: Opera.\n"
+    # El LLM genera diff para eliminar con saltos de línea en bordes
+    result = apply_change_diff(markdown, before="\n- Administrador: Gestiona el sistema.\n", after="")
+
+    assert result is not None
+    assert "Administrador" not in result
+    assert "- Operador: Opera." in result
+    # Debe ser diferente al original (eliminación exitosa)
+    assert result != markdown
+
+
+@pytest.mark.unit
+def test_delete_does_not_falsely_succeed_with_empty_after_when_before_missing() -> None:
+    markdown = "## Actores\n\n- Empleado: Trabaja aquí.\n"
+    # Si before no existe en absoluto, debe retornar None y NO markdown
+    result = apply_change_diff(markdown, before="Inexistente", after="")
+
+    assert result is None
+
+
+@pytest.mark.unit
+def test_idempotency_does_not_trigger_when_before_still_in_text() -> None:
+    markdown = "## Actores\n- Administrador\n- Jefe\n"
+    result = apply_change_diff(markdown, before="- Administrador", after="- SuperJefe")
+
+    assert result is not None
+    assert "- SuperJefe" in result
+    assert "- Administrador" not in result

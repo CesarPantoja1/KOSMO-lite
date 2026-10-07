@@ -2,15 +2,15 @@ import { apiClient } from './client';
 import { generateCodeVerifier, generateCodeChallenge } from '@/shared/lib/pkce';
 import { useAuthStore } from '@/shared/model/auth.store';
 import type {
-	UserPublic,
+	RegisterResponse,
 	AuthorizationCodeResponse,
 	TokenPairResponse,
 	PrincipalView,
 } from './auth.types';
 
 export const authApi = {
-	async register(name: string, email: string, password: string): Promise<UserPublic> {
-		return apiClient<UserPublic>('/api/v1/auth/register', {
+	async register(name: string, email: string, password: string): Promise<RegisterResponse> {
+		return apiClient<RegisterResponse>('/api/v1/auth/register', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name, email, password }),

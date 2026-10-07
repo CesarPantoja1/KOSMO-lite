@@ -51,3 +51,17 @@ class TestCreateSession:
 
         # Assert
         assert s1.conversation is not s2.conversation
+
+    @pytest.mark.unit
+    def test_create_session_with_injected_now(self) -> None:
+        from datetime import UTC, datetime
+
+        fixed_time = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+        session = create_session(
+            project_id=ProjectId("prj_01KT01ABC"),
+            session_type="generation",
+            phase=SpecPhase.DESCUBRIMIENTO,
+            now=fixed_time,
+        )
+        assert session.created_at == fixed_time
+        assert session.updated_at == fixed_time

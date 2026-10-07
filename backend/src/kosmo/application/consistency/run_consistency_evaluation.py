@@ -15,7 +15,10 @@ from kosmo.contracts.ai.consistency import (
     ConsistencyEvaluationRepository,
     ConsistencyEvaluationStatus,
     ConsistencyEvaluator,
+    ConsistencyStatus,
 )
+from kosmo.contracts.auth.context import current_user_id
+from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import ConsistencyEvaluationId, ProjectId
 from kosmo.contracts.sdd.repositories import (
@@ -34,7 +37,7 @@ _log = structlog.get_logger(__name__)
 
 def _to_applied_change(raw: dict[str, object]) -> AppliedChange:
     return AppliedChange(
-        id=IdGenerator.generate("plan_change"),
+        id=str(raw.get("id", "")),
         section=str(raw.get("section", "")),
         description=str(raw.get("description", "")),
         diff=DiffCambio(
@@ -51,6 +54,7 @@ async def _has_target_artifacts(
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
     diagram_repo: ActivityDiagramRepository,
+    implementation_repo: FeatureImplementationRepository | None = None,
 ) -> bool:
     features = await feature_repo.list_by_project(project_id)
     if not features:
@@ -63,6 +67,12 @@ async def _has_target_artifacts(
         if target_phase == SpecPhase.REQUISITOS and await requirement_repo.by_feature_id(feature.id):
             return True
         if target_phase == SpecPhase.MODELO and await diagram_repo.exists(feature.id):
+            return True
+        if (
+            target_phase == SpecPhase.IMPLEMENTACION
+            and implementation_repo is not None
+            and await implementation_repo.by_feature_id(feature.id)
+        ):
             return True
     return False
 
@@ -77,6 +87,7 @@ async def run_consistency_evaluation(
     document_repo: DocumentRepository,
     evaluator: ConsistencyEvaluator,
     evaluation_repo: ConsistencyEvaluationRepository,
+    implementation_repo: FeatureImplementationRepository | None = None,
 ) -> None:
     """Evaluacion fresca de un par de fases, ejecutada por el outbox worker.
 
@@ -100,117 +111,151 @@ async def run_consistency_evaluation(
         _log.warning("consistency.project_missing", project_id=str(project_id))
         return
 
-    for target_phase in trace_downstream_phases(source_phase):
-        try:
-            has_artifacts = await _has_target_artifacts(
-                target_phase=target_phase,
-                project_id=project_id,
-                feature_repo=feature_repo,
-                requirement_repo=requirement_repo,
-                diagram_repo=diagram_repo,
-            )
-            if not has_artifacts:
-                await _supersede_pair(
-                    project_id,
-                    source_phase,
-                    target_phase,
-                    kept_keys=set(),
-                    evaluation_repo=evaluation_repo,
-                )
-                continue
+    user_id = payload.get("user_id") or (str(project.owner_id) if project.owner_id else None)
+    user_token = current_user_id.set(str(user_id)) if user_id else None
 
-            eval_start = time.monotonic()
-            result = await evaluator.evaluate(
-                source_phase=source_phase,
-                target_phase=target_phase,
-                project_id=project_id,
-                applied_changes=changes,
-            )
-            _log.info(
-                "consistency.eval_ms",
-                project_id=str(project_id),
-                source=source_phase.value,
-                target=target_phase.value,
-                eval_ms=int((time.monotonic() - eval_start) * 1000),
-            )
-        except Exception as exc:
-            _log.warning(
-                "consistency.evaluation_failed",
-                project_id=str(project_id),
-                source=source_phase.value,
-                target=target_phase.value,
-                exc_info=True,
-            )
-            await evaluation_repo.save(
-                ConsistencyEvaluation(
-                    id=ConsistencyEvaluationId(IdGenerator.generate("consistency_evaluation")),
-                    project_id=project_id,
-                    source_phase=source_phase,
-                    target_phase=target_phase,
-                    target_artifact_id="_pair",
-                    artifact_type="_PairEvaluation",
-                    snapshot_hash="",
-                    status=ConsistencyEvaluationStatus.FAILED,
-                    source_changes=raw_changes,
-                    operation_id=operation_id,
-                    failure_reason=str(exc)[:1000],
-                )
-            )
-            continue
-
-        items = await enrich_impact_items(
-            result,
-            target_phase,
-            source_phase,
-            feature_repo,
-            requirement_repo,
-            diagram_repo,
-        )
-
-        kept_keys: set[str] = set()
-        for item in items:
-            key = _row_key(item)
-            kept_keys.add(key)
+    try:
+        for target_phase in trace_downstream_phases(source_phase):
             try:
-                parts = await fetch_snapshot_parts(
-                    project_id=project_id,
-                    source_phase=source_phase,
+                has_artifacts = await _has_target_artifacts(
                     target_phase=target_phase,
-                    target_artifact_id=key,
-                    artifact_type=item.artifact_type,
-                    document_repo=document_repo,
+                    project_id=project_id,
                     feature_repo=feature_repo,
                     requirement_repo=requirement_repo,
                     diagram_repo=diagram_repo,
+                    implementation_repo=implementation_repo,
                 )
-                snapshot_hash = compute_snapshot_hash(*parts)
-            except Exception:
-                _log.warning("consistency.snapshot_failed", exc_info=True)
-                continue
+                if not has_artifacts:
+                    await _supersede_pair(
+                        project_id,
+                        source_phase,
+                        target_phase,
+                        kept_keys=set(),
+                        evaluation_repo=evaluation_repo,
+                    )
+                    continue
 
-            await evaluation_repo.save(
-                ConsistencyEvaluation(
-                    id=ConsistencyEvaluationId(IdGenerator.generate("consistency_evaluation")),
-                    project_id=project_id,
+                eval_start = time.monotonic()
+                result = await evaluator.evaluate(
                     source_phase=source_phase,
                     target_phase=target_phase,
-                    target_artifact_id=key,
-                    artifact_type=item.artifact_type,
-                    snapshot_hash=snapshot_hash,
-                    status=ConsistencyEvaluationStatus.COMPLETED,
-                    result=impact_item_to_dict(item),
-                    source_changes=raw_changes,
-                    operation_id=operation_id,
+                    project_id=project_id,
+                    applied_changes=changes,
                 )
+                _log.info(
+                    "consistency.eval_ms",
+                    project_id=str(project_id),
+                    source=source_phase.value,
+                    target=target_phase.value,
+                    eval_ms=int((time.monotonic() - eval_start) * 1000),
+                )
+            except Exception as exc:
+                _log.warning(
+                    "consistency.evaluation_failed",
+                    project_id=str(project_id),
+                    source=source_phase.value,
+                    target=target_phase.value,
+                    exc_info=True,
+                )
+                await evaluation_repo.save(
+                    ConsistencyEvaluation(
+                        id=ConsistencyEvaluationId(IdGenerator.generate("consistency_evaluation")),
+                        project_id=project_id,
+                        source_phase=source_phase,
+                        target_phase=target_phase,
+                        target_artifact_id="_pair",
+                        artifact_type="_PairEvaluation",
+                        snapshot_hash="",
+                        status=ConsistencyEvaluationStatus.FAILED,
+                        source_changes=raw_changes,
+                        operation_id=operation_id,
+                        failure_reason=str(exc)[:1000],
+                    )
+                )
+                continue
+
+            if result.status == ConsistencyStatus.ANALISIS_FALLIDO:
+                _log.warning(
+                    "consistency.evaluation_reported_failure",
+                    project_id=str(project_id),
+                    source=source_phase.value,
+                    target=target_phase.value,
+                    reason=result.failure_reason,
+                )
+                await evaluation_repo.save(
+                    ConsistencyEvaluation(
+                        id=ConsistencyEvaluationId(IdGenerator.generate("consistency_evaluation")),
+                        project_id=project_id,
+                        source_phase=source_phase,
+                        target_phase=target_phase,
+                        target_artifact_id="_pair",
+                        artifact_type="_PairEvaluation",
+                        snapshot_hash="",
+                        status=ConsistencyEvaluationStatus.FAILED,
+                        source_changes=raw_changes,
+                        operation_id=operation_id,
+                        failure_reason=(result.failure_reason or "Analisis fallido")[:1000],
+                    )
+                )
+                continue
+
+            items = await enrich_impact_items(
+                result,
+                target_phase,
+                source_phase,
+                feature_repo,
+                requirement_repo,
+                diagram_repo,
             )
 
-        await _supersede_pair(
-            project_id,
-            source_phase,
-            target_phase,
-            kept_keys=kept_keys,
-            evaluation_repo=evaluation_repo,
-        )
+            kept_keys: set[str] = set()
+            for item in items:
+                key = _row_key(item)
+                kept_keys.add(key)
+                try:
+                    parts = await fetch_snapshot_parts(
+                        project_id=project_id,
+                        source_phase=source_phase,
+                        target_phase=target_phase,
+                        target_artifact_id=key,
+                        artifact_type=item.artifact_type,
+                        document_repo=document_repo,
+                        feature_repo=feature_repo,
+                        requirement_repo=requirement_repo,
+                        diagram_repo=diagram_repo,
+                        implementation_repo=implementation_repo,
+                    )
+                    snapshot_hash = compute_snapshot_hash(*parts)
+                except Exception:
+                    _log.warning("consistency.snapshot_failed", exc_info=True)
+                    continue
+
+                await evaluation_repo.save(
+                    ConsistencyEvaluation(
+                        id=ConsistencyEvaluationId(IdGenerator.generate("consistency_evaluation")),
+                        project_id=project_id,
+                        source_phase=source_phase,
+                        target_phase=target_phase,
+                        target_artifact_id=key,
+                        artifact_type=item.artifact_type,
+                        snapshot_hash=snapshot_hash,
+                        status=ConsistencyEvaluationStatus.COMPLETED,
+                        result=impact_item_to_dict(item),
+                        source_changes=raw_changes,
+                        operation_id=operation_id,
+                    )
+                )
+
+            await _supersede_pair(
+                project_id,
+                source_phase,
+                target_phase,
+                kept_keys=kept_keys,
+                evaluation_repo=evaluation_repo,
+            )
+    finally:
+        if user_token is not None:
+            current_user_id.reset(user_token)
 
 
 def _row_key(item: Any) -> str:

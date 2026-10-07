@@ -174,7 +174,7 @@ def test_test_ai_connection_input_validation() -> None:
     # Caso válido con clave
     input_with_key = TestAIConnectionInput(
         provider=AIProvider.GOOGLE,
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         api_key="AIzaSy...",
     )
     assert input_with_key.provider == AIProvider.GOOGLE
@@ -183,7 +183,7 @@ def test_test_ai_connection_input_validation() -> None:
     # Caso válido sin clave (prueba con clave persistida)
     input_no_key = TestAIConnectionInput(
         provider=AIProvider.GOOGLE,
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
     )
     assert input_no_key.api_key is None
 
@@ -196,7 +196,7 @@ def test_test_ai_connection_input_validation() -> None:
 
     # Clave demasiado larga
     with pytest.raises(InvalidApiKeyError):
-        TestAIConnectionInput(provider=AIProvider.GOOGLE, model="gemini-2.5-flash", api_key="k" * 501)
+        TestAIConnectionInput(provider=AIProvider.GOOGLE, model="gemini-3.8-flash", api_key="k" * 501)
 
 
 @pytest.mark.unit

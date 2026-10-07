@@ -10,7 +10,7 @@ import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import structlog
 
@@ -21,7 +21,8 @@ from kosmo.application.codegen.analyze_ux_context import (
 from kosmo.contracts.sdd.codegen import (
     CodeRunnerPort,
     CodeWorkspace,
-    PreviewPublisherPort,
+    FileSystemReader,
+    FileSystemWriter,
     WorkspaceManagerPort,
     WorkspaceRepository,
     WorkspaceStatus,
@@ -31,13 +32,13 @@ from kosmo.contracts.sdd.repositories import DocumentRepository, ProjectReposito
 from kosmo.domain.codegen.site_config import format_site_config
 from kosmo.domain.sdd.document_converters import document_to_markdown
 from kosmo.infrastructure.git import (
-    git_add,
-    git_commit,
-    git_has_commits,
-    git_head_hash,
-    git_init,
-    git_revert_commit,
-    git_rollback,
+    git_add_async,
+    git_commit_async,
+    git_has_commits_async,
+    git_head_hash_async,
+    git_init_async,
+    git_revert_commit_async,
+    git_rollback_async,
 )
 from kosmo.infrastructure.sandbox.code_runner import INSTALL_COMMAND, INSTALL_TIMEOUT_SECONDS
 
@@ -138,7 +139,9 @@ def _generate_opencode_json(
         "permission": {
             "read": {"*": "allow"},
             "edit": {"*": "allow"},
-            "bash": {"*": "allow"},
+            "bash": "deny",
+            "external_directory": "deny",
+            "websearch": "allow",
         },
         # Flujo headless: el agente no debe bloquearse pidiendo aclaraciones al usuario
         "tools": {
@@ -152,7 +155,40 @@ class WorkspaceLockedError(RuntimeError):
     """Lanzada cuando se intenta acceder o bloquear un workspace que ya está bloqueado."""
 
 
-class LocalWorkspaceManager(WorkspaceManagerPort):
+class LocalFileSystemReader(FileSystemReader):
+    """Adaptador de infraestructura para lectura del sistema de archivos local."""
+
+    def list_files(self, root: str | Path) -> tuple[str, ...]:
+        root_path = Path(root)
+        if not root_path.is_dir():
+            return ()
+        files: list[str] = []
+        for p in root_path.rglob("*"):
+            if p.is_file():
+                with contextlib.suppress(ValueError):
+                    files.append(p.relative_to(root_path).as_posix())
+        return tuple(files)
+
+    def read_text(self, path: str | Path) -> str | None:
+        p = Path(path)
+        if not p.is_file():
+            return None
+        try:
+            return p.read_text(encoding="utf-8")
+        except Exception:
+            return None
+
+
+class LocalFileSystemWriter(FileSystemWriter):
+    """Adaptador de infraestructura para escritura del sistema de archivos local."""
+
+    def write_text(self, path: str | Path, content: str) -> None:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+
+
+class LocalWorkspaceManager(WorkspaceManagerPort, FileSystemReader, FileSystemWriter):
     """Adaptador de infraestructura para la gestión de workspaces locales."""
 
     def __init__(
@@ -164,8 +200,8 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         mcp_url: str = "http://127.0.0.1:8000/mcp",
         project_repo: ProjectRepository | None = None,
         code_runner: CodeRunnerPort | None = None,
-        preview_publisher: PreviewPublisherPort | None = None,
         document_repo: DocumentRepository | None = None,
+        fs_reader: FileSystemReader | None = None,
     ) -> None:
         self._workspaces_root = Path(workspaces_root)
         self._workspace_repo = workspace_repo
@@ -174,12 +210,25 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         self._mcp_url = mcp_url
         self._project_repo = project_repo
         self._code_runner = code_runner
-        self._preview_publisher = preview_publisher
         self._document_repo = document_repo
+        self._fs_reader = fs_reader or LocalFileSystemReader()
+        self._fs_writer = LocalFileSystemWriter()
         self._in_memory_locks: set[str] = set()
         # ponytail: guard global del proceso; la carrera multi-worker se cierra con el
         # CAS (UPDATE condicional) de update_lock en el repositorio SQL.
         self._lock_guard = asyncio.Lock()
+
+    def list_files(self, root: str | Path) -> tuple[str, ...]:
+        """Implementación de FileSystemReader delegada en LocalFileSystemReader."""
+        return self._fs_reader.list_files(root)
+
+    def read_text(self, path: str | Path) -> str | None:
+        """Implementación de FileSystemReader delegada en LocalFileSystemReader."""
+        return self._fs_reader.read_text(path)
+
+    def write_text(self, path: str | Path, content: str) -> None:
+        """Implementación de FileSystemWriter delegada en LocalFileSystemWriter."""
+        self._fs_writer.write_text(path, content)
 
     @staticmethod
     def _extract_manifest(workspace_path: Path) -> tuple[str, ...]:
@@ -201,46 +250,27 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
 
         return tuple(sorted(files))
 
+    def _resolve_target_dir(self, project_id: ProjectId) -> Path:
+        """Resuelve y valida que el directorio del proyecto resida estrictamente dentro de la raíz."""
+        root_dir = self._workspaces_root.resolve()
+        target_dir = (root_dir / str(project_id)).resolve()
+        if not target_dir.is_relative_to(root_dir) or target_dir == root_dir:
+            raise ValueError(f"Workspace path escapes configured root for project '{project_id}'.")
+        return target_dir
+
     async def ensure_workspace(self, project_id: ProjectId) -> CodeWorkspace:
         """Crea el directorio del workspace si no existe (idempotente) y retorna la entidad."""
-        target_dir = (self._workspaces_root / str(project_id)).resolve()
-        created_new = False
+        target_dir = self._resolve_target_dir(project_id)
+        created_new = not target_dir.exists()
 
-        if not target_dir.exists():
-            target_dir.mkdir(parents=True, exist_ok=True)
-            created_new = True
-
-            if self._template_dir and self._template_dir.exists():
-                shutil.copytree(self._template_dir, target_dir, dirs_exist_ok=True)
-
-            if self._git_init:
-                with contextlib.suppress(Exception):
-                    git_init(target_dir)
-
-        # Generar AGENTS.md y opencode.json si no existen
-        agents_file = target_dir / "AGENTS.md"
-        if not agents_file.exists():
-            project_name = str(project_id)
-            if self._project_repo:
-                with contextlib.suppress(Exception):
-                    proj = await self._project_repo.by_id(project_id)
-                    if proj and proj.name:
-                        project_name = proj.name
-            agents_file.write_text(_generate_agents_md(project_name), encoding="utf-8")
-
-        opencode_file = target_dir / "opencode.json"
-        if not opencode_file.exists():
-            opencode_file.write_text(
-                _generate_opencode_json(project_id, str(target_dir), self._mcp_url),
-                encoding="utf-8",
-            )
-
-        # Actualizar site.ts con el nombre, descripción y arquetipo reales del proyecto
-        site_file = target_dir / "src" / "lib" / "site.ts"
-        if site_file.exists() and self._project_repo:
+        # Resuelve project_name y site_config de forma asíncrona desde repositorios
+        project_name = str(project_id)
+        site_config_content: str | None = None
+        if self._project_repo:
             with contextlib.suppress(Exception):
                 proj = await self._project_repo.by_id(project_id)
                 if proj and proj.name:
+                    project_name = proj.name
                     desc = proj.description or "Aplicación generada con KOSMO."
                     archetype_val = "saas_tool"
                     primary_color = "#0f766e"
@@ -253,16 +283,13 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
                             tokens = THEME_TOKENS_BY_ARCHETYPE.get(arch)
                             if tokens:
                                 primary_color = tokens.primary_color
-                    content = format_site_config(
+                    site_config_content = format_site_config(
                         name=proj.name,
                         description=desc,
                         archetype=archetype_val,
                         primary_color=primary_color,
                     )
-                    site_file.write_text(content, encoding="utf-8")
 
-        # Generar las skills en .opencode/skills si no existen
-        skills_dir = target_dir / ".opencode" / "skills"
         skills_map = {
             "kosmo-implementation": _generate_implementation_skill_md(),
             "kosmo-testing": _generate_testing_skill_md(),
@@ -271,18 +298,105 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
             "kosmo-ui": _generate_ui_skill_md(),
             "tdd": _generate_tdd_skill_md(),
         }
-        for skill_name, skill_content in skills_map.items():
-            skill_file = skills_dir / skill_name / "SKILL.md"
-            if not skill_file.exists():
-                skill_file.parent.mkdir(parents=True, exist_ok=True)
-                skill_file.write_text(skill_content, encoding="utf-8")
+
+        def _init_disk_workspace() -> None:
+            if not target_dir.exists():
+                target_dir.mkdir(parents=True, exist_ok=True)
+                if self._template_dir and self._template_dir.exists():
+                    shutil.copytree(self._template_dir, target_dir, dirs_exist_ok=True)
+
+            # Generar AGENTS.md y opencode.json si no existen
+            agents_file = target_dir / "AGENTS.md"
+            if not agents_file.exists():
+                agents_file.write_text(_generate_agents_md(project_name), encoding="utf-8")
+
+            opencode_file = target_dir / "opencode.json"
+            if not opencode_file.exists():
+                opencode_file.write_text(
+                    _generate_opencode_json(project_id, str(target_dir), self._mcp_url),
+                    encoding="utf-8",
+                )
+            else:
+                try:
+                    parsed: object = json.loads(opencode_file.read_text(encoding="utf-8"))
+                    if isinstance(parsed, dict):
+                        raw_cfg: dict[str, Any] = cast(dict[str, Any], parsed)
+                        perms = raw_cfg.get("permission")
+                        if isinstance(perms, dict):
+                            cfg_perms: dict[str, Any] = cast(dict[str, Any], perms)
+                            cfg_updated = False
+                            for perm_key in ("read", "edit"):
+                                if perm_key not in cfg_perms:
+                                    cfg_perms[perm_key] = {"*": "allow"}
+                                    cfg_updated = True
+                            for deny_key in ("bash", "external_directory"):
+                                if cfg_perms.get(deny_key) != "deny":
+                                    cfg_perms[deny_key] = "deny"
+                                    cfg_updated = True
+                            if cfg_perms.get("websearch") != "allow":
+                                cfg_perms["websearch"] = "allow"
+                                cfg_updated = True
+                            if cfg_updated:
+                                opencode_file.write_text(json.dumps(raw_cfg, indent=2) + "\n", encoding="utf-8")
+                except Exception:
+                    pass
+
+            # Actualizar site.ts con el nombre, descripción y arquetipo reales del proyecto
+            site_file = target_dir / "src" / "lib" / "site.ts"
+            if site_file.exists() and site_config_content is not None:
+                site_file.write_text(site_config_content, encoding="utf-8")
+
+            # Sincronizar y reparar infraestructura de despliegue (Dockerfile, next.config.ts, db/index.ts)
+            tmpl_dockerfile = self._template_dir / "Dockerfile" if self._template_dir else None
+            target_dockerfile = target_dir / "Dockerfile"
+            if tmpl_dockerfile and tmpl_dockerfile.exists():
+                needs_update = False
+                if not target_dockerfile.exists():
+                    needs_update = True
+                else:
+                    cur_df = target_dockerfile.read_text(encoding="utf-8")
+                    if (
+                        "npm rebuild better-sqlite3" not in cur_df
+                        or "better-sqlite3" not in cur_df
+                        or "python3 make g++" not in cur_df
+                    ):
+                        needs_update = True
+                if needs_update:
+                    target_dockerfile.write_text(tmpl_dockerfile.read_text(encoding="utf-8"), encoding="utf-8")
+
+            tmpl_next_config = self._template_dir / "next.config.ts" if self._template_dir else None
+            target_next_config = target_dir / "next.config.ts"
+            if tmpl_next_config and tmpl_next_config.exists() and target_next_config.exists():
+                cur_nc = target_next_config.read_text(encoding="utf-8")
+                if "serverExternalPackages" not in cur_nc:
+                    target_next_config.write_text(tmpl_next_config.read_text(encoding="utf-8"), encoding="utf-8")
+
+            tmpl_db_index = self._template_dir / "src" / "db" / "index.ts" if self._template_dir else None
+            target_db_index = target_dir / "src" / "db" / "index.ts"
+            if tmpl_db_index and tmpl_db_index.exists() and target_db_index.exists():
+                cur_db = target_db_index.read_text(encoding="utf-8")
+                if "syncSchema" not in cur_db or "(exported as any)" in cur_db:
+                    target_db_index.write_text(tmpl_db_index.read_text(encoding="utf-8"), encoding="utf-8")
+
+            # Generar las skills en .opencode/skills si no existen
+            skills_dir = target_dir / ".opencode" / "skills"
+            for skill_name, skill_content in skills_map.items():
+                skill_file = skills_dir / skill_name / "SKILL.md"
+                if not skill_file.exists():
+                    skill_file.parent.mkdir(parents=True, exist_ok=True)
+                    skill_file.write_text(skill_content, encoding="utf-8")
+
+        await asyncio.to_thread(_init_disk_workspace)
 
         if self._git_init:
             with contextlib.suppress(Exception):
-                git_init(target_dir)
-                if not git_has_commits(target_dir):
-                    git_add(target_dir)
-                    git_commit(target_dir, "chore: initialize workspace template and configurations")
+                await git_init_async(target_dir)
+                await git_add_async(target_dir)
+                has_commits = await git_has_commits_async(target_dir)
+                if not has_commits:
+                    await git_commit_async(target_dir, "chore: initialize workspace template and configurations")
+                else:
+                    await git_commit_async(target_dir, "chore: update build and database deployment configuration")
 
         # Pre-instalar dependencias al crear el workspace para que la primera
         # validación no consuma el timeout de npm install dentro del pipeline.
@@ -300,7 +414,7 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
                         exit_code=install.exit_code,
                     )
 
-        manifest = self._extract_manifest(target_dir)
+        manifest = await asyncio.to_thread(self._extract_manifest, target_dir)
         now = datetime.now(UTC)
 
         if self._workspace_repo:
@@ -340,13 +454,13 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
             ws = await self._workspace_repo.by_project_id(project_id)
             if ws is not None:
                 if ws.workspace_dir and Path(ws.workspace_dir).exists():
-                    manifest = self._extract_manifest(Path(ws.workspace_dir))
+                    manifest = await asyncio.to_thread(self._extract_manifest, Path(ws.workspace_dir))
                     return dataclasses.replace(ws, manifest_files=manifest)
                 return ws
 
         target_dir = (self._workspaces_root / str(project_id)).resolve()
         if target_dir.exists():
-            manifest = self._extract_manifest(target_dir)
+            manifest = await asyncio.to_thread(self._extract_manifest, target_dir)
             now = datetime.now(UTC)
             return CodeWorkspace(
                 id=WorkspaceId(f"ws_{project_id}"),
@@ -366,7 +480,7 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         """Retorna el manifiesto de archivos actual del workspace."""
         if not workspace.workspace_dir:
             return ()
-        return self._extract_manifest(Path(workspace.workspace_dir))
+        return await asyncio.to_thread(self._extract_manifest, Path(workspace.workspace_dir))
 
     async def is_locked(self, project_id: ProjectId) -> bool:
         """Verifica si el workspace está bloqueado."""
@@ -404,9 +518,9 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         if not target_dir.exists():
             return
 
-        git_rollback(target_dir)
+        await git_rollback_async(target_dir)
 
-        manifest = self._extract_manifest(target_dir)
+        manifest = await asyncio.to_thread(self._extract_manifest, target_dir)
         if self._workspace_repo:
             ws = await self._workspace_repo.by_project_id(project_id)
             if ws is not None:
@@ -414,66 +528,38 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
                 await self._workspace_repo.save(updated)
 
     async def delete_workspace(self, project_id: ProjectId) -> None:
-        """Elimina el código persistido y cualquier preview activo de un proyecto.
+        """Elimina el código persistido de un proyecto.
 
         La metadata de base de datos se elimina en cascada al borrar el proyecto,
         pero el filesystem compartido no tiene ese mecanismo. Esta operación debe
         completarse antes de borrar el proyecto para no dejar código accesible.
         """
-        root_dir = self._workspaces_root.resolve()
-        target_dir = (root_dir / str(project_id)).resolve()
-        if not target_dir.is_relative_to(root_dir):
-            raise ValueError(f"Workspace path escapes configured root for project '{project_id}'.")
-
-        if self._preview_publisher is not None:
-            try:
-                await self._preview_publisher.unpublish(project_id)
-            except Exception:
-                _log.warning(
-                    "workspace.preview_unpublish_failed",
-                    project_id=str(project_id),
-                    exc_info=True,
-                )
-
-        markers_dir = root_dir / ".preview-active"
-        (markers_dir / str(project_id)).unlink(missing_ok=True)
-
-        ports_file = root_dir / ".preview-ports.json"
-        try:
-            raw_ports = json.loads(ports_file.read_text(encoding="utf-8"))
-            ports = cast(dict[str, object], raw_ports) if isinstance(raw_ports, dict) else None
-            if ports is not None and str(project_id) in ports:
-                ports.pop(str(project_id), None)
-                temporary_ports_file = ports_file.with_suffix(".json.tmp")
-                temporary_ports_file.write_text(json.dumps(ports, indent=2) + "\n", encoding="utf-8")
-                temporary_ports_file.replace(ports_file)
-        except (FileNotFoundError, ValueError):
-            pass
+        target_dir = self._resolve_target_dir(project_id)
 
         if target_dir.exists():
             for attempt in range(4):
                 try:
-                    shutil.rmtree(target_dir)
+                    await asyncio.to_thread(shutil.rmtree, target_dir)
                     break
                 except OSError:
                     if attempt < 3:
                         await asyncio.sleep(0.3)
                     else:
-                        shutil.rmtree(target_dir, ignore_errors=True)
+                        await asyncio.to_thread(shutil.rmtree, target_dir, ignore_errors=True)
 
     async def commit_workspace(self, project_id: ProjectId, message: str) -> str | None:
         """Consolida los cambios del workspace en un commit de git y actualiza el manifiesto.
 
         Retorna el hash del commit creado, o None si no había cambios.
         """
-        target_dir = (self._workspaces_root / str(project_id)).resolve()
+        target_dir = self._resolve_target_dir(project_id)
         if not target_dir.exists():
             return None
 
-        git_add(target_dir)
-        committed = git_commit(target_dir, message)
+        await git_add_async(target_dir)
+        committed = await git_commit_async(target_dir, message)
 
-        manifest = self._extract_manifest(target_dir)
+        manifest = await asyncio.to_thread(self._extract_manifest, target_dir)
         if self._workspace_repo:
             ws = await self._workspace_repo.by_project_id(project_id)
             if ws is not None:
@@ -482,7 +568,7 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
 
         if not committed:
             return None
-        return git_head_hash(target_dir)
+        return await git_head_hash_async(target_dir)
 
     async def remove_feature_paths(self, project_id: ProjectId, slug: str) -> tuple[str, ...]:
         """Elimina los archivos del código generado de una feature.
@@ -494,30 +580,33 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         empiece con "<slug>.". Nunca coincide con slugs hermanos más largos
         (ej. borrar "registrar-productos" no toca "registrar-productos-con-s".
         """
-        target_dir = (self._workspaces_root / str(project_id)).resolve()
+        target_dir = self._resolve_target_dir(project_id)
         if not target_dir.exists():
             return ()
 
-        removed: list[str] = []
-        slug_lower = slug.lower()
+        def _sync_remove() -> tuple[str, ...]:
+            removed: list[str] = []
+            slug_lower = slug.lower()
 
-        for root, dirs, filenames in os.walk(target_dir):
-            dirs[:] = [d for d in dirs if d not in _IGNORED_DIRS]
-            rel_root = Path(root).relative_to(target_dir)
+            for root, dirs, filenames in os.walk(target_dir):
+                dirs[:] = [d for d in dirs if d not in _IGNORED_DIRS]
+                rel_root = Path(root).relative_to(target_dir)
 
-            for dirname in list(dirs):
-                if dirname.lower() == slug_lower:
-                    shutil.rmtree(Path(root) / dirname, ignore_errors=True)
-                    removed.append((rel_root / dirname).as_posix())
-                    dirs.remove(dirname)
+                for dirname in list(dirs):
+                    if dirname.lower() == slug_lower:
+                        shutil.rmtree(Path(root) / dirname, ignore_errors=True)
+                        removed.append((rel_root / dirname).as_posix())
+                        dirs.remove(dirname)
 
-            for fname in filenames:
-                base = fname.lower()
-                if base == slug_lower or base.startswith(f"{slug_lower}."):
-                    (Path(root) / fname).unlink(missing_ok=True)
-                    removed.append((rel_root / fname).as_posix())
+                for fname in filenames:
+                    base = fname.lower()
+                    if base == slug_lower or base.startswith(f"{slug_lower}."):
+                        (Path(root) / fname).unlink(missing_ok=True)
+                        removed.append((rel_root / fname).as_posix())
 
-        return tuple(sorted(set(removed)))
+            return tuple(sorted(set(removed)))
+
+        return await asyncio.to_thread(_sync_remove)
 
     async def update_text_file(
         self,
@@ -530,10 +619,14 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         file_path = (target_dir / relative_path).resolve()
         if not file_path.is_file() or not str(file_path).startswith(str(target_dir)):
             return
-        content = file_path.read_text(encoding="utf-8")
-        updated = transform(content)
-        if updated != content:
-            file_path.write_text(updated, encoding="utf-8")
+
+        def _sync_transform() -> None:
+            content = file_path.read_text(encoding="utf-8")
+            updated = transform(content)
+            if updated != content:
+                file_path.write_text(updated, encoding="utf-8")
+
+        await asyncio.to_thread(_sync_transform)
 
     async def revert_commit(self, project_id: ProjectId, commit: str) -> None:
         """Revierte un commit del workspace conservando el historial posterior (best-effort)."""
@@ -541,26 +634,4 @@ class LocalWorkspaceManager(WorkspaceManagerPort):
         if not target_dir.exists():
             return
         with contextlib.suppress(Exception):
-            git_revert_commit(target_dir, commit)
-
-    async def publish_preview(self, project_id: ProjectId) -> None:
-        """Marca el proyecto como activo para el servicio de preview (un puerto por proyecto).
-
-        El marker vive en `<workspaces_root>/.preview-active/<project_id>` con el directorio
-        del workspace como contenido; el servicio preview (docker/preview/run.sh) lo escanea
-        y levanta `next dev` por proyecto.
-        """
-        target_dir = (self._workspaces_root / str(project_id)).resolve()
-        if self._preview_publisher is not None:
-            try:
-                await self._preview_publisher.publish(project_id)
-            except Exception:
-                _log.warning(
-                    "workspace.preview_publish_failed",
-                    project_id=str(project_id),
-                    exc_info=True,
-                )
-                return
-        markers_dir = self._workspaces_root / ".preview-active"
-        markers_dir.mkdir(parents=True, exist_ok=True)
-        (markers_dir / str(project_id)).write_text(str(target_dir), encoding="utf-8")
+            await git_revert_commit_async(target_dir, commit)

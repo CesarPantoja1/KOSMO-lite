@@ -12,6 +12,7 @@ from kosmo.application.chat.process_chat_message import (
 from kosmo.application.chat.validate_phase_context import (
     ValidatePhaseContextUseCase,
 )
+from kosmo.application.pipeline.context_builder import ContextBuilder
 from kosmo.application.requirements import (
     GetRequirementChatHistoryInput,
     GetRequirementChatHistoryUseCase,
@@ -26,9 +27,9 @@ from kosmo.contracts.sdd.errors import (
     ProjectNotFoundError,
 )
 from kosmo.contracts.sdd.ids import ChatSessionId, FeatureId
-from kosmo.domain.pipeline.context_builder import ContextBuilder
-from kosmo.infrastructure.api.dependencies.auth import get_principal
+from kosmo.infrastructure.api.dependencies.auth import get_principal, verify_feature_owner
 from kosmo.infrastructure.api.dependencies.container import get_container
+from kosmo.infrastructure.api.dependencies.rate_limit import ProjectGenerationRateLimiter
 from kosmo.infrastructure.api.schemas import (
     ChatHistoryResponse,
     ChatResponse,
@@ -38,7 +39,14 @@ from kosmo.infrastructure.api.schemas import (
 router = APIRouter(
     prefix="/api/v1/features/{feature_id}/requirements/chat",
     tags=["requirements"],
+    dependencies=[Depends(verify_feature_owner)],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Token inválido o expirado."},
+        status.HTTP_404_NOT_FOUND: {"description": "Característica o requisito no encontrado."},
+    },
 )
+
+_generation_rate_limiter = ProjectGenerationRateLimiter()
 
 
 def _chat_uc(request: Request) -> ProcessChatMessageUseCase:
@@ -82,6 +90,7 @@ async def process_requirement_chat_message(
     chat_uc: Annotated[ProcessChatMessageUseCase, Depends(_chat_uc)],
     validate_uc: Annotated[ValidatePhaseContextUseCase, Depends(_validate_phase_context)],
     context_builder: Annotated[ContextBuilder, Depends(_context_builder)],
+    _rate: Annotated[None, Depends(_generation_rate_limiter)] = None,
 ) -> ChatResponse:
     from kosmo.infrastructure.api.async_generation import validate_chat_content
 
@@ -198,6 +207,7 @@ async def stream_requirement_chat_message(
     validate_uc: Annotated[ValidatePhaseContextUseCase, Depends(_validate_phase_context)],
     chat_uc: Annotated[ProcessChatMessageUseCase, Depends(_chat_uc)],
     context_builder: Annotated[ContextBuilder, Depends(_context_builder)],
+    _rate: Annotated[None, Depends(_generation_rate_limiter)] = None,
 ) -> StreamingResponse:
     from kosmo.infrastructure.api.async_generation import sse_chat_response
 

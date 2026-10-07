@@ -26,17 +26,47 @@ def apply_change_diff(markdown: str, *, before: str, after: str, section: str | 
     return _try_replace(markdown, before, after)
 
 
+def _normalize_newlines(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _try_replace(text: str, before: str, after: str) -> str | None:
-    if before in text:
-        return text.replace(before, after, 1)
-    if before.strip() in text:
-        return text.replace(before.strip(), after.strip(), 1)
-    normalized_before = collapse_whitespace(before)
-    normalized_text = collapse_whitespace(text)
+    norm_text = _normalize_newlines(text)
+    norm_before = _normalize_newlines(before)
+    norm_after = _normalize_newlines(after)
+
+    # 1. Match exacto
+    if norm_before in norm_text:
+        return norm_text.replace(norm_before, norm_after, 1)
+
+    # 2. Match sin espacios/saltos de línea en los extremos
+    stripped_before = norm_before.strip()
+    if stripped_before and stripped_before in norm_text:
+        # Si es eliminación y la línea contenía solo este texto, limpiamos el salto de línea
+        if not norm_after.strip():
+            # Intentar eliminar la línea completa con su salto si estaba aislada
+            pattern = re.compile(rf"(?:^[ \t]*)?{re.escape(stripped_before)}[ \t]*(?:\n|$)", re.MULTILINE)
+            if pattern.search(norm_text):
+                cleaned = pattern.sub("", norm_text, count=1)
+                return re.sub(r"\n{3,}", "\n\n", cleaned)
+        return norm_text.replace(stripped_before, norm_after.strip(), 1)
+
+    # 3. Match normalizando líneas intermedias y espacios
+    normalized_before = collapse_whitespace(norm_before)
+    normalized_text = collapse_whitespace(norm_text)
     if normalized_before in normalized_text:
-        return _apply_normalized_replace(text, before, after)
-    if after in text:
-        return text
+        res = _apply_normalized_replace(norm_text, norm_before, norm_after)
+        if res is not None:
+            return res
+
+    # 4. Idempotencia segura (SOLO si after no es vacío y before ya no está en el texto)
+    if (
+        norm_after.strip()
+        and norm_after.strip() in norm_text
+        and (not stripped_before or stripped_before not in norm_text)
+    ):
+        return norm_text
+
     return None
 
 
@@ -101,8 +131,12 @@ def _apply_normalized_replace(text: str, before: str, after: str) -> str | None:
         window = [lines[j].strip() for j in range(i, i + len(before_lines))]
         if window == [bl.strip() for bl in before_lines]:
             result_lines = list(lines)
-            result_lines[i : i + len(before_lines)] = [al + "\n" for al in after_lines]
-            return "".join(result_lines)
+            if after_lines:
+                result_lines[i : i + len(before_lines)] = [al + "\n" for al in after_lines]
+            else:
+                result_lines[i : i + len(before_lines)] = []
+            res = "".join(result_lines)
+            return re.sub(r"\n{3,}", "\n\n", res)
 
     return None
 

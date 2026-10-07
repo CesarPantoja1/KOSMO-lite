@@ -19,6 +19,7 @@ const emptyStatus = {
 		features: { pending: 0, evaluating: 0, failed: 0 },
 		requirements: { pending: 0, evaluating: 0, failed: 0 },
 		model: { pending: 0, evaluating: 0, failed: 0 },
+		implementation: { pending: 0, evaluating: 0, failed: 0 },
 	},
 };
 
@@ -34,6 +35,7 @@ describe('useConsistencyGateStore', () => {
 				features: { pending: 2, evaluating: 1, failed: 0 },
 				requirements: { pending: 0, evaluating: 0, failed: 1 },
 				model: { pending: 0, evaluating: 0, failed: 0 },
+				implementation: { pending: 0, evaluating: 0, failed: 0 },
 			},
 		});
 
@@ -108,6 +110,76 @@ describe('useConsistencyGateStore', () => {
 
 		expect(apiMocks.getConsistencyReview).not.toHaveBeenCalled();
 		expect(useConsistencyGateStore.getState().actionByEvaluation.ev_01).toBeUndefined();
+	});
+
+	it('applyEvaluation y discardEvaluation reducen optimistamente el conteo de pending y remueven la card', async () => {
+		useConsistencyGateStore.setState({
+			status: {
+				phases: {
+					features: { pending: 2, evaluating: 0, failed: 0 },
+					requirements: { pending: 3, evaluating: 0, failed: 0 },
+					model: { pending: 1, evaluating: 0, failed: 0 },
+					implementation: { pending: 1, evaluating: 0, failed: 0 },
+				},
+			},
+			cardsByPhase: {
+				requirements: [
+					{
+						evaluation_id: 'ev_01',
+						source_phase: 'features',
+						target_phase: 'requirements',
+						target_artifact_id: 'req_01',
+						artifact_type: 'EARSRequirement',
+						target_display_id: 'REQ-1.1',
+						target_title: 'Req 1',
+						section: 'content',
+						rationale: 'Diff',
+						action: 'update',
+						diff: null,
+						status: 'completed',
+						failure_reason: null,
+					},
+					{
+						evaluation_id: 'ev_02',
+						source_phase: 'features',
+						target_phase: 'requirements',
+						target_artifact_id: 'req_02',
+						artifact_type: 'EARSRequirement',
+						target_display_id: 'REQ-1.2',
+						target_title: 'Req 2',
+						section: 'content',
+						rationale: 'Diff',
+						action: 'update',
+						diff: null,
+						status: 'completed',
+						failure_reason: null,
+					},
+				],
+			},
+		});
+
+		apiMocks.applyConsistencyEvaluation.mockResolvedValue({
+			evaluation_id: 'ev_01',
+			applied: true,
+		});
+
+		await useConsistencyGateStore.getState().applyEvaluation('prj_01', 'requirements', 'ev_01');
+
+		let state = useConsistencyGateStore.getState();
+		expect(state.status?.phases.requirements.pending).toBe(2);
+		expect(state.cardsByPhase.requirements).toHaveLength(1);
+		expect(state.cardsByPhase.requirements[0].evaluation_id).toBe('ev_02');
+
+		apiMocks.discardConsistencyEvaluation.mockResolvedValue({
+			evaluation_id: 'ev_02',
+			discarded: true,
+		});
+
+		await useConsistencyGateStore.getState().discardEvaluation('prj_01', 'requirements', 'ev_02');
+
+		state = useConsistencyGateStore.getState();
+		expect(state.status?.phases.requirements.pending).toBe(1);
+		expect(state.cardsByPhase.requirements).toHaveLength(0);
 	});
 
 	it('bulkResolve devuelve el resultado del backend', async () => {

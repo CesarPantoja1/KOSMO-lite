@@ -55,9 +55,7 @@ class RequestLoggingMiddleware:
             await send(message)
 
         try:
-            # ponytail: span duplicado con logfire.instrument_fastapi (bootstrap.py:107).
-            # Se conserva el span del middleware como fuente de verdad; el de logfire
-            # puede desactivarse si la duplicación molesta en el backend de tracing.
+            # Span HTTP raíz como fuente única de verdad para observabilidad distribuida.
             with _tracer.start_as_current_span(
                 "http.request",
                 attributes={

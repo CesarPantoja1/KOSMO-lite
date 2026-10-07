@@ -171,14 +171,9 @@ class ChatRepository(Protocol):
         session_id: ChatSessionId | None = None,
     ) -> HistorialChat | None: ...
 
-    async def save_history(
-        self,
-        history: HistorialChat,
-    ) -> HistorialChat: ...
-
     async def create_session(self, session: ChatSession) -> ChatSession: ...
 
-    async def delete_session(self, session_id: ChatSessionId) -> None: ...
+    async def delete_session(self, session_id: ChatSessionId, project_id: ProjectId) -> bool: ...
 
     async def delete_by_project(self, project_id: ProjectId) -> None: ...
 
@@ -188,6 +183,7 @@ class ChatRepository(Protocol):
         phase: SpecPhase,
         *,
         context_id: str | None = None,
+        limit: int = 100,
     ) -> list[ChatSessionSummary]: ...
 
 

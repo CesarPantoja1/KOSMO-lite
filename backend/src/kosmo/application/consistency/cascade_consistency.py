@@ -298,5 +298,6 @@ def _phase_label(spec: SpecPhase) -> str:
         SpecPhase.CARACTERISTICAS: "Características",
         SpecPhase.REQUISITOS: "Requisitos",
         SpecPhase.MODELO: "Modelo",
+        SpecPhase.IMPLEMENTACION: "Implementación",
     }
     return labels.get(spec, spec.value)

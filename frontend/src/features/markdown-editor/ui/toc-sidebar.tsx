@@ -55,11 +55,11 @@ export function TocSidebar({ headings, activeId }: Props) {
 									className={clsx(
 										'block w-full px-2 py-1.5 text-left text-xs transition-colors cursor-pointer',
 										activeId === heading.id
-											? 'bg-primary-50 text-primary-600 font-medium'
+											? 'bg-neutral-200/75 text-base-950 font-medium'
 											: 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800',
 									)}
 									style={{
-										paddingLeft: `${(heading.depth - 1) * 12 + 8}px`,
+										paddingLeft: `${(heading.depth - 1) * 8 + 8}px`,
 									}}
 								>
 									{heading.text}

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kosmo.application.consistency.trigger_downstream import trigger_downstream_evaluation
+from kosmo.application.pipeline.context_builder import ContextBuilder
 from kosmo.contracts.persistence.persistence import OutboxPort
 from kosmo.contracts.pipeline.orchestrator_ports import AgentPort
 from kosmo.contracts.pipeline.phase_outputs import DiscoveryPhaseOutput
@@ -10,7 +11,6 @@ from kosmo.contracts.sdd.document import RichTextDocument, SpecPhase
 from kosmo.contracts.sdd.errors import LLMInvocationError
 from kosmo.contracts.sdd.ids import ProjectId
 from kosmo.contracts.sdd.repositories import DocumentRepository, ProjectRepository
-from kosmo.domain.pipeline.context_builder import ContextBuilder
 from kosmo.domain.sdd.document_converters import document_to_markdown
 
 

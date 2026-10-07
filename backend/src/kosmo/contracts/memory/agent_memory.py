@@ -121,6 +121,13 @@ class AgentMemoryPort(Protocol):
 
     async def delete_by_project(self, project_id: ProjectId) -> None: ...
 
+    async def purge_stale_sessions(
+        self,
+        *,
+        older_than_days: int = 7,
+        incomplete_only: bool = True,
+    ) -> int: ...
+
 
 class KnowledgePatternStore(Protocol):
     async def replace_patterns(

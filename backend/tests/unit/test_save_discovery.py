@@ -103,3 +103,48 @@ async def test_save_discovery_enqueues_downstream_evaluation() -> None:
     assert payload["project_id"] == "prj_chain"
     assert payload["source_phase"] == "descubrimiento"
     assert len(payload["changes"]) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_save_discovery_computes_real_diff_from_previous_version() -> None:
+    # Arrange
+    repository = InMemoryDocumentRepository()
+    outbox = InMemoryOutbox()
+    use_case = SaveDiscoveryUseCase(document_repo=repository, outbox=outbox)
+    project_id = ProjectId("prj_diff_real")
+
+    doc_v1 = RichTextDocument(
+        nodes=[
+            DocumentNode(
+                type="heading",
+                heading=SectionHeading(text="Actores", level=2, slug="actores"),
+                content="- Administrador: Gestiona el sistema.",
+            ),
+        ]
+    )
+    doc_v2 = RichTextDocument(
+        nodes=[
+            DocumentNode(
+                type="heading",
+                heading=SectionHeading(text="Actores", level=2, slug="actores"),
+                content="- Jefe: Gestiona el sistema.",
+            ),
+        ]
+    )
+
+    # Act: primer guardado (creación)
+    await use_case.execute(SaveDiscoveryInput(project_id=project_id, document=doc_v1))
+    outbox.jobs.clear()
+
+    # Segundo guardado (modificación de actor Administrador -> Jefe)
+    await use_case.execute(SaveDiscoveryInput(project_id=project_id, document=doc_v2))
+
+    # Assert: el segundo guardado debe incluir un diff real con before y after no vacíos
+    assert len(outbox.jobs) == 1
+    _, payload = outbox.jobs[0]
+    changes = payload["changes"]
+    assert len(changes) >= 1
+    actor_change = next((c for c in changes if "Administrador" in c.get("before", "")), None)
+    assert actor_change is not None, "El diff debe incluir el texto anterior (Administrador)"
+    assert "Jefe" in actor_change["after"], "El diff debe incluir el texto nuevo (Jefe)"

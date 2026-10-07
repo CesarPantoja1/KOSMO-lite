@@ -93,10 +93,14 @@ const Register = ({ onClose, onSwitchToLogin }: RegisterModalProps) => {
 
 			<div className='flex flex-col gap-4'>
 				<div>
-					<label className='block text-neutral-600 text-sm font-medium mb-1.5'>
+					<label
+						htmlFor='register-name'
+						className='block text-neutral-600 text-sm font-medium mb-1.5'
+					>
 						Nombre completo
 					</label>
 					<input
+						id='register-name'
 						type='text'
 						className='w-full bg-neutral-50 border border-neutral-300 text-neutral-800 rounded-lg px-3 py-2.5 outline-none focus:border-primary-500 transition-colors placeholder:text-neutral-400'
 						placeholder='Tu nombre y apellido'
@@ -107,10 +111,14 @@ const Register = ({ onClose, onSwitchToLogin }: RegisterModalProps) => {
 					/>
 				</div>
 				<div>
-					<label className='block text-neutral-600 text-sm font-medium mb-1.5'>
+					<label
+						htmlFor='register-email'
+						className='block text-neutral-600 text-sm font-medium mb-1.5'
+					>
 						Correo electrónico
 					</label>
 					<input
+						id='register-email'
 						type='email'
 						className='w-full bg-neutral-50 border border-neutral-300 text-neutral-800 rounded-lg px-3 py-2.5 outline-none focus:border-primary-500 transition-colors placeholder:text-neutral-400'
 						placeholder='tu@email.com'
@@ -121,10 +129,14 @@ const Register = ({ onClose, onSwitchToLogin }: RegisterModalProps) => {
 					/>
 				</div>
 				<div>
-					<label className='block text-neutral-600 text-sm font-medium mb-1.5'>
+					<label
+						htmlFor='register-password'
+						className='block text-neutral-600 text-sm font-medium mb-1.5'
+					>
 						Contraseña
 					</label>
 					<input
+						id='register-password'
 						type='password'
 						className='w-full bg-neutral-50 border border-neutral-300 text-neutral-800 rounded-lg px-3 py-2.5 outline-none focus:border-primary-500 transition-colors placeholder:text-neutral-400'
 						placeholder='Mínimo 12 caracteres'

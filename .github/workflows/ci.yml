@@ -48,8 +48,8 @@ jobs:
 
           case "$BASE_BRANCH" in
             main)
-              if [[ ! "$HEAD_BRANCH" =~ ^(release|hotfix)/ ]]; then
-                echo "::error::Only release/* and hotfix/* branches may target main; received $HEAD_BRANCH."
+              if [[ ! "$HEAD_BRANCH" =~ ^(release|hotfix|docs)/ ]]; then
+                echo "::error::Only release/*, hotfix/* and docs/* branches may target main; received $HEAD_BRANCH."
                 exit 1
               fi
               ;;
@@ -83,6 +83,9 @@ jobs:
               ;;
             release/*)
               [[ "$HEAD_BRANCH" =~ ^release/[0-9]+\.[0-9]+\.[0-9]+$ ]] || branch_name_is_conventional=false
+              ;;
+            docs/*)
+              [[ "$HEAD_BRANCH" =~ ^docs/[a-z0-9]+(-[a-z0-9]+)*$ ]] || branch_name_is_conventional=false
               ;;
           esac
 
@@ -130,6 +133,73 @@ jobs:
       - name: Run actionlint
         uses: raven-actions/actionlint@v2
 
+      - name: Test isolated OpenCode launcher
+        run: node --test docker/opencode/launcher.test.js
+
+      - name: Check isolated code runner syntax
+        run: node --check docker/code-runner/server.js
+
+  opencode-integration:
+    name: OpenCode isolated startup
+    needs: detect-changes
+    if: needs.detect-changes.outputs.opencode == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build pinned OpenCode image
+        run: docker build -f docker/opencode/Dockerfile -t kosmo-opencode:ci docker/opencode
+
+      - name: Start a real isolated job with a fake key and no prompt
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_root="$(mktemp -d "$RUNNER_TEMP/kosmo-opencode-smoke-XXXXXX")"
+          case "$smoke_root" in
+            "$RUNNER_TEMP"/kosmo-opencode-smoke-*) ;;
+            *) exit 1 ;;
+          esac
+          trap 'docker rm -f kosmo-ci-opencode-launcher >/dev/null 2>&1 || true; docker network rm kosmo-ci-codegen >/dev/null 2>&1 || true; sudo rm -rf -- "$smoke_root"' EXIT
+          mkdir -p "$smoke_root/workspaces/prj_smoke_ci"
+          printf '{}\n' > "$smoke_root/workspaces/prj_smoke_ci/opencode.json"
+          chmod 0750 "$smoke_root/workspaces"
+          sudo chown -R 1000:1000 "$smoke_root/workspaces"
+          docker network create kosmo-ci-codegen
+          docker run -d --name kosmo-ci-opencode-launcher \
+            --user 0:1000 --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --memory 256m --cpus 0.5 --pids-limit 64 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
+            --network kosmo-ci-codegen \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -v "$smoke_root/workspaces:/workspaces:ro" \
+            -e OPENCODE_LAUNCHER_TOKEN=ci-only-token \
+            -e KOSMO_OPENCODE_IMAGE=kosmo-opencode:ci \
+            -e KOSMO_STACK=ci \
+            -e KOSMO_NETWORK=kosmo-ci-codegen \
+            -e KOSMO_WORKSPACES_HOST_PATH="$smoke_root/workspaces" \
+            --entrypoint node kosmo-opencode:ci /usr/local/bin/opencode-launcher.js
+          for attempt in $(seq 1 20); do
+            if docker exec kosmo-ci-opencode-launcher node -e "fetch('http://127.0.0.1:8082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs --tail 100 kosmo-ci-opencode-launcher
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec kosmo-ci-opencode-launcher node /usr/local/bin/opencode-smoke.js prj_smoke_ci
+
+
   detect-changes:
     name: Detect changed areas
     runs-on: ubuntu-latest
@@ -141,6 +211,8 @@ jobs:
     outputs:
       backend: ${{ steps.changes.outputs.backend }}
       frontend: ${{ steps.changes.outputs.frontend }}
+      opencode: ${{ steps.changes.outputs.opencode }}
+      generated_app: ${{ steps.changes.outputs.generated_app }}
 
     steps:
       - name: Checkout repository
@@ -205,8 +277,23 @@ jobs:
 
           backend=false
           frontend=false
+          opencode=false
+          generated_app=false
 
           while IFS= read -r file; do
+            case "$file" in
+              docker/opencode/*|.github/workflows/ci.yml)
+                opencode=true
+                ;;
+            esac
+            case "$file" in
+              backend/src/kosmo/infrastructure/codegen/templates/basic-next-app/*|\
+              docker/code-runner/*|\
+              backend/src/kosmo/infrastructure/sandbox/remote_code_runner.py|\
+              .github/workflows/ci.yml)
+                generated_app=true
+                ;;
+            esac
             case "$file" in
               .github/workflows/ci.yml|\
               deploy/**|\
@@ -238,6 +325,8 @@ jobs:
           {
             echo "backend=$backend"
             echo "frontend=$frontend"
+            echo "opencode=$opencode"
+            echo "generated_app=$generated_app"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -253,7 +342,28 @@ jobs:
             echo
             echo "- Backend required: \`$backend\`"
             echo "- Frontend required: \`$frontend\`"
+            echo "- OpenCode startup required: \`$opencode\`"
+            echo "- Generated app build required: \`$generated_app\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  generated-app-build:
+    name: Generated app / Docker build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.generated_app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build the generated app like Railway
+        run: docker build -t kosmo-generated-app:ci backend/src/kosmo/infrastructure/codegen/templates/basic-next-app
 
   backend-lint:
     name: Backend / Lint & types
@@ -486,6 +596,8 @@ jobs:
       - branch-policy
       - actionlint
       - detect-changes
+      - opencode-integration
+      - generated-app-build
       - backend-lint
       - backend-test
       - frontend
@@ -501,6 +613,10 @@ jobs:
           actionlint_result="${{ needs.actionlint.result }}"
           branch_policy_result="${{ needs.branch-policy.result }}"
           detect_result="${{ needs.detect-changes.result }}"
+          opencode_required="${{ needs.detect-changes.outputs.opencode }}"
+          opencode_result="${{ needs.opencode-integration.result }}"
+          generated_app_required="${{ needs.detect-changes.outputs.generated_app }}"
+          generated_app_result="${{ needs.generated-app-build.result }}"
 
           backend_required="${{ needs.detect-changes.outputs.backend }}"
           backend_lint_result="${{ needs.backend-lint.result }}"
@@ -517,6 +633,8 @@ jobs:
             echo "| Branch policy | Yes | \`$branch_policy_result\` |"
             echo "| Workflow lint | Yes | \`$actionlint_result\` |"
             echo "| Change detection | Yes | \`$detect_result\` |"
+            echo "| OpenCode startup | \`$opencode_required\` | \`$opencode_result\` |"
+            echo "| Generated app Docker build | \`$generated_app_required\` | \`$generated_app_result\` |"
             echo "| Backend lint & types | \`${backend_required:-unknown}\` | \`$backend_lint_result\` |"
             echo "| Backend tests | \`${backend_required:-unknown}\` | \`$backend_test_result\` |"
             echo "| Frontend | \`${frontend_required:-unknown}\` | \`$frontend_result\` |"
@@ -554,6 +672,34 @@ jobs:
               exit 1
               ;;
           esac
+
+          case "$opencode_required" in
+            true|false)
+              ;;
+            *)
+              echo "Invalid or missing OpenCode change-detection output."
+              exit 1
+              ;;
+          esac
+
+          case "$generated_app_required" in
+            true|false)
+              ;;
+            *)
+              echo "Invalid or missing generated app change-detection output."
+              exit 1
+              ;;
+          esac
+
+          if [ "$opencode_required" = "true" ] && [ "$opencode_result" != "success" ]; then
+            echo "OpenCode integration smoke was required but did not succeed."
+            exit 1
+          fi
+
+          if [ "$generated_app_required" = "true" ] && [ "$generated_app_result" != "success" ]; then
+            echo "Generated app Docker build was required but did not succeed."
+            exit 1
+          fi
 
           if [ "$backend_required" = "true" ]; then
             if [ "$backend_lint_result" != "success" ]; then

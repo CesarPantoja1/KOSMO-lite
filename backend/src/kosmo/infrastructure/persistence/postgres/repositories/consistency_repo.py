@@ -30,13 +30,28 @@ _RESOLVED_STATUSES = (
 
 
 class SqlAlchemyConsistencyEvaluationRepository(ConsistencyEvaluationRepository):
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        if session_factory is None and session is None:
+            raise ValueError("Se requiere session_factory o session")
         self._session_factory = session_factory
+        self._session = session
 
     @asynccontextmanager
     async def _session_ctx(self) -> AsyncGenerator[AsyncSession]:
+        if self._session is not None:
+            yield self._session
+            return
+        assert self._session_factory is not None
         async with self._session_factory() as session:
             yield session
+
+    async def _commit(self, session: AsyncSession) -> None:
+        if self._session is None:
+            await session.commit()
 
     async def save(self, evaluation: ConsistencyEvaluation) -> ConsistencyEvaluation:
         async with self._session_ctx() as session:
@@ -67,7 +82,7 @@ class SqlAlchemyConsistencyEvaluationRepository(ConsistencyEvaluationRepository)
             model.operation_id = evaluation.operation_id
             model.failure_reason = evaluation.failure_reason
             model.updated_at = datetime.now(UTC)
-            await session.commit()
+            await self._commit(session)
 
         return evaluation
 
@@ -122,6 +137,7 @@ class SqlAlchemyConsistencyEvaluationRepository(ConsistencyEvaluationRepository)
         async with self._session_ctx() as session:
             stmt = delete(ConsistencyEvaluationModel).where(ConsistencyEvaluationModel.project_id == str(project_id))
             await session.execute(stmt)
+            await self._commit(session)
 
 
 def _with_id(evaluation: ConsistencyEvaluation, id_value: str) -> ConsistencyEvaluation:

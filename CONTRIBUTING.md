@@ -28,13 +28,16 @@ Al participar en este proyecto, te comprometes a mantener un entorno respetuoso,
 
 ## Estrategia de Ramas (Git Flow)
 
-El desarrollo en KOSMO se organiza mediante ramas basadas en características o historias de usuario (*User Stories*):
+El desarrollo en KOSMO sigue Git Flow y usa las siguientes ramas:
 
 * **`main`**: Código estable y listo para producción.
-* **`feature/hu-<id>-<descripcion-corta>`**: Ramas de trabajo para la implementación de nuevas historias de usuario o características (ej. `feature/hu-12-generacion-diagrama-actividad-ia`).
-* **`fix/<descripcion-corta>`**: Ramas para la corrección de errores puntuales o *hotfixes*.
+* **`develop`**: Rama de integración del desarrollo.
+* **`feature/hu-<id>-<descripcion-corta>`**: Ramas creadas desde `develop` para implementar historias de usuario o características (ej. `feature/hu-12-generacion-diagrama-actividad-ia`). Sus Pull Requests se dirigen a `develop`.
+* **`release/<version>`**: Ramas de preparación de una versión, creadas desde `develop`. Sus Pull Requests se dirigen a `main` y luego se sincronizan con `develop`.
+* **`hotfix/<version>-<descripcion-corta>`**: Ramas para corregir incidencias urgentes de producción, creadas desde `main`. Sus Pull Requests se dirigen a `main` y luego se sincronizan con `develop`.
+* **`docs/<descripcion-corta>`**: Ramas para cambios exclusivamente documentales, creadas desde `main` (ej. `docs/guia-despliegue`). Sus Pull Requests se dirigen a `main`.
 
-> **Nota:** No trabajes directamente sobre la rama `main`. Todas las modificaciones deben integrarse mediante Pull Requests revisados.
+> **Nota:** No trabajes directamente sobre `main`. Todas las modificaciones deben integrarse mediante Pull Requests revisados. Después de integrar una rama `docs/*` en `main`, incorpora el mismo cambio en `develop` para mantener ambas ramas sincronizadas.
 
 ---
 
@@ -112,17 +115,25 @@ En KOSMO seguimos la convención **Conventional Commits** vinculada a Azure Boar
 
 ## Flujo para Enviar un Pull Request (PR)
 
-1. Crea tu rama desde la rama base de trabajo:
+1. Crea tu rama desde la rama base correspondiente:
    ```bash
-   git checkout -b feature/hu-XX-mi-funcionalidad
+   # Funcionalidad
+   git switch develop
+   git pull origin develop
+   git switch -c feature/hu-XX-mi-funcionalidad
+
+   # Documentación que se publicará directamente
+   git switch main
+   git pull origin main
+   git switch -c docs/guia-despliegue
    ```
 2. Realiza tus cambios y haz commits siguiendo la [Convención Estricta de Commits](#convención-estricta-de-commits).
 3. Asegúrate de que las pruebas pasen y el código construya sin errores.
 4. Envía la rama al repositorio remoto:
    ```bash
-   git push origin feature/hu-XX-mi-funcionalidad
+   git push -u origin <nombre-de-tu-rama>
    ```
-5. Abre un **Pull Request** en GitHub / Azure DevOps describiendo:
+5. Abre un **Pull Request** en GitHub / Azure DevOps: hacia `develop` para `feature/*`; hacia `main` para `release/*`, `hotfix/*` y `docs/*`. Describe:
    * El objetivo de la historia de usuario o corrección.
    * Los cambios principales realizados.
    * El plan de verificación o pruebas realizadas.

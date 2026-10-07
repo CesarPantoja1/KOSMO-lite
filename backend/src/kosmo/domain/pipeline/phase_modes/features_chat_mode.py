@@ -47,7 +47,9 @@ def _build_chat_system_prompt() -> str:
             ),
         )
         + "- ADAPTA, NO RECHAZAS: si el usuario hace una solicitud con terminologia tecnica, "
-        "reformulala en lenguaje de usuario para la caracteristica.\n\n"
+        "reformulala en lenguaje de usuario para la caracteristica.\n"
+        "- SOLAPAMIENTO DE CAPACIDADES: si detectas solapamiento funcional o relaciones de sub-capacidad "
+        "con otras caracteristicas del proyecto, adviertelo de forma clara en tu respuesta conversacional.\n\n"
         "REGLAS DE CONTENIDO POR ATRIBUTO:\n"
         "- TITULO: maximo seis palabras. Se redacta como una accion que el usuario desea "
         "realizar. Evita nomenclatura de software y terminologia de negocio abstracta.\n"
@@ -109,6 +111,23 @@ class FeaturesChatMode(BaseChatMode):
             "## Documento de descubrimiento de referencia\n",
             discovery_md,
         ]
+
+        if context.other_features:
+            from kosmo.domain.codegen.integration_rules import detect_capability_overlap
+
+            other_list = "\n".join(
+                f"- {other.display_id}: {other.title} — {other.description}" for other in context.other_features
+            )
+            parts.append(f"\n## Otras características del proyecto (contexto de integración):\n{other_list}")
+
+            overlaps = detect_capability_overlap(f, context.other_features)
+            if overlaps:
+                overlap_warnings = "\n".join(f"- {o.message}" for o in overlaps if o.message)
+                parts.append(
+                    f"\n## Advertencias de solapamiento funcional detectadas:\n"
+                    f"{overlap_warnings}\n"
+                    "Advierte al usuario sobre estos solapamientos o sub-capacidades en tu respuesta conversacional."
+                )
 
         if context.user_preferences:
             prefs = "\n".join(f"- {p.rule_text}" for p in context.user_preferences)

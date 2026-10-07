@@ -45,10 +45,19 @@ _TEST_DEFAULTS: dict[str, str] = {
     "LLM_MODEL": "noop",
     # DSNs de infraestructura: valores stub; los tests deben usar fakes en memoria.
     "DATABASE_URL": "postgresql+asyncpg://kosmo:kosmo@localhost:5432/kosmo_test",
-    "REDIS_URL": "redis://localhost:6379/1",
+    "REDIS_URL": "redis://:test_redis_pass@localhost:6379/1",
     "OTEL_SERVICE_NAME": "kosmo-backend-test",
     "OTEL_ENVIRONMENT": "development",
 }
 
 for _key, _value in _TEST_DEFAULTS.items():
     os.environ.setdefault(_key, _value)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(scope="session")
+def rsa_key_pair() -> tuple[str, str]:
+    """Retorna el par de claves RSA (privada, publica) en formato PEM para la sesion."""
+    return _PRIVATE_KEY_PEM, _PUBLIC_KEY_PEM

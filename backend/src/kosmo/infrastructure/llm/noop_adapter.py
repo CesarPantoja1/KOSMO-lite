@@ -80,7 +80,7 @@ class NoopLLMClient:
         self,
         prompt: PromptTemplate,  # noqa: ARG002
         temperature: float = 0.3,  # noqa: ARG002
-        max_tokens: int = 4096,  # noqa: ARG002
+        max_tokens: int = 8192,  # noqa: ARG002
     ) -> LLMResponse:
         return LLMResponse(
             text=_NOOP_RESPONSE,
@@ -92,7 +92,7 @@ class NoopLLMClient:
         self,
         prompt: PromptTemplate,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> LLMResponse:
         return await self.complete(prompt=prompt, temperature=temperature, max_tokens=max_tokens)
 
@@ -101,7 +101,7 @@ class NoopLLMClient:
         prompt: PromptTemplate,
         output_type: type[T],
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> T:
         response = await self.complete(prompt, temperature=temperature, max_tokens=max_tokens)
         if output_type is str:
@@ -136,7 +136,7 @@ class NoopLLMClient:
         prompt: PromptTemplate,
         output_type: type[T],
         temperature: float = 0.1,  # noqa: ARG002
-        max_tokens: int = 4096,  # noqa: ARG002
+        max_tokens: int = 8192,  # noqa: ARG002
     ) -> AsyncGenerator[Any]:
         class _NoopStreamed:
             def __init__(self, data: T):

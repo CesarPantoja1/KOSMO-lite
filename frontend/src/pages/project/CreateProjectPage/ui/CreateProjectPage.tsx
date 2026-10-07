@@ -35,10 +35,6 @@ const CreateProjectPage = () => {
 
 	const hasNoProjects = projects.length === 0;
 
-	// if (hasNoProjects && !showForm) {
-	// 	return <VideoIntro src='/kosmo_intruduction.mp4' onEnded={() => setShowForm(true)} />;
-	// }
-
 	return (
 		<div className={`page-container pt-6${hasNoProjects ? ' animate-fade-in' : ''}`}>
 			<div className='page-header overflow-y-auto! pb-4'>

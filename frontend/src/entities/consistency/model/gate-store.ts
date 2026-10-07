@@ -14,6 +14,7 @@ import type {
 	BulkResolveResult,
 	ConsistencyActivityItem,
 	ConsistencyStatusResponse,
+	ConsistencyTargetPhase,
 	EvaluationActionResult,
 	ReviewCard,
 } from './types';
@@ -91,6 +92,31 @@ export const useConsistencyGateStore = create<ConsistencyGateState>()((set, get)
 		}));
 		try {
 			const result = await applyConsistencyEvaluation(projectId, evaluationId);
+			set((state) => {
+				const currentCards = state.cardsByPhase[targetPhase] ?? [];
+				const updatedCards = currentCards.filter((c) => c.evaluation_id !== evaluationId);
+				const currentPhaseStatus = state.status?.phases?.[targetPhase as ConsistencyTargetPhase];
+				const newPending = Math.max(0, (currentPhaseStatus?.pending ?? 1) - 1);
+				return {
+					cardsByPhase: {
+						...state.cardsByPhase,
+						[targetPhase]: updatedCards,
+					},
+					status:
+						state.status && currentPhaseStatus
+							? {
+									...state.status,
+									phases: {
+										...state.status.phases,
+										[targetPhase as ConsistencyTargetPhase]: {
+											...currentPhaseStatus,
+											pending: newPending,
+										},
+									},
+							  }
+							: state.status,
+				};
+			});
 			return result;
 		} catch (error) {
 			// 409: la sugerencia quedó obsoleta; el backend la re-evalúa automáticamente
@@ -114,6 +140,31 @@ export const useConsistencyGateStore = create<ConsistencyGateState>()((set, get)
 		}));
 		try {
 			const result = await discardConsistencyEvaluation(projectId, evaluationId);
+			set((state) => {
+				const currentCards = state.cardsByPhase[targetPhase] ?? [];
+				const updatedCards = currentCards.filter((c) => c.evaluation_id !== evaluationId);
+				const currentPhaseStatus = state.status?.phases?.[targetPhase as ConsistencyTargetPhase];
+				const newPending = Math.max(0, (currentPhaseStatus?.pending ?? 1) - 1);
+				return {
+					cardsByPhase: {
+						...state.cardsByPhase,
+						[targetPhase]: updatedCards,
+					},
+					status:
+						state.status && currentPhaseStatus
+							? {
+									...state.status,
+									phases: {
+										...state.status.phases,
+										[targetPhase as ConsistencyTargetPhase]: {
+											...currentPhaseStatus,
+											pending: newPending,
+										},
+									},
+							  }
+							: state.status,
+				};
+			});
 			return result;
 		} catch (error) {
 			if (error instanceof ApiError && error.status === 409) {
@@ -132,6 +183,28 @@ export const useConsistencyGateStore = create<ConsistencyGateState>()((set, get)
 
 	bulkResolve: async (projectId, action, targetPhase) => {
 		const result = await bulkResolveConsistency(projectId, action, targetPhase);
+		set((state) => {
+			const currentPhaseStatus = state.status?.phases?.[targetPhase as ConsistencyTargetPhase];
+			return {
+				cardsByPhase: {
+					...state.cardsByPhase,
+					[targetPhase]: [],
+				},
+				status:
+					state.status && currentPhaseStatus
+						? {
+								...state.status,
+								phases: {
+									...state.status.phases,
+									[targetPhase as ConsistencyTargetPhase]: {
+										...currentPhaseStatus,
+										pending: 0,
+									},
+								},
+						  }
+						: state.status,
+			};
+		});
 		return result;
 	},
 

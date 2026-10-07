@@ -746,3 +746,80 @@ async def test_send_prompt_handles_http_connection_error_specifically() -> None:
     assert events[0].data.get("connection_error") is True
     assert "Error de conexión HTTP" in str(events[0].data.get("error"))
     await client.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_send_prompt_formats_timeout_when_exception_message_is_empty() -> None:
+    # Arrange: httpx.ReadTimeout() default has empty str(exc) == ""
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("")
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.AsyncClient(transport=transport, base_url="http://testserver")
+    client = OpenCodeHttpClient(client=http_client, read_timeout_seconds=300.0)
+
+    # Act
+    events: list[OpenCodeEvent] = []
+    async for event in client.send_prompt("oc_sess_timeout", "Prompt"):
+        events.append(event)
+
+    # Assert
+    assert len(events) == 1
+    assert events[0].event_type == OpenCodeEventType.ERROR
+    assert events[0].data.get("timeout") is True
+    error_msg = str(events[0].data.get("error"))
+    assert "tiempo límite: 300s" in error_msg
+    assert not error_msg.endswith(":")
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_send_prompt_yields_file_edits_from_tool_calls() -> None:
+    # Arrange
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "info": {"id": "msg_1", "sessionID": "oc_sess_tools", "role": "assistant", "finish": "stop"},
+                "parts": [
+                    {
+                        "id": "prt_tool_1",
+                        "type": "tool",
+                        "tool": "write_file",
+                        "args": {"path": "src/features/search/search.ts", "content": "export const search = () => {};"},
+                    },
+                    {
+                        "id": "prt_tool_2",
+                        "type": "tool_call",
+                        "name": "edit_file",
+                        "parameters": {"path": "src/lib/feature-registry.ts", "content": "// updated"},
+                    },
+                ],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    http_client = httpx.AsyncClient(transport=transport, base_url="http://testserver")
+    client = OpenCodeHttpClient(client=http_client)
+
+    # Act
+    events: list[OpenCodeEvent] = []
+    async for event in client.send_prompt("oc_sess_tools", "Implementa", agent="build"):
+        events.append(event)
+
+    # Assert
+    # 2 tool progress events + 2 file edit events + 1 build complete
+    file_edit_events = [e for e in events if e.event_type == OpenCodeEventType.FILE_EDIT]
+    assert len(file_edit_events) == 2
+    assert file_edit_events[0].data.get("path") == "src/features/search/search.ts"
+    assert file_edit_events[1].data.get("path") == "src/lib/feature-registry.ts"
+
+    complete_events = [e for e in events if e.event_type == OpenCodeEventType.BUILD_COMPLETE]
+    assert len(complete_events) == 1
+    assert complete_events[0].data.get("files") == [
+        "src/features/search/search.ts",
+        "src/lib/feature-registry.ts",
+    ]
+    await client.aclose()

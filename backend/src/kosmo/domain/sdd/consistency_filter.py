@@ -68,9 +68,10 @@ _TOKEN_RE = re.compile(r"[a-záéíóúñü]+")
 def extract_key_terms(changes: list[AppliedChange]) -> set[str]:
     terms: set[str] = set()
     for change in changes:
+        # Combinar descripción, texto previo y texto posterior
         text = " ".join((change.description, change.diff.before, change.diff.after))
         for token in _TOKEN_RE.findall(text.lower()):
-            if len(token) >= 4 and token not in _STOPWORDS:
+            if len(token) >= 2 and token not in _STOPWORDS:
                 terms.add(token)
     return terms
 
@@ -83,6 +84,7 @@ def filter_downstream_artifacts(
     terms = extract_key_terms(changes)
     if not terms:
         return artifacts
+
     candidates = [
         artifact
         for artifact in artifacts

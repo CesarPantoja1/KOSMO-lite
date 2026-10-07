@@ -1,45 +1,92 @@
 @import "bootstrap/dist/css/bootstrap.min.css";
 
 :root {
+  /* ═══ KOSMO DESIGN TOKENS (Adaptables por proyecto) ═══ */
+
+  /* Paleta semántica */
   --app-primary: #0f766e;
   --app-primary-rgb: 15, 118, 110;
+  --app-secondary: #64748b;
+  --app-secondary-rgb: 100, 116, 139;
+  --app-success: #16a34a;
+  --app-success-rgb: 22, 163, 74;
+  --app-warning: #d97706;
+  --app-warning-rgb: 217, 119, 6;
+  --app-danger: #dc2626;
+  --app-danger-rgb: 220, 38, 38;
+  --app-accent: #0ea5e9;
+  --app-accent-rgb: 14, 165, 233;
+
+  /* Superficies y texto */
   --app-body-bg: #f8fafc;
   --app-card-bg: #ffffff;
+  --app-muted-bg: #f1f5f9;
+  --app-muted-text: #64748b;
   --app-border: #e2e8f0;
-  --app-radius: 0.5rem;
-  --app-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --app-text: #1e293b;
+  --app-text-secondary: #475569;
 
-  /* Bootstrap 5 CSS variables override */
+  /* Tipografía */
+  --app-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --app-font-heading: var(--app-font);
+
+  /* Formas y Sombras */
+  --app-radius: 0.5rem;
+  --app-radius-sm: 0.25rem;
+  --app-radius-lg: 0.75rem;
+  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --app-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --app-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+
+  /* ═══ BOOTSTRAP 5 CSS VARIABLES OVERRIDE ═══ */
   --bs-primary: var(--app-primary);
   --bs-primary-rgb: var(--app-primary-rgb);
+  --bs-secondary: var(--app-secondary);
+  --bs-secondary-rgb: var(--app-secondary-rgb);
+  --bs-success: var(--app-success);
+  --bs-success-rgb: var(--app-success-rgb);
+  --bs-warning: var(--app-warning);
+  --bs-warning-rgb: var(--app-warning-rgb);
+  --bs-danger: var(--app-danger);
+  --bs-danger-rgb: var(--app-danger-rgb);
+  --bs-info: var(--app-accent);
+  --bs-info-rgb: var(--app-accent-rgb);
+
   --bs-body-font-family: var(--app-font);
   --bs-body-bg: var(--app-body-bg);
-  --bs-border-radius: var(--app-radius);
-  --bs-border-radius-sm: calc(var(--app-radius) * 0.5);
-  --bs-border-radius-lg: calc(var(--app-radius) * 1.5);
+  --bs-body-color: var(--app-text);
   --bs-border-color: var(--app-border);
+  --bs-border-radius: var(--app-radius);
+  --bs-border-radius-sm: var(--app-radius-sm);
+  --bs-border-radius-lg: var(--app-radius-lg);
 }
 
 body {
   background-color: var(--bs-body-bg);
   font-family: var(--bs-body-font-family);
-  color: #1e293b;
+  color: var(--bs-body-color);
   min-height: 100vh;
 }
 
-/* Card custom styling to avoid generic look */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--app-font-heading);
+}
+
+/* Card custom styling */
 .card {
   border: 1px solid var(--bs-border-color);
   border-radius: var(--bs-border-radius);
   background-color: var(--app-card-bg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--app-shadow);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 /* Table wrapper & density */
 .table-responsive {
   border-radius: var(--bs-border-radius);
   border: 1px solid var(--bs-border-color);
-  background-color: #ffffff;
+  background-color: var(--app-card-bg);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .table {
@@ -50,7 +97,7 @@ body {
 /* Sidebar responsive navigation */
 .app-sidebar {
   width: 260px;
-  background-color: #ffffff;
+  background-color: var(--app-card-bg);
   border-right: 1px solid var(--bs-border-color);
   min-height: 100vh;
 }
@@ -61,7 +108,7 @@ body {
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
   border-radius: var(--bs-border-radius);
-  color: #475569;
+  color: var(--app-text-secondary);
   text-decoration: none;
   font-weight: 500;
   font-size: 0.875rem;
@@ -69,12 +116,62 @@ body {
 }
 
 .app-sidebar-link:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
+  background-color: var(--app-muted-bg);
+  color: var(--app-text);
 }
 
 .app-sidebar-link.active {
   background-color: rgba(var(--bs-primary-rgb), 0.1);
   color: var(--bs-primary);
   font-weight: 600;
+}
+
+/* Skeleton Loading Shimmer */
+@keyframes kosmo-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.kosmo-skeleton {
+  background: linear-gradient(90deg, var(--app-muted-bg) 25%, #e2e8f0 50%, var(--app-muted-bg) 75%);
+  background-size: 200% 100%;
+  animation: kosmo-shimmer 1.5s infinite;
+  border-radius: var(--bs-border-radius-sm);
+}
+
+/* Timeline component styling */
+.kosmo-timeline {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.kosmo-timeline::before {
+  content: "";
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  width: 2px;
+  background-color: var(--bs-border-color);
+}
+
+.kosmo-timeline-item {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.kosmo-timeline-item:last-child {
+  margin-bottom: 0;
+}
+
+.kosmo-timeline-point {
+  position: absolute;
+  left: -1.5rem;
+  top: 0.25rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  background-color: var(--bs-primary);
+  box-shadow: 0 0 0 2px var(--bs-border-color);
 }

@@ -5,10 +5,14 @@ vi.mock('@/entities/integration', () => ({
 	getIntegrationStatus: vi.fn(),
 }));
 
-vi.mock('@/entities/project', () => ({
-	getProjectGitHubStatus: vi.fn(),
-	pushProjectToGitHub: vi.fn(),
-}));
+vi.mock('@/entities/project', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@/entities/project')>();
+	return {
+		...actual,
+		getProjectGitHubStatus: vi.fn(),
+		pushProjectToGitHub: vi.fn(),
+	};
+});
 
 import { getIntegrationStatus } from '@/entities/integration';
 import { getProjectGitHubStatus, pushProjectToGitHub } from '@/entities/project';

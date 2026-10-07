@@ -67,9 +67,14 @@ class SqlAlchemyFeatureRepository(FeatureRepository):
             return feature
 
     async def save_many(self, features: list[Feature]) -> list[Feature]:
+        if not features:
+            return features
         async with self._session_ctx() as session:
+            ids = [str(f.id) for f in features]
+            result = await session.execute(select(FeatureModel).where(FeatureModel.id.in_(ids)))
+            existing: dict[str, FeatureModel] = {m.id: m for m in result.scalars().all()}
             for feature in features:
-                model = await session.get(FeatureModel, str(feature.id))
+                model = existing.get(str(feature.id))
                 if model is None:
                     session.add(self._to_model(feature))
                 else:

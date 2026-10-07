@@ -62,13 +62,95 @@ jobs:
       contents: read
       packages: write
     outputs:
-      api_image: ${{ steps.images.outputs.api }}
+      api_image_amd64: ${{ steps.images.outputs.api }}
 
     steps:
       - name: Checkout release source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Define immutable API image reference
+      - name: Define immutable AMD64 API image reference
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "api=${REGISTRY}/${owner}/kosmo-api:sha-${GITHUB_SHA}-amd64" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish backend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.images.outputs.api }}
+
+  build-backend-arm64:
+    name: Build API image (ARM64)
+    needs: wait-for-ci
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      api_image_arm64: ${{ steps.images.outputs.api }}
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Define immutable ARM64 API image reference
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "api=${REGISTRY}/${owner}/kosmo-api:sha-${GITHUB_SHA}-arm64" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish ARM64 backend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.images.outputs.api }}
+
+  publish-backend-manifest:
+    name: Publish API multi-architecture manifest
+    needs:
+      - build-backend
+      - build-backend-arm64
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    outputs:
+      api_image: ${{ steps.images.outputs.api }}
+
+    steps:
+      - name: Define immutable API manifest reference
         id: images
         shell: bash
         run: |
@@ -76,27 +158,24 @@ jobs:
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           echo "api=${REGISTRY}/${owner}/kosmo-api:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.images.outputs.api }}
+      - name: Publish the manifest list
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "${{ steps.images.outputs.api }}" \
+            "${{ needs.build-backend.outputs.api_image_amd64 }}" \
+            "${{ needs.build-backend-arm64.outputs.api_image_arm64 }}"
 
   build-frontend:
     name: Build Web image
@@ -107,39 +186,36 @@ jobs:
       contents: read
       packages: write
     outputs:
-      web_image: ${{ steps.images.outputs.web }}
+      web_image_amd64: ${{ steps.images.outputs.web }}
 
     steps:
       - name: Checkout release source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Define immutable Web image reference
+      - name: Define immutable AMD64 Web image reference
         id: images
         shell: bash
         run: |
           set -euo pipefail
           owner="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "web=${REGISTRY}/${owner}/kosmo-web:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+          echo "web=${REGISTRY}/${owner}/kosmo-web:sha-${GITHUB_SHA}-amd64" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and publish frontend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.images.outputs.web }}
           build-args: |
@@ -148,6 +224,94 @@ jobs:
             NEXT_PUBLIC_APP_ENV=deployment
             NEXT_PUBLIC_AUTH_DISABLED=false
             NEXT_PUBLIC_USE_MOCKS=false
+
+  build-frontend-arm64:
+    name: Build Web image (ARM64)
+    needs: wait-for-ci
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      web_image_arm64: ${{ steps.images.outputs.web }}
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Define immutable ARM64 Web image reference
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "web=${REGISTRY}/${owner}/kosmo-web:sha-${GITHUB_SHA}-arm64" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish ARM64 frontend image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.prod
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.images.outputs.web }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=
+            NEXT_PUBLIC_APP_NAME=KOSMO
+            NEXT_PUBLIC_APP_ENV=deployment
+            NEXT_PUBLIC_AUTH_DISABLED=false
+            NEXT_PUBLIC_USE_MOCKS=false
+
+  publish-frontend-manifest:
+    name: Publish Web multi-architecture manifest
+    needs:
+      - build-frontend
+      - build-frontend-arm64
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    outputs:
+      web_image: ${{ steps.images.outputs.web }}
+
+    steps:
+      - name: Define immutable Web manifest reference
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "web=${REGISTRY}/${owner}/kosmo-web:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the manifest list
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "${{ steps.images.outputs.web }}" \
+            "${{ needs.build-frontend.outputs.web_image_amd64 }}" \
+            "${{ needs.build-frontend-arm64.outputs.web_image_arm64 }}"
 
   build-opencode:
     name: Build OpenCode image
@@ -158,15 +322,122 @@ jobs:
       contents: read
       packages: write
     outputs:
-      opencode_image: ${{ steps.images.outputs.opencode }}
-      code_runner_image: ${{ steps.images.outputs.code_runner }}
-      preview_image: ${{ steps.images.outputs.preview }}
+      opencode_image_amd64: ${{ steps.images.outputs.opencode }}
+      code_runner_image_amd64: ${{ steps.images.outputs.code_runner }}
 
     steps:
       - name: Checkout release source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Define immutable OpenCode image reference
+      - name: Define immutable AMD64 OpenCode image references
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "opencode=${REGISTRY}/${owner}/kosmo-opencode:sha-${GITHUB_SHA}-amd64"
+            echo "code_runner=${REGISTRY}/${owner}/kosmo-code-runner:sha-${GITHUB_SHA}-amd64"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish OpenCode image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./docker/opencode
+          file: ./docker/opencode/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.images.outputs.opencode }}
+
+      - name: Build and publish isolated code-runner image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./docker/code-runner
+          file: ./docker/code-runner/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.images.outputs.code_runner }}
+
+  build-opencode-arm64:
+    name: Build code-generation images (ARM64)
+    needs: wait-for-ci
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      opencode_image_arm64: ${{ steps.images.outputs.opencode }}
+      code_runner_image_arm64: ${{ steps.images.outputs.code_runner }}
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Define immutable ARM64 image references
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "opencode=${REGISTRY}/${owner}/kosmo-opencode:sha-${GITHUB_SHA}-arm64"
+            echo "code_runner=${REGISTRY}/${owner}/kosmo-code-runner:sha-${GITHUB_SHA}-arm64"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish ARM64 OpenCode image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./docker/opencode
+          file: ./docker/opencode/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.images.outputs.opencode }}
+
+      - name: Build and publish ARM64 isolated code-runner image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./docker/code-runner
+          file: ./docker/code-runner/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.images.outputs.code_runner }}
+
+  publish-opencode-manifests:
+    name: Publish code-generation multi-architecture manifests
+    needs:
+      - build-opencode
+      - build-opencode-arm64
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    outputs:
+      opencode_image: ${{ steps.images.outputs.opencode }}
+      code_runner_image: ${{ steps.images.outputs.code_runner }}
+
+    steps:
+      - name: Define immutable image manifest references
         id: images
         shell: bash
         run: |
@@ -175,55 +446,37 @@ jobs:
           {
             echo "opencode=${REGISTRY}/${owner}/kosmo-opencode:sha-${GITHUB_SHA}"
             echo "code_runner=${REGISTRY}/${owner}/kosmo-code-runner:sha-${GITHUB_SHA}"
-            echo "preview=${REGISTRY}/${owner}/kosmo-preview:sha-${GITHUB_SHA}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish OpenCode image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./docker/opencode
-          file: ./docker/opencode/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.images.outputs.opencode }}
-
-      - name: Build and publish isolated code-runner image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./docker/code-runner
-          file: ./docker/code-runner/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.images.outputs.code_runner }}
-
-      - name: Build and publish preview image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./docker/preview
-          file: ./docker/preview/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.images.outputs.preview }}
+      - name: Publish the manifest lists
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "${{ steps.images.outputs.opencode }}" \
+            "${{ needs.build-opencode.outputs.opencode_image_amd64 }}" \
+            "${{ needs.build-opencode-arm64.outputs.opencode_image_arm64 }}"
+          docker buildx imagetools create \
+            --tag "${{ steps.images.outputs.code_runner }}" \
+            "${{ needs.build-opencode.outputs.code_runner_image_amd64 }}" \
+            "${{ needs.build-opencode-arm64.outputs.code_runner_image_arm64 }}"
 
   deploy-staging:
     name: Deploy Staging
     needs:
-      - build-backend
-      - build-frontend
-      - build-opencode
+      - publish-backend-manifest
+      - publish-frontend-manifest
+      - publish-opencode-manifests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: staging
@@ -233,10 +486,10 @@ jobs:
 
     steps:
       - name: Checkout deployment configuration
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Configure AWS credentials through OIDC
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -313,12 +566,10 @@ jobs:
           STAGING_ENV_FILE: ${{ secrets.STAGING_ENV_FILE }}
           STAGING_CODEGEN_ENV_FILE: ${{ secrets.STAGING_CODEGEN_ENV_FILE }}
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_TUNNEL_TOKEN }}
-          CLOUDFLARE_PREVIEW_API_TOKEN: ${{ secrets.STAGING_PREVIEW_CLOUDFLARE_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$STAGING_ENV_FILE"
           test -n "$STAGING_CODEGEN_ENV_FILE"
-          test -n "$CLOUDFLARE_PREVIEW_API_TOKEN"
           work_dir="${RUNNER_TEMP}/kosmo-staging-deploy"
           install -d -m 700 "$work_dir"
           # GitHub Environment secrets may not end in a newline. Preserve the
@@ -327,17 +578,11 @@ jobs:
           printf '%s\n' "$STAGING_ENV_FILE" > "$work_dir/application.env"
           printf '%s\n' "$STAGING_CODEGEN_ENV_FILE" >> "$work_dir/application.env"
           printf '%s\n' \
-            "KOSMO_WEB_IMAGE=${{ needs.build-frontend.outputs.web_image }}" \
-            "KOSMO_API_IMAGE=${{ needs.build-backend.outputs.api_image }}" \
-            "KOSMO_OPENCODE_IMAGE=${{ needs.build-opencode.outputs.opencode_image }}" \
-            "KOSMO_CODE_RUNNER_IMAGE=${{ needs.build-opencode.outputs.code_runner_image }}" \
-            "KOSMO_PREVIEW_IMAGE=${{ needs.build-opencode.outputs.preview_image }}" \
-            "CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}" \
-            "PREVIEW_PUBLIC_HOST_SUFFIX=preview-staging-kosmo.cespan.dev" \
-            "CLOUDFLARE_PREVIEW_API_TOKEN=${CLOUDFLARE_PREVIEW_API_TOKEN}" \
-            "CLOUDFLARE_PREVIEW_ACCOUNT_ID=${{ vars.STAGING_CLOUDFLARE_ACCOUNT_ID }}" \
-            "CLOUDFLARE_PREVIEW_ZONE_ID=${{ vars.STAGING_CLOUDFLARE_ZONE_ID }}" \
-            "CLOUDFLARE_PREVIEW_TUNNEL_ID=${{ vars.STAGING_CLOUDFLARE_TUNNEL_ID }}" > "$work_dir/runtime.env"
+            "KOSMO_WEB_IMAGE=${{ needs.publish-frontend-manifest.outputs.web_image }}" \
+            "KOSMO_API_IMAGE=${{ needs.publish-backend-manifest.outputs.api_image }}" \
+            "KOSMO_OPENCODE_IMAGE=${{ needs.publish-opencode-manifests.outputs.opencode_image }}" \
+            "KOSMO_CODE_RUNNER_IMAGE=${{ needs.publish-opencode-manifests.outputs.code_runner_image }}" \
+            "CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}" > "$work_dir/runtime.env"
           chmod 600 "$work_dir/application.env" "$work_dir/runtime.env"
 
           ssh -i "$SSH_DIR/id_ed25519" \
@@ -371,6 +616,9 @@ jobs:
              cat application.env runtime.env > .env
              chmod 600 .env
              rm -f application.env runtime.env
+             if ! grep -q "^OPENCODE_LAUNCHER_TOKEN=." .env; then
+               printf "OPENCODE_LAUNCHER_TOKEN=%s\n" "$(openssl rand -hex 32)" >> .env
+             fi
              for key in DATABASE_URL REDIS_URL REDIS_PASSWORD FERNET_MASTER_KEY CORS_ALLOWED_ORIGINS GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET RAILWAY_CLIENT_ID RAILWAY_CLIENT_SECRET NEXT_PUBLIC_GITHUB_CLIENT_ID NEXT_PUBLIC_RAILWAY_CLIENT_ID NEXT_PUBLIC_DOMAIN_APP; do
                if ! grep -q "^${key}=." .env; then
                  echo "Missing required authentication variable: ${key}" >&2
@@ -389,25 +637,40 @@ jobs:
                  exit 1
                fi
              done
-             for key in KOSMO_WEB_IMAGE KOSMO_API_IMAGE KOSMO_OPENCODE_IMAGE KOSMO_CODE_RUNNER_IMAGE KOSMO_PREVIEW_IMAGE; do
+             for key in KOSMO_WEB_IMAGE KOSMO_API_IMAGE KOSMO_OPENCODE_IMAGE KOSMO_CODE_RUNNER_IMAGE; do
                if ! grep -q "^${key}=." .env; then
                  echo "Missing generated deployment variable: ${key}" >&2
                  exit 1
                fi
              done
-             for key in OPENCODE_SERVER_PASSWORD OPENCODE_MODEL DEEPSEEK_API_KEY CODE_RUNNER_TOKEN; do
+             for key in CODE_RUNNER_TOKEN OPENCODE_LAUNCHER_TOKEN; do
                if ! grep -q "^${key}=." .env; then
                  echo "Missing required code-generation variable: ${key}" >&2
                  exit 1
                fi
              done
-             for key in PREVIEW_PUBLIC_HOST_SUFFIX CLOUDFLARE_PREVIEW_API_TOKEN CLOUDFLARE_PREVIEW_ACCOUNT_ID CLOUDFLARE_PREVIEW_ZONE_ID CLOUDFLARE_PREVIEW_TUNNEL_ID; do
-               if ! grep -q "^${key}=." .env; then
-                 echo "Missing required staging preview variable: ${key}" >&2
-                 exit 1
-               fi
-             done
              docker login ghcr.io --username "${{ vars.STAGING_GHCR_USERNAME }}" --password-stdin
+             # Pulling a replacement image temporarily requires the old and new
+             # layers at once. Reclaim only Docker resources that are unused by
+             # every container; volumes and project workspaces are deliberately
+             # left intact.
+             disk_target=/var/lib/containerd
+             min_free_kb=$((7 * 1024 * 1024))
+             available_kb="$(df -Pk "$disk_target" | awk "NR == 2 { print \$4 }")"
+             if [ "$available_kb" -lt "$min_free_kb" ]; then
+               echo "Less than 7 GiB is free for Docker; reclaiming unused Docker resources."
+               docker container prune --force
+               docker image prune --all --force
+               docker builder prune --all --force
+             fi
+             echo "Disk state before pulling deployment images:"
+             df -h "$disk_target"
+             docker system df
+             available_kb="$(df -Pk "$disk_target" | awk "NR == 2 { print \$4 }")"
+             if [ "$available_kb" -lt "$min_free_kb" ]; then
+               echo "Insufficient disk space for a safe deployment after pruning (need at least 7 GiB free)." >&2
+               exit 1
+             fi
              install -d -m 0750 workspaces
              docker run --rm -v "$PWD/workspaces:/workspaces" alpine:3.22 chown -R 1000:1000 /workspaces
              docker network inspect kosmo-staging-network >/dev/null 2>&1 || docker network create kosmo-staging-network >/dev/null
@@ -417,7 +680,7 @@ jobs:
              docker run --rm \
                -v "$PWD/secrets/jwt_private.pem:/run/kosmo-secrets/jwt_private.pem:ro" \
                -v "$PWD/secrets/jwt_public.pem:/run/kosmo-secrets/jwt_public.pem:ro" \
-               --entrypoint sh "${{ needs.build-backend.outputs.api_image }}" \
+               --entrypoint sh "${{ needs.publish-backend-manifest.outputs.api_image }}" \
                -c "test -r /run/kosmo-secrets/jwt_private.pem && test -r /run/kosmo-secrets/jwt_public.pem"
              docker run --rm --env-file .env --network kosmo-staging-network \
                -e ENV=staging \
@@ -426,8 +689,11 @@ jobs:
                -e JWT_PUBLIC_KEY_PATH=/run/kosmo-secrets/jwt_public.pem \
                -v "$PWD/secrets/jwt_private.pem:/run/kosmo-secrets/jwt_private.pem:ro" \
                -v "$PWD/secrets/jwt_public.pem:/run/kosmo-secrets/jwt_public.pem:ro" \
-               --entrypoint alembic "${{ needs.build-backend.outputs.api_image }}" upgrade head
+               --entrypoint alembic "${{ needs.publish-backend-manifest.outputs.api_image }}" upgrade head
              docker compose -f compose.yaml up -d --remove-orphans
+             # Health only checks Docker access; verify the launcher can actually
+             # traverse the 0750 project workspace before declaring deployment healthy.
+             docker exec kosmo-staging-opencode-launcher node -e "require(\"node:fs\").readdirSync(\"/workspaces\")"
              # Reload the transferred Nginx configuration after app containers
              # have been recreated. --no-deps prevents an unnecessary restart
              # of frontend or backend.
@@ -448,6 +714,9 @@ jobs:
                docker compose -f compose.yaml logs --tail=100 backend
                exit 1
              fi
+             # Exercise the full create → secret-stdin → OpenCode health path
+             # with a temporary project and fake key; no prompt is submitted.
+             docker exec kosmo-staging-opencode-launcher node /usr/local/bin/opencode-smoke.js
              for attempt in $(seq 1 15); do
                if docker exec kosmo-staging-nginx wget -q -O /dev/null \
                     --header="Host: staging-kosmo.cespan.dev" http://127.0.0.1/ && \
@@ -459,7 +728,7 @@ jobs:
                fi
                sleep 2
              done
-             docker compose -f compose.yaml logs --tail=100 nginx backend opencode
+             docker compose -f compose.yaml logs --tail=100 nginx backend opencode-launcher
              exit 1'
 
       - name: Remove this runner SSH access

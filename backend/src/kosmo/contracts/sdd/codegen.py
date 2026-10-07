@@ -4,7 +4,8 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
 
 from kosmo.contracts.sdd.ids import FeatureId, ImplementationId, ProjectId, WorkspaceId
 
@@ -171,8 +172,6 @@ class WorkspaceManagerPort(Protocol):
 
     async def commit_workspace(self, project_id: ProjectId, message: str) -> str | None: ...
 
-    async def publish_preview(self, project_id: ProjectId) -> None: ...
-
     async def remove_feature_paths(self, project_id: ProjectId, slug: str) -> tuple[str, ...]: ...
 
     async def update_text_file(
@@ -185,12 +184,32 @@ class WorkspaceManagerPort(Protocol):
     async def revert_commit(self, project_id: ProjectId, commit: str) -> None: ...
 
 
-class PreviewPublisherPort(Protocol):
-    """Publica y retira el hostname externo de una preview de proyecto."""
+@runtime_checkable
+class FileSystemReader(Protocol):
+    """Protocolo para operaciones de lectura del sistema de archivos desacopladas de infraestructura."""
 
-    async def publish(self, project_id: ProjectId) -> None: ...
+    def list_files(self, root: str | Path) -> tuple[str, ...]:
+        """Retorna las rutas relativas en formato POSIX de todos los archivos bajo root."""
+        ...
 
-    async def unpublish(self, project_id: ProjectId) -> None: ...
+    def read_text(self, path: str | Path) -> str | None:
+        """Lee el contenido de un archivo de texto en UTF-8 o retorna None si no existe o falla."""
+        ...
+
+
+FileSystemReaderPort = FileSystemReader
+
+
+@runtime_checkable
+class FileSystemWriter(Protocol):
+    """Protocolo para operaciones de escritura del sistema de archivos desacopladas de infraestructura."""
+
+    def write_text(self, path: str | Path, content: str) -> None:
+        """Escribe contenido de texto en UTF-8 en la ruta indicada creando directorios si es necesario."""
+        ...
+
+
+FileSystemWriterPort = FileSystemWriter
 
 
 class CodeRunnerPort(Protocol):

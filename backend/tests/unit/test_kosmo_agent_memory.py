@@ -11,9 +11,6 @@ from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import ProjectId
 from kosmo.domain.pipeline.knowledge_tool_registry import KnowledgeToolDef, KnowledgeToolRegistry
 from kosmo.domain.pipeline.skill_registry import SkillRegistry
-from kosmo.infrastructure.persistence.memory.in_memory_store import (
-    InMemoryAgentSessionStore,
-)
 from tests.factories import a_project_id
 from tests.unit.conftest import (
     DISCOVERY_VALID,
@@ -21,6 +18,7 @@ from tests.unit.conftest import (
     make_discovery_document,
     make_discovery_mode,
 )
+from tests.unit.fakes import InMemoryAgentSessionStore
 
 
 def _make_agent(llm, max_iterations=3, memory=None):

@@ -6,6 +6,7 @@ import type { IntegrationStatus } from '@/entities/integration';
 import {
 	getProjectGitHubStatus,
 	pushProjectToGitHub,
+	useProjectStore,
 } from '@/entities/project';
 import type { ProjectGitHubStatus, PushGitHubRequest } from '@/entities/project';
 import { formatApiError } from '@/shared/api';
@@ -44,11 +45,17 @@ const isNoCodeError = (err: unknown): boolean => {
  * la vez, algo que FSD no permite hacer a una entidad sobre otra.
  */
 export function useProjectGithubRepo(projectId: string | null): ProjectGithubRepoState {
+	const githubSyncingProjectId = useProjectStore((s) => s.githubSyncingProjectId);
+	const setGithubSyncing = useProjectStore((s) => s.setGithubSyncing);
+	const isLocalSyncing = Boolean(projectId && githubSyncingProjectId === projectId);
+
 	const [integration, setIntegration] = useState<IntegrationStatus | null>(null);
 	const [status, setStatus] = useState<ProjectGitHubStatus | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [noCode, setNoCode] = useState(false);
+
+	const isSyncing = isLocalSyncing || status?.sync_status === 'syncing';
 
 	const refresh = useCallback(async () => {
 		if (!projectId) return;
@@ -58,9 +65,12 @@ export function useProjectGithubRepo(projectId: string | null): ProjectGithubRep
 		]);
 		setIntegration(integrationRes);
 		setStatus(statusRes);
+		if (statusRes.sync_status === 'synced' || statusRes.sync_status === 'failed') {
+			setGithubSyncing(projectId, false);
+		}
 		setNoCode(false);
 		setError(null);
-	}, [projectId]);
+	}, [projectId, setGithubSyncing]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -87,6 +97,18 @@ export function useProjectGithubRepo(projectId: string | null): ProjectGithubRep
 			cancelled = true;
 		};
 	}, [projectId, refresh]);
+
+	useEffect(() => {
+		if (!isSyncing || !projectId) return;
+
+		const interval = setInterval(() => {
+			void refresh();
+		}, 3000);
+
+		return () => {
+			clearInterval(interval);
+		};
+	}, [isSyncing, projectId, refresh]);
 
 	const push = useCallback(
 		async (body: PushGitHubRequest) => {
@@ -123,15 +145,15 @@ export function useProjectGithubRepo(projectId: string | null): ProjectGithubRep
 	}, [push]);
 
 	const viewState = useMemo<ProjectGithubViewState>(() => {
+		if (isSyncing) return 'syncing';
 		if (loading) return 'loading';
 		if (noCode) return 'no-code';
 		if (!integration?.is_connected) return 'not-linked';
 		if (!status) return 'failed';
-		if (status.sync_status === 'syncing') return 'syncing';
 		if (status.sync_status === 'failed') return 'failed';
 		if (status.has_repository) return 'synced';
 		return 'create';
-	}, [loading, noCode, integration, status]);
+	}, [isSyncing, loading, noCode, integration, status]);
 
 	return { viewState, integration, status, loading, error, refresh, createRepo, sync };
 }

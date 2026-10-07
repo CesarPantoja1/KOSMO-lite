@@ -5,11 +5,16 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from kosmo.application.integrations.sync_github_repository import (
+    SyncGitHubRepositoryCommand,
+    SyncGitHubRepositoryUseCase,
+)
 from kosmo.contracts.auth.principal import Principal
 from kosmo.contracts.auth.secrets import EncryptedSecret, SecretCipher
 from kosmo.contracts.integrations.deployment import (
     DeploymentAccountNotLinkedError,
     DeploymentAuthenticationError,
+    DeploymentPreconditionError,
     DeploymentProvider,
     DeploymentProviderPort,
     DeploymentRepositoryMissingError,
@@ -40,7 +45,6 @@ class OrchestrateCloudDeploymentCommand:
     environment_variables: dict[str, str] | None = None
 
 
-OrquestarDespliegueNubeCommand = OrchestrateCloudDeploymentCommand
 DeployRailwayCommand = OrchestrateCloudDeploymentCommand
 
 
@@ -54,12 +58,14 @@ class OrchestrateCloudDeploymentUseCase:
         project_github_repo: ProjectGitHubIntegrationRepository,
         deployment_client: DeploymentProviderPort,
         cipher: SecretCipher,
+        sync_github_use_case: SyncGitHubRepositoryUseCase | None = None,
     ) -> None:
         self._project_deployment_repo = project_deployment_repo
         self._user_deployment_repo = user_deployment_repo
         self._project_github_repo = project_github_repo
         self._deployment_client = deployment_client
         self._cipher = cipher
+        self._sync_github_use_case = sync_github_use_case
 
     async def _refresh_user_token(self, user_integration: UserDeploymentIntegration) -> str:
         """Renueva el token de acceso utilizando el refresh token cifrado del usuario y actualiza la base de datos."""
@@ -133,16 +139,37 @@ class OrchestrateCloudDeploymentUseCase:
                 "Debes sincronizar el código con GitHub antes de publicar en la nube."
             )
 
+        # La validación y el push deben terminar antes de disparar Railway: de otro
+        # modo Railway compila un commit anterior sin el lockfile generado.
+        if self._sync_github_use_case is not None:
+            try:
+                sync_cmd = SyncGitHubRepositoryCommand(
+                    project_id=cmd.project_id,
+                    commit_message="chore: sync latest project configuration before deployment",
+                )
+                updated_github = await self._sync_github_use_case.execute(sync_cmd, UserId(principal.subject))
+                if not updated_github or not updated_github.last_commit_hash:
+                    raise DeploymentPreconditionError(
+                        "La sincronización de GitHub no devolvió un commit para desplegar."
+                    )
+                github_integration = updated_github
+            except Exception as sync_err:
+                logger.warning("No se pudo sincronizar GitHub antes de desplegar: %s", sync_err)
+                raise DeploymentPreconditionError(
+                    "No se pudo validar y sincronizar el código en GitHub antes de desplegar en Railway."
+                ) from sync_err
+
         # 4. Configurar variables de entorno predeterminadas y personalizadas
         default_env_vars = [
             EnvironmentVariable(key="NODE_ENV", value="production", is_secret=False),
             EnvironmentVariable(key="PORT", value="3000", is_secret=False),
+            EnvironmentVariable(key="HOSTNAME", value="0.0.0.0", is_secret=False),
             EnvironmentVariable(key="DATABASE_URL", value="file:/data/db.sqlite", is_secret=False),
         ]
         custom_env_vars: list[EnvironmentVariable] = []
         if cmd.environment_variables:
             for k, v in cmd.environment_variables.items():
-                if k not in {"NODE_ENV", "PORT", "DATABASE_URL"}:
+                if k not in {"NODE_ENV", "PORT", "HOSTNAME", "DATABASE_URL"}:
                     custom_env_vars.append(EnvironmentVariable(key=k, value=v, is_secret=False))
         all_env_vars = default_env_vars + custom_env_vars
 
@@ -178,6 +205,7 @@ class OrchestrateCloudDeploymentUseCase:
             await self._deployment_client.trigger_deployment(
                 token=current_token,
                 service_id=sid,
+                commit_sha=github_integration.last_commit_hash if github_integration else None,
             )
             return sid
 
@@ -227,5 +255,4 @@ class OrchestrateCloudDeploymentUseCase:
         return deployment
 
 
-OrquestarDespliegueNubeUseCase = OrchestrateCloudDeploymentUseCase
 DeployRailwayUseCase = OrchestrateCloudDeploymentUseCase

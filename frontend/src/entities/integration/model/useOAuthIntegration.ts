@@ -39,6 +39,25 @@ export function useOAuthIntegration({
 	const [actionLoading, setActionLoading] = useState(false);
 	const popupRef = useRef<Window | null>(null);
 	const processingCodeRef = useRef<string | null>(null);
+	const processedCodesRef = useRef<Set<string>>(new Set());
+
+	const refresh = useCallback(() => {
+		return getIntegrationStatus(provider)
+			.then((result) => {
+				setStatus(result);
+				onStatusChange?.(result);
+				return result;
+			})
+			.catch((err) => {
+				toast.error(
+					formatApiError(
+						err,
+						`No se pudo verificar el estado de la integración con ${label}.`,
+					),
+				);
+				return null;
+			});
+	}, [provider, label, onStatusChange]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -81,6 +100,14 @@ export function useOAuthIntegration({
 				return;
 			}
 			if (event.data?.type !== messageType) return;
+
+			const code = event.data?.code as string | undefined;
+			if (!code || typeof code !== 'string') return;
+
+			if (processingCodeRef.current === code || processedCodesRef.current.has(code)) {
+				return;
+			}
+
 			if (!consumeOAuthState(provider, event.data?.state)) {
 				toast.error(`La respuesta de autorización de ${label} no es válida. Intenta de nuevo.`);
 				popupRef.current?.close();
@@ -95,9 +122,8 @@ export function useOAuthIntegration({
 				return;
 			}
 
-			const code = event.data.code as string;
-			if (!code || processingCodeRef.current === code) return;
 			processingCodeRef.current = code;
+			processedCodesRef.current.add(code);
 
 			setActionLoading(true);
 			connectIntegration(provider, {
@@ -118,14 +144,15 @@ export function useOAuthIntegration({
 						// Noop si falla la actualización de la tienda
 					}
 				})
-				.catch((err) =>
+				.catch((err) => {
+					processedCodesRef.current.delete(code);
 					toast.error(
 						formatApiError(
 							err,
 							`Error al vincular la cuenta de ${label}. Intenta de nuevo.`,
 						),
-					),
-				)
+					);
+				})
 				.finally(() => {
 					setActionLoading(false);
 					processingCodeRef.current = null;
@@ -185,5 +212,6 @@ export function useOAuthIntegration({
 		username: status?.username ?? null,
 		handleConnect,
 		handleDisconnect,
+		refresh,
 	};
 }

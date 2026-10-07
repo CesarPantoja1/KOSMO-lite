@@ -65,12 +65,13 @@ export function FlowSteps() {
 					</p>
 
 					<h2 className='mt-4 text-3xl font-bold text-neutral-800 md:text-4xl'>
-						De tu idea a una aplicación <span className='text-neutral-800'>funcionando</span>
+						De tu idea a una aplicación{' '}
+						<span className='text-neutral-800'>funcionando</span>
 					</h2>
 
 					<p className='mt-4 text-neutral-500'>
-						KOSMO sigue un proceso estructurado para convertir conocimiento de negocio
-						en software.
+						KOSMO sigue un proceso estructurado para convertir conocimiento de negocio en
+						software.
 					</p>
 				</div>
 
@@ -78,17 +79,21 @@ export function FlowSteps() {
 					{steps.map((step) => (
 						<div
 							key={step.number}
-							className='group relative rounded-2xl border border-neutral-200 bg-neutral-0 p-5 transition hover:-translate-y-1 hover:border-primary-200 hover:shadow-lg hover:shadow-primary-50'
+							className='group relative rounded-2xl border border-neutral-200 bg-neutral-0 p-5 transition hover:-translate-y-1 hover:shadow-lg hover:shadow-neutral-100'
 						>
 							<div className='flex items-center justify-between'>
-								<span className='text-xs font-medium text-neutral-400'>{step.number}</span>
+								<span className='text-xs font-medium text-neutral-400'>
+									{step.number}
+								</span>
 
-							<span className='flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-lg text-neutral-500'>
-								{step.icon}
-							</span>
+								<span className='flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-lg text-neutral-500'>
+									{step.icon}
+								</span>
 							</div>
 
-							<h3 className='mt-7 text-sm font-semibold text-neutral-800'>{step.title}</h3>
+							<h3 className='mt-7 text-sm font-semibold text-neutral-800'>
+								{step.title}
+							</h3>
 
 							<p className='mt-2 text-xs leading-5 text-neutral-500'>{step.text}</p>
 						</div>

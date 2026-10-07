@@ -72,7 +72,10 @@ def build_auth_components(settings: Settings, repos: RepositoryRegistry) -> Auth
     )
 
     redis: Redis = Redis.from_url(  # pyright: ignore[reportUnknownMemberType]
-        settings.redis_url.get_secret_value()
+        settings.redis_url.get_secret_value(),
+        max_connections=settings.redis_max_connections,
+        socket_timeout=settings.redis_socket_timeout,
+        socket_connect_timeout=settings.redis_socket_connect_timeout,
     )
     token_store = RedisTokenRevocationStore(redis)
     authorization_code_store = RedisAuthorizationCodeStore(redis)

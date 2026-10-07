@@ -35,6 +35,11 @@ export interface UserPublic {
 	created_at: string;
 }
 
+export interface RegisterResponse {
+	email: string;
+	message: string;
+}
+
 export interface AuthorizationCodeResponse {
 	authorization_code: string;
 	expires_in: number;

@@ -13,6 +13,8 @@ interface ProjectStore {
 	setProjectState: (project: Project) => void;
 	isProyectosOpen: boolean;
 	setIsProyectosOpen: (v: boolean) => void;
+	githubSyncingProjectId: string | null;
+	setGithubSyncing: (id: string | null, isSyncing: boolean) => void;
 	getProjects: () => Promise<Project[]>;
 	getProject: (id: string) => Promise<Project>;
 }
@@ -28,6 +30,7 @@ export const useProjectStore = create<ProjectStore>()(
 				await deleteProject(id);
 				set((state) => ({
 					projects: state.projects.filter((p) => p.id !== id),
+					currentProject: state.currentProject?.id === id ? null : state.currentProject,
 				}));
 			},
 			currentProject: null,
@@ -36,6 +39,9 @@ export const useProjectStore = create<ProjectStore>()(
 				set({ currentProject: project, isProyectosOpen: true }),
 			isProyectosOpen: false,
 			setIsProyectosOpen: (v) => set({ isProyectosOpen: v }),
+			githubSyncingProjectId: null,
+			setGithubSyncing: (id, isSyncing) =>
+				set({ githubSyncingProjectId: isSyncing ? id : null }),
 
 			getProjects: async () => {
 				const data = await getProjects();
@@ -54,6 +60,7 @@ export const useProjectStore = create<ProjectStore>()(
 			partialize: (state) => ({
 				currentProject: state.currentProject,
 				isProyectosOpen: state.isProyectosOpen,
+				githubSyncingProjectId: state.githubSyncingProjectId,
 			}),
 		},
 	),
@@ -65,9 +72,13 @@ export const clearProjectStore = () => {
 		projects: [],
 		currentProject: null,
 		isProyectosOpen: false,
+		githubSyncingProjectId: null,
 	});
 };
 
 export const clearProjectStoreExceptProjects = () => {
-	useProjectStore.setState({ currentProject: null, isProyectosOpen: false });
+	useProjectStore.setState({
+		currentProject: null,
+		isProyectosOpen: false,
+	});
 };

@@ -1,4 +1,4 @@
-export type ConsistencyTargetPhase = 'features' | 'requirements' | 'model';
+export type ConsistencyTargetPhase = 'features' | 'requirements' | 'model' | 'implementation';
 
 export type ConsistencyEvaluationStatus =
 	| 'evaluating'

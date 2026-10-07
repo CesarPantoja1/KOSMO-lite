@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from kosmo.contracts.ai.chat import ChatRepository, ChatSession, ChatSessionSummary
 from kosmo.contracts.sdd.document import SpecPhase
+from kosmo.contracts.sdd.errors import ChatSessionNotFoundError
 from kosmo.contracts.sdd.ids import ChatSessionId, ProjectId
 from kosmo.domain.sdd.id_generator import IdGenerator
 
@@ -55,6 +56,7 @@ class ListChatSessionsUseCase:
 @dataclass(frozen=True)
 class DeleteChatSessionInput:
     session_id: ChatSessionId
+    project_id: ProjectId
 
 
 class DeleteChatSessionUseCase:
@@ -64,4 +66,9 @@ class DeleteChatSessionUseCase:
         self._chat_repo = chat_repo
 
     async def execute(self, input_data: DeleteChatSessionInput) -> None:
-        await self._chat_repo.delete_session(input_data.session_id)
+        deleted = await self._chat_repo.delete_session(input_data.session_id, input_data.project_id)
+        if not deleted:
+            raise ChatSessionNotFoundError(
+                session_id=str(input_data.session_id),
+                project_id=str(input_data.project_id),
+            )

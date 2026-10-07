@@ -20,6 +20,10 @@ from kosmo.contracts.pipeline.phase_outputs import (
     ConsistencyDetectionReport,
     ConsistencyReport,
 )
+from kosmo.contracts.sdd.codegen import (
+    FeatureImplementationRepository,
+    FeatureImplementationStatus,
+)
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import (
@@ -57,6 +61,9 @@ def _validate_action(
     if suggested_before == suggested_after:
         _log.warning("consistency.noop_action", artifact_id=artifact_id, action=action)
         return False
+    # Si el artefacto fue truncado para la evaluación del LLM, omitir validación estricta de contención
+    if "[…contenido truncado…]" in artifact_desc:
+        return True
     if suggested_before and normalize_for_match(suggested_before) not in normalize_for_match(artifact_desc):
         _log.warning(
             "consistency.before_mismatch",
@@ -79,12 +86,14 @@ class EvaluateConsistencyUseCase:
         requirement_repo: RequirementRepository,
         diagram_repo: ActivityDiagramRepository,
         document_repo: DocumentRepository,
+        implementation_repo: FeatureImplementationRepository | None = None,
     ) -> None:
         self._agent = agent
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
         self._diagram_repo = diagram_repo
         self._document_repo = document_repo
+        self._implementation_repo = implementation_repo
 
     async def evaluate(
         self,
@@ -178,6 +187,21 @@ class EvaluateConsistencyUseCase:
                 affected_ids.append(detection.artifact_id)
                 continue
 
+            art = artifact_by_id[detection.artifact_id]
+            if art.artifact_type == "FeatureImplementation":
+                actions.append(
+                    ArtifactAction(
+                        artifact_id=detection.artifact_id,
+                        action="update",
+                        rationale=detection.rationale,
+                        suggested_field="status",
+                        suggested_before="",
+                        suggested_after="requires_review",
+                    )
+                )
+                affected_ids.append(detection.artifact_id)
+                continue
+
             full_content = await self._fetch_full_artifact_content(target_phase, project_id, detection.artifact_id)
             if full_content is None:
                 _log.warning(
@@ -260,6 +284,16 @@ class EvaluateConsistencyUseCase:
 
     @staticmethod
     def _detection_skill_name(source_phase: SpecPhase, target_phase: SpecPhase) -> str:
+        if target_phase == SpecPhase.IMPLEMENTACION:
+            if source_phase == SpecPhase.DESCUBRIMIENTO:
+                return "consistency_evaluate_discovery_implementation"
+            if source_phase == SpecPhase.CARACTERISTICAS:
+                return "consistency_evaluate_features_implementation"
+            if source_phase == SpecPhase.REQUISITOS:
+                return "consistency_evaluate_requirements_implementation"
+            if source_phase == SpecPhase.MODELO:
+                return "consistency_evaluate_model_implementation"
+            return "consistency_evaluate_implementation"
         if source_phase == SpecPhase.REQUISITOS and target_phase == SpecPhase.CARACTERISTICAS:
             return "consistency_evaluate_requirements"
         if source_phase == SpecPhase.REQUISITOS and target_phase == SpecPhase.DESCUBRIMIENTO:
@@ -270,6 +304,8 @@ class EvaluateConsistencyUseCase:
             return "consistency_evaluate_features_downstream"
         if source_phase == SpecPhase.CARACTERISTICAS and target_phase == SpecPhase.MODELO:
             return "consistency_evaluate_features_model"
+        if source_phase == SpecPhase.DESCUBRIMIENTO and target_phase == SpecPhase.CARACTERISTICAS:
+            return "consistency_evaluate_discovery_features"
         if source_phase == SpecPhase.DESCUBRIMIENTO and target_phase == SpecPhase.REQUISITOS:
             return "consistency_evaluate_discovery_requirements"
         if source_phase == SpecPhase.DESCUBRIMIENTO and target_phase == SpecPhase.MODELO:
@@ -384,12 +420,21 @@ class EvaluateConsistencyUseCase:
             feature = await self._feature_repo.by_id(FeatureId(artifact_id))
             if feature is None:
                 return None
-            return feature.description + (f"\nOrigen: {feature.origin}" if feature.origin else "")
+            desc = feature.description + (f"\nOrigen: {feature.origin}" if feature.origin else "")
+            return f"Título: {feature.title}\nDescripción: {desc}"
         if target_phase == SpecPhase.REQUISITOS:
             return await self._requirement_repo.by_feature_id(FeatureId(artifact_id))
         if target_phase == SpecPhase.MODELO:
             diagram = await self._diagram_repo.by_feature_id(FeatureId(artifact_id))
             return diagram.diagram_syntax if diagram is not None else None
+        if target_phase == SpecPhase.IMPLEMENTACION:
+            if self._implementation_repo is None:
+                return None
+            impl = await self._implementation_repo.by_feature_id(FeatureId(artifact_id))
+            if impl is None:
+                return None
+            files_str = ", ".join(impl.generated_files) if impl.generated_files else "Sin archivos"
+            return f"Estado: {impl.status.value}\nArchivos: {files_str}"
         return None
 
     async def _fetch_source_content(self, source_phase: SpecPhase, project_id: ProjectId) -> str:
@@ -413,7 +458,7 @@ class EvaluateConsistencyUseCase:
             for f in features:
                 req_md = await self._requirement_repo.by_feature_id(f.id)
                 if req_md:
-                    parts.append(f"## Requisitos de '{f.title}' (Feature {f.id})\n\n{req_md[:15000]}")
+                    parts.append(f"## Requisitos de '{f.title}' (Feature {f.id})\n\n{req_md}")
             return "\n\n".join(parts)
         return ""
 
@@ -426,9 +471,14 @@ class EvaluateConsistencyUseCase:
         if source_phase != SpecPhase.DESCUBRIMIENTO:
             return plan_changes
 
+        # Si ya vienen diffs específicos con before no vacío, usarlos directamente
+        if any(c.diff.before.strip() for c in plan_changes):
+            return plan_changes
+
         try:
             previous_md = await self._document_repo.get_latest_version(project_id, SpecPhase.DESCUBRIMIENTO)
         except Exception:
+            _log.debug("evaluate_consistency.prev_version_fetch_failed", project_id=str(project_id), exc_info=True)
             previous_md = None
 
         if previous_md is None:
@@ -451,16 +501,12 @@ class EvaluateConsistencyUseCase:
         if target_phase == SpecPhase.DESCUBRIMIENTO:
             doc = await self._document_repo.get_discovery(project_id)
             if doc is not None:
-                full_md = document_to_markdown(doc)
-                md_text = full_md[:8000]
-                if len(full_md) > 8000:
-                    md_text += "\n[…contenido truncado…]"
                 return [
                     DownstreamArtifact(
                         artifact_id=str(project_id),
                         artifact_type="DiscoveryDocument",
                         title="Documento de Descubrimiento",
-                        description=md_text,
+                        description=document_to_markdown(doc),
                     )
                 ]
             return []
@@ -470,6 +516,8 @@ class EvaluateConsistencyUseCase:
             return await self._fetch_requirements(project_id)
         if target_phase == SpecPhase.MODELO:
             return await self._fetch_models(project_id)
+        if target_phase == SpecPhase.IMPLEMENTACION:
+            return await self._fetch_implementations(project_id)
         return []
 
     async def _fetch_features(self, project_id: ProjectId) -> list[DownstreamArtifact]:
@@ -490,15 +538,12 @@ class EvaluateConsistencyUseCase:
         for f in features:
             req_md = await self._requirement_repo.by_feature_id(f.id)
             if req_md is not None:
-                md_text = req_md[:20000]
-                if len(req_md) > 20000:
-                    md_text += "\n[…contenido truncado…]"
                 artifacts.append(
                     DownstreamArtifact(
                         artifact_id=str(f.id),
                         artifact_type="EARSRequirement",
                         title=f"Requisitos de {f.title}",
-                        description=md_text,
+                        description=req_md,
                     )
                 )
         return artifacts
@@ -521,4 +566,33 @@ class EvaluateConsistencyUseCase:
                         description=syntax,
                     )
                 )
+        return artifacts
+
+    async def _fetch_implementations(self, project_id: ProjectId) -> list[DownstreamArtifact]:
+        if self._implementation_repo is None:
+            return []
+        implementations = await self._implementation_repo.list_by_project(project_id)
+        artifacts: list[DownstreamArtifact] = []
+        for impl in implementations:
+            if impl.status not in (
+                FeatureImplementationStatus.IMPLEMENTED,
+                FeatureImplementationStatus.REQUIRES_REVIEW,
+                FeatureImplementationStatus.IN_PROGRESS,
+            ):
+                continue
+            feature = await self._feature_repo.by_id(impl.feature_id)
+            if feature is None:
+                continue
+            files_str = ", ".join(impl.generated_files) if impl.generated_files else "Sin archivos"
+            desc = f"Implementación de '{feature.title}'. Estado: {impl.status.value}. Archivos: {files_str}."
+            if impl.plan and impl.plan.summary:
+                desc += f" Resumen: {impl.plan.summary}"
+            artifacts.append(
+                DownstreamArtifact(
+                    artifact_id=str(impl.feature_id),
+                    artifact_type="FeatureImplementation",
+                    title=f"Código de {feature.title}",
+                    description=desc,
+                )
+            )
         return artifacts

@@ -111,3 +111,100 @@ async def test_get_container_returns_container_from_app_state() -> None:
     assert container is components
 
     await components.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_build_app_components_configures_db_connection_pool() -> None:
+    # Arrange
+    settings = _make_settings()
+
+    # Act
+    components = build_app_components(settings)
+
+    try:
+        # Assert
+        from sqlalchemy.pool import QueuePool
+
+        pool = components.db_engine.pool
+        assert isinstance(pool, QueuePool)
+        assert pool.size() == 60
+        assert pool._max_overflow == 40
+        assert pool._recycle == 1800
+    finally:
+        await components.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_build_app_components_scales_pool_for_multiple_workers() -> None:
+    # Arrange: 4 workers
+    settings = _make_settings()
+    settings.server_workers = 4
+
+    # Act
+    components = build_app_components(settings)
+
+    try:
+        from sqlalchemy.pool import QueuePool
+
+        pool = components.db_engine.pool
+        assert isinstance(pool, QueuePool)
+        # pool_size = max(5, 60 // 4) = 15
+        assert pool.size() == 15
+        # max_overflow = max(3, 40 // 4) = 10
+        assert pool._max_overflow == 10
+    finally:
+        await components.close()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_build_app_components_pool_size_respects_floor() -> None:
+    # Arrange: muchos workers (20)
+    settings = _make_settings()
+    settings.server_workers = 20
+
+    # Act
+    components = build_app_components(settings)
+
+    try:
+        from sqlalchemy.pool import QueuePool
+
+        pool = components.db_engine.pool
+        assert isinstance(pool, QueuePool)
+        # Floor: pool_size >= 5, max_overflow >= 3
+        assert pool.size() == 5
+        assert pool._max_overflow == 3
+    finally:
+        await components.close()
+
+
+@pytest.mark.unit
+def test_build_auth_components_configures_redis_pool_and_timeouts() -> None:
+    from kosmo.infrastructure.api.composition.auth import build_auth_components
+    from tests.conftest import _FERNET_KEY, _PRIVATE_KEY_PEM, _PUBLIC_KEY_PEM
+
+    settings = Settings(
+        env="development",
+        database_url="postgresql+asyncpg://user:pass@localhost:5432/kosmo",
+        redis_url="redis://:pass@localhost:6379/0",
+        llm_provider="noop",
+        llm_model="noop",
+        embedding_provider="none",
+        auth_disabled=False,
+        jwt_private_key_pem=_PRIVATE_KEY_PEM,
+        jwt_public_key_pem=_PUBLIC_KEY_PEM,
+        fernet_master_key=_FERNET_KEY,
+        redis_max_connections=50,
+        redis_socket_timeout=10.0,
+        redis_socket_connect_timeout=5.0,
+    )
+    repos = RepositoryRegistry.build(async_sessionmaker())
+    auth = build_auth_components(settings, repos)
+
+    assert auth.redis is not None
+    pool = auth.redis.connection_pool
+    assert pool.max_connections == 50
+    assert pool.connection_kwargs.get("socket_timeout") == 10.0
+    assert pool.connection_kwargs.get("socket_connect_timeout") == 5.0

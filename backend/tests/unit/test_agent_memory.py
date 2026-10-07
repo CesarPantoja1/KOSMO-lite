@@ -6,10 +6,8 @@ from kosmo.contracts.memory.agent_memory import AgentSessionSummary
 from kosmo.contracts.pipeline.phase_contexts import DiscoveryPhaseContext
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import AgentMemoryId, ProjectId
-from kosmo.infrastructure.persistence.memory.in_memory_store import (
-    InMemoryAgentSessionStore,
-)
 from tests.factories import a_project_id, a_session
+from tests.unit.fakes import InMemoryAgentSessionStore
 
 
 @pytest.mark.unit

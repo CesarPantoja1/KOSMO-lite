@@ -20,7 +20,7 @@ class AIProvider(StrEnum):
 
 
 DEFAULT_AI_PROVIDER: AIProvider = AIProvider.KOSMO_DEFAULT
-DEFAULT_AI_MODEL: str = "gemini-2.5-flash"
+DEFAULT_AI_MODEL: str = "gemini-3.8-flash"
 
 
 # ── Catálogo curado de modelos por proveedor ──
@@ -49,9 +49,8 @@ SUPPORTED_PROVIDERS: tuple[AIProviderInfo, ...] = (
         value=AIProvider.OPENAI,
         label="OpenAI (ChatGPT)",
         models=(
-            AIModelInfo(id="o1", display_name="o1", tier="flagship"),
-            AIModelInfo(id="gpt-4o", display_name="GPT-4o", tier="flagship"),
-            AIModelInfo(id="o3-mini", display_name="o3 Mini", tier="balanced"),
+            AIModelInfo(id="o3", display_name="o3", tier="flagship"),
+            AIModelInfo(id="gpt-4o", display_name="GPT-4o", tier="balanced"),
             AIModelInfo(id="gpt-4o-mini", display_name="GPT-4o Mini", tier="fast"),
         ),
     ),
@@ -59,19 +58,18 @@ SUPPORTED_PROVIDERS: tuple[AIProviderInfo, ...] = (
         value=AIProvider.ANTHROPIC,
         label="Anthropic",
         models=(
-            AIModelInfo(id="claude-3-opus-20240229", display_name="Claude Opus 3", tier="flagship"),
-            AIModelInfo(id="claude-3-5-sonnet-20241022", display_name="Claude Sonnet 3.5", tier="balanced"),
-            AIModelInfo(id="claude-3-5-haiku-20241022", display_name="Claude Haiku 3.5", tier="fast"),
+            AIModelInfo(id="claude-opus-5", display_name="Claude Opus 5", tier="flagship"),
+            AIModelInfo(id="claude-sonnet-5", display_name="Claude Sonnet 5", tier="balanced"),
+            AIModelInfo(id="claude-haiku-4-5", display_name="Claude Haiku 4.5", tier="fast"),
         ),
     ),
     AIProviderInfo(
         value=AIProvider.GOOGLE,
         label="Google Gemini",
         models=(
-            AIModelInfo(id="gemini-2.5-pro", display_name="Gemini 2.5 Pro", tier="flagship"),
-            AIModelInfo(id="gemini-2.5-flash", display_name="Gemini 2.5 Flash", tier="fast"),
-            AIModelInfo(id="gemini-1.5-pro", display_name="Gemini 1.5 Pro", tier="balanced"),
-            AIModelInfo(id="gemini-1.5-flash", display_name="Gemini 1.5 Flash", tier="fast"),
+            AIModelInfo(id="gemini-3.1-pro", display_name="Gemini 3.1 Pro", tier="flagship"),
+            AIModelInfo(id="gemini-3.8-flash", display_name="Gemini 3.8 Flash", tier="balanced"),
+            AIModelInfo(id="gemini-3.5-flash-lite", display_name="Gemini 3.5 Flash Lite", tier="fast"),
         ),
     ),
     AIProviderInfo(
@@ -79,9 +77,7 @@ SUPPORTED_PROVIDERS: tuple[AIProviderInfo, ...] = (
         label="DeepSeek",
         models=(
             AIModelInfo(id="deepseek-v4-pro", display_name="DeepSeek V4 Pro", tier="flagship"),
-            AIModelInfo(id="deepseek-reasoner", display_name="DeepSeek R1", tier="flagship"),
-            AIModelInfo(id="deepseek-v4-flash", display_name="DeepSeek V4 Flash", tier="fast"),
-            AIModelInfo(id="deepseek-chat", display_name="DeepSeek V3", tier="fast"),
+            AIModelInfo(id="deepseek-flash", display_name="DeepSeek Flash", tier="fast"),
         ),
     ),
 )
@@ -92,7 +88,7 @@ SUPPORTED_MODELS_PER_PROVIDER: dict[AIProvider, tuple[str, ...]] = {
     for p in SUPPORTED_PROVIDERS
 } | {
     AIProvider.CUSTOM: ("custom-model",),
-    AIProvider.KOSMO_DEFAULT: ("gemini-2.5-flash",),
+    AIProvider.KOSMO_DEFAULT: ("gemini-3.8-flash",),
 }
 
 

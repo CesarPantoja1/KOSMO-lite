@@ -1,5 +1,4 @@
-import json
-from typing import Annotated, cast
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
@@ -14,12 +13,10 @@ from kosmo.application.projects import (
 from kosmo.contracts.auth import Principal
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.ids import ProjectId, UserId
-from kosmo.infrastructure.api.composition import AppContainer
 from kosmo.infrastructure.api.dependencies.auth import get_principal
 from kosmo.infrastructure.api.dependencies.container import get_container
 from kosmo.infrastructure.api.schemas import (
     CreateProjectRequest,
-    ProjectPreviewResponse,
     ProjectResponse,
 )
 
@@ -139,7 +136,7 @@ async def list_projects(
 )
 async def get_project(
     project_id: str,
-    _principal: Annotated[Principal, Depends(get_principal)],
+    principal: Annotated[Principal, Depends(get_principal)],
     use_case: Annotated[GetProjectUseCase, Depends(_get_project)],
 ) -> ProjectResponse:
     try:
@@ -149,6 +146,11 @@ async def get_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=exc.problem.detail,
         ) from exc
+    if str(project.owner_id) != principal.subject:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proyecto '{project_id}' no encontrado.",
+        )
     return ProjectResponse(
         id=project.id,
         name=project.name,
@@ -158,50 +160,6 @@ async def get_project(
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
-
-
-@router.get(
-    "/{project_id}/preview",
-    response_model=ProjectPreviewResponse,
-    summary="URL de la vista previa del proyecto",
-    description="Devuelve la URL de la vista previa del proyecto si está activo "
-    "(tiene una implementación exitosa y el servicio preview le asignó un puerto); "
-    "404 si aún no hay vista previa.",
-    responses={
-        status.HTTP_404_NOT_FOUND: {
-            "description": "El proyecto no tiene una vista previa activa.",
-        },
-    },
-)
-async def get_project_preview(
-    project_id: str,
-    principal: Annotated[Principal, Depends(get_principal)],
-    container: Annotated[AppContainer, Depends(get_container)],
-) -> ProjectPreviewResponse:
-    project = await container.repos.projects.by_id(ProjectId(project_id))
-    if project is None or str(project.owner_id) != principal.subject:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
-    ports_file = container.settings.kosmo_workspaces_dir / ".preview-ports.json"
-    manifest: dict[str, object] = {}
-    try:
-        raw = json.loads(ports_file.read_text(encoding="utf-8"))
-        if isinstance(raw, dict):
-            manifest = cast(dict[str, object], raw)
-    except (FileNotFoundError, ValueError):
-        manifest = {}
-    raw_entry = manifest.get(project_id)
-    entry: dict[str, object] = cast(dict[str, object], raw_entry) if isinstance(raw_entry, dict) else {}
-    url_val = entry.get("url")
-    public_host_suffix = getattr(container.settings, "preview_public_host_suffix", None)
-    if public_host_suffix:
-        project_host = str(project.id).replace("_", "-").lower()
-        url_val = f"https://{project_host}-{public_host_suffix.rstrip('.').lower()}"
-    if not url_val:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El proyecto {project_id} no tiene una vista previa activa",
-        )
-    return ProjectPreviewResponse(url=str(url_val))
 
 
 @router.delete(

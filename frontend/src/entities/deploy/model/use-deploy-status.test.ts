@@ -165,4 +165,51 @@ describe('useDeployStatus', () => {
 		// Assert
 		expect(api.getDeployStatus).toHaveBeenCalledTimes(2);
 	});
+
+	it('mantiene el sondeo activo incluso si ocurre un error transitorio de red durante building', async () => {
+		// Arrange
+		api.getDeployStatus
+			.mockResolvedValueOnce(makeStatus({ status: 'building' })) // init
+			.mockRejectedValueOnce(new Error('Network glitch')) // primer poll (5s)
+			.mockResolvedValueOnce(makeStatus({ status: 'ready' })); // segundo poll
+
+		const { result } = renderHook(() => useDeployStatus('prj_01'));
+		await flushInit();
+		expect(result.current.loading).toBe(false);
+
+		// Act: avanza al primer poll (falla con error)
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(5_000);
+		});
+		expect(result.current.error).toBe('Network glitch');
+		expect(api.getDeployStatus).toHaveBeenCalledTimes(2);
+
+		// Act: avanza al siguiente poll (se recupera a ready)
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(5_000);
+		});
+
+		// Assert
+		expect(api.getDeployStatus).toHaveBeenCalledTimes(3);
+		expect(result.current.status?.status).toBe('ready');
+		expect(result.current.error).toBeNull();
+	});
+
+	it('revalida de inmediato al recibir evento de visibilidad visible si no es terminal', async () => {
+		// Arrange
+		api.getDeployStatus.mockResolvedValue(makeStatus({ status: 'building' }));
+		const { result } = renderHook(() => useDeployStatus('prj_01'));
+		await flushInit();
+		expect(api.getDeployStatus).toHaveBeenCalledTimes(1);
+
+		// Act: dispara evento de visibilidad
+		await act(async () => {
+			document.dispatchEvent(new Event('visibilitychange'));
+		});
+
+		// Assert: se consultó de inmediato sin esperar el temporizador
+		expect(api.getDeployStatus).toHaveBeenCalledTimes(2);
+		expect(result.current.status?.status).toBe('building');
+	});
 });
+

@@ -6,6 +6,7 @@ from typing import Any
 
 import structlog
 
+from kosmo.contracts.auth.context import current_user_id
 from kosmo.contracts.llm.ports import LLMClient, PromptTemplate
 from kosmo.contracts.memory.agent_memory import AgentMemoryPort, KnowledgePatternStore
 from kosmo.contracts.persistence.persistence import OutboxPort
@@ -93,17 +94,21 @@ class SessionRecorder:
         _log.info("agent.session_saved")
 
         if self._outbox is not None:
+            user_id = current_user_id.get()
+            payload: dict[str, Any] = {
+                "session_id": str(session.session_id),
+                "phase": phase.value,
+                "session_type": session_type,
+                "is_completed": is_completed,
+                "current_iteration": current_iteration,
+                "validation_is_valid": validation.is_valid,
+                "validation_errors": "; ".join(validation.errors[:5]),
+            }
+            if user_id:
+                payload["user_id"] = str(user_id)
             await self._outbox.enqueue(
                 "reflect_and_consolidate",
-                {
-                    "session_id": str(session.session_id),
-                    "phase": phase.value,
-                    "session_type": session_type,
-                    "is_completed": is_completed,
-                    "current_iteration": current_iteration,
-                    "validation_is_valid": validation.is_valid,
-                    "validation_errors": "; ".join(validation.errors[:5]),
-                },
+                payload,
             )
         else:
             asyncio.create_task(

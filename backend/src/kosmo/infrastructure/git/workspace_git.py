@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import re
 import subprocess
 from pathlib import Path
+from urllib.parse import quote, urlsplit
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +29,15 @@ def _run_git(
     workspace_path: Path | str,
     *,
     check: bool = True,
+    timeout: float | None = 60.0,
 ) -> subprocess.CompletedProcess[str]:
     """Helper interno para ejecutar comandos de Git dentro de un directorio de workspace."""
     cwd = Path(workspace_path).resolve()
     if not cwd.exists():
         raise GitError(f"El directorio del workspace no existe: {cwd}")
+
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
 
     try:
         res = subprocess.run(
@@ -41,9 +48,14 @@ def _run_git(
             encoding="utf-8",
             errors="replace",
             check=False,
+            timeout=timeout,
+            env=env,
         )
     except FileNotFoundError as e:
         raise GitError("Git no está instalado o no se encuentra en el PATH del sistema.") from e
+    except subprocess.TimeoutExpired as e:
+        sanitized_cmd = _sanitize_git_output(" ".join(cmd))
+        raise GitError(f"Tiempo de espera agotado al ejecutar el comando Git {sanitized_cmd}: {e}") from e
     except Exception as e:
         sanitized_cmd = _sanitize_git_output(" ".join(cmd))
         raise GitError(f"Error al ejecutar el comando Git {sanitized_cmd}: {e}") from e
@@ -202,28 +214,30 @@ def git_remote_get_url(
 
 
 def git_build_authenticated_url(repo_url: str, token: str) -> str:
-    """Construye una URL HTTPS autenticada para GitHub utilizando el token provisto.
+    """Construye una URL autenticada para GitHub usando HTTPS o un Git local.
 
     Ejemplo:
         'https://github.com/org/repo.git' -> 'https://x-access-token:<token>@github.com/org/repo.git'
     """
     clean_url = repo_url.strip()
-    clean_token = token.strip()
+    clean_token = quote(token.strip(), safe="")
 
     if not clean_token:
         raise GitError("El token de acceso no puede estar vacío.")
 
-    # Quitar cualquier credencial existente en la URL
-    if clean_url.startswith("https://"):
-        host_path = clean_url[len("https://") :]
-        if "@" in host_path:
-            host_path = host_path.split("@", 1)[1]
-        return f"https://x-access-token:{clean_token}@{host_path}"
-    elif clean_url.startswith("http://"):
-        host_path = clean_url[len("http://") :]
-        if "@" in host_path:
-            host_path = host_path.split("@", 1)[1]
-        return f"http://x-access-token:{clean_token}@{host_path}"
+    parsed = urlsplit(clean_url)
+    if parsed.scheme:
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise GitError("La URL remota debe ser HTTPS o un servidor Git local HTTP válido.")
+
+        local_hosts = {"localhost", "127.0.0.1", "::1"}
+        if parsed.scheme == "http" and parsed.hostname not in local_hosts:
+            raise GitError("Solo se permiten URLs HTTPS fuera de servidores Git locales.")
+
+        host_path = parsed.netloc.rsplit("@", 1)[-1] + parsed.path
+        if parsed.query:
+            host_path += f"?{parsed.query}"
+        return f"{parsed.scheme}://x-access-token:{clean_token}@{host_path}"
 
     return f"https://x-access-token:{clean_token}@{clean_url}"
 
@@ -282,12 +296,125 @@ def git_revert_commit(workspace_path: Path | str, commit: str) -> None:
     _run_git(["git", "revert", "--no-edit", commit], workspace_path, check=True)
 
 
+async def run_git_async(
+    cmd: list[str],
+    workspace_path: Path | str,
+    *,
+    check: bool = True,
+    timeout: float | None = 60.0,
+) -> subprocess.CompletedProcess[str]:
+    """Helper interno asíncrono para ejecutar comandos de Git fuera del event loop principal."""
+    return await asyncio.to_thread(_run_git, cmd, workspace_path, check=check, timeout=timeout)
+
+
+async def git_init_async(
+    workspace_path: Path | str,
+    initial_branch: str = "main",
+    user_name: str = "KOSMO Bot",
+    user_email: str = "bot@kosmo.ai",
+) -> None:
+    """Versión asíncrona de git_init."""
+    await asyncio.to_thread(git_init, workspace_path, initial_branch, user_name, user_email)
+
+
+async def git_add_async(workspace_path: Path | str, pattern: str = ".") -> None:
+    """Versión asíncrona de git_add."""
+    await asyncio.to_thread(git_add, workspace_path, pattern)
+
+
+async def git_commit_async(
+    workspace_path: Path | str,
+    message: str,
+    *,
+    allow_empty: bool = False,
+) -> bool:
+    """Versión asíncrona de git_commit."""
+    return await asyncio.to_thread(git_commit, workspace_path, message, allow_empty=allow_empty)
+
+
+async def git_rollback_async(workspace_path: Path | str) -> None:
+    """Versión asíncrona de git_rollback."""
+    await asyncio.to_thread(git_rollback, workspace_path)
+
+
+async def git_status_async(workspace_path: Path | str) -> str:
+    """Versión asíncrona de git_status."""
+    return await asyncio.to_thread(git_status, workspace_path)
+
+
+async def git_is_clean_async(workspace_path: Path | str) -> bool:
+    """Versión asíncrona de git_is_clean."""
+    return await asyncio.to_thread(git_is_clean, workspace_path)
+
+
+async def git_has_commits_async(workspace_path: Path | str) -> bool:
+    """Versión asíncrona de git_has_commits."""
+    return await asyncio.to_thread(git_has_commits, workspace_path)
+
+
+async def git_head_hash_async(workspace_path: Path | str) -> str | None:
+    """Versión asíncrona de git_head_hash."""
+    return await asyncio.to_thread(git_head_hash, workspace_path)
+
+
+async def git_current_branch_async(workspace_path: Path | str) -> str:
+    """Versión asíncrona de git_current_branch."""
+    return await asyncio.to_thread(git_current_branch, workspace_path)
+
+
+async def git_remote_add_or_update_async(
+    workspace_path: Path | str,
+    name: str = "origin",
+    url: str = "",
+) -> None:
+    """Versión asíncrona de git_remote_add_or_update."""
+    await asyncio.to_thread(git_remote_add_or_update, workspace_path, name=name, url=url)
+
+
+async def git_remote_get_url_async(
+    workspace_path: Path | str,
+    name: str = "origin",
+) -> str | None:
+    """Versión asíncrona de git_remote_get_url."""
+    return await asyncio.to_thread(git_remote_get_url, workspace_path, name=name)
+
+
+async def git_push_async(
+    workspace_path: Path | str,
+    remote: str = "origin",
+    branch: str | None = None,
+    *,
+    token: str | None = None,
+    force_with_lease: bool = False,
+    set_upstream: bool = True,
+) -> str:
+    """Versión asíncrona de git_push."""
+    return await asyncio.to_thread(
+        git_push,
+        workspace_path,
+        remote=remote,
+        branch=branch,
+        token=token,
+        force_with_lease=force_with_lease,
+        set_upstream=set_upstream,
+    )
+
+
+async def git_revert_commit_async(workspace_path: Path | str, commit: str) -> None:
+    """Versión asíncrona de git_revert_commit."""
+    await asyncio.to_thread(git_revert_commit, workspace_path, commit)
+
+
 class LocalGitWorkspaceAdapter:
     """Adaptador de infraestructura para operaciones Git en el workspace local."""
 
     def remote_add_or_update(self, workspace_path: str, name: str, url: str) -> None:
         """Añade un remoto al repositorio local o actualiza su URL si ya existe."""
         git_remote_add_or_update(workspace_path, name=name, url=url)
+
+    async def remote_add_or_update_async(self, workspace_path: str, name: str, url: str) -> None:
+        """Añade un remoto al repositorio local o actualiza su URL asíncronamente."""
+        await asyncio.to_thread(self.remote_add_or_update, workspace_path, name=name, url=url)
 
     def build_authenticated_url(self, repo_url: str, token: str) -> str:
         """Construye una URL HTTPS autenticada utilizando el token provisto."""
@@ -303,3 +430,14 @@ class LocalGitWorkspaceAdapter:
     ) -> str:
         """Ejecuta git push sin persistir credenciales en el remoto local."""
         return git_push(workspace_path, remote=remote, branch=branch, token=token)
+
+    async def push_async(
+        self,
+        workspace_path: str,
+        remote: str = "origin",
+        branch: str | None = None,
+        *,
+        token: str | None = None,
+    ) -> str:
+        """Ejecuta git push asíncronamente sin persistir credenciales en el remoto local."""
+        return await asyncio.to_thread(self.push, workspace_path, remote=remote, branch=branch, token=token)

@@ -180,9 +180,8 @@ export const useCharacteristicStore = create<CharacteristicStore>()(
 		{
 			name: 'kosmo-characteristic-store',
 			version: 2,
-			partialize: () => ({
-				// Las características, sugerencias y selección pertenecen a un proyecto.
-				// No se deben reutilizar tras abrir otro proyecto o cambiar de ambiente.
+			partialize: (state) => ({
+				selectedId: state.selectedId,
 			}),
 			migrate: () => ({
 				currentCharacteristics: [],

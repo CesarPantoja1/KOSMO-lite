@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 from typing import TYPE_CHECKING
 
 import structlog
@@ -17,6 +19,7 @@ from kosmo.application.chat.validate_phase_context import (
 from kosmo.contracts.ai.chat import ModificacionChat
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import ChatSessionId, ProjectId
+from kosmo.infrastructure.telemetry import ACTIVE_SSE_CONNECTIONS, get_current_trace_id
 
 if TYPE_CHECKING:
     from kosmo.application.chat.process_chat_message import (
@@ -25,6 +28,62 @@ if TYPE_CHECKING:
     )
 
 _log = structlog.get_logger(__name__)
+
+_HEARTBEAT_INTERVAL: float = 15.0
+_HEARTBEAT_COMMENT: str = ": ping\n\n"
+
+
+async def with_heartbeat(
+    source: AsyncIterator[str],
+    interval: float = _HEARTBEAT_INTERVAL,
+    heartbeat: str = _HEARTBEAT_COMMENT,
+    max_duration_seconds: float = 1800.0,
+) -> AsyncGenerator[str]:
+    """Envuelve un iterador asíncrono emitiendo comentarios ping periódicos si no hay actividad.
+
+    Ejecuta el consumo de la fuente en una única tarea dedicada mediante una cola,
+    asegurando que context managers vinculados a tareas (como AnyIO cancel scopes y
+    conexiones HTTP/LLM) se inicien y finalicen dentro de la misma tarea asyncio.
+    """
+    sentinel = object()
+    queue: asyncio.Queue[tuple[object, Exception | None]] = asyncio.Queue()
+
+    async def producer() -> None:
+        try:
+            async for item in source:
+                await queue.put((item, None))
+        except Exception as exc:
+            await queue.put((sentinel, exc))
+        else:
+            await queue.put((sentinel, None))
+
+    ACTIVE_SSE_CONNECTIONS.inc()
+    producer_task = asyncio.create_task(producer(), name="sse_producer_task")
+    start_time = time.monotonic()
+    try:
+        while True:
+            if time.monotonic() - start_time > max_duration_seconds:
+                _log.warning("sse.max_duration_exceeded", max_duration_seconds=max_duration_seconds)
+                break
+            try:
+                item, exc = await asyncio.wait_for(queue.get(), timeout=interval)
+            except TimeoutError:
+                if producer_task.done() and queue.empty():
+                    break
+                yield heartbeat
+                continue
+            if exc is not None:
+                raise exc
+            if item is sentinel:
+                break
+            assert isinstance(item, str)
+            yield item
+    finally:
+        ACTIVE_SSE_CONNECTIONS.dec()
+        if not producer_task.done():
+            producer_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await producer_task
 
 
 async def validate_chat_content(
@@ -115,9 +174,10 @@ async def sse_chat_response(
         context_id=context_id,
         session_id=session_id,
     )
+    trace_id = get_current_trace_id()
 
     async def event_stream() -> AsyncGenerator[str]:
-        yield "data: " + json.dumps({"type": "start"}, ensure_ascii=False) + "\n\n"
+        yield "data: " + json.dumps({"type": "start", "trace_id": trace_id}, ensure_ascii=False) + "\n\n"
         try:
             async for item in chat_uc.execute_stream(input_data):
                 if isinstance(item, ChatStreamChunk):
@@ -134,7 +194,7 @@ async def sse_chat_response(
         except Exception as exc:
             # Frontera de transporte: el stream ya empezó, así que el error se
             # comunica como evento SSE para que el cliente muestre feedback.
-            _log.exception("chat.stream_error", phase=document_type.value)
+            _log.exception("chat.stream_error", phase=document_type.value, trace_id=trace_id)
             from kosmo.contracts.sdd.errors import AIProviderAuthError
             from kosmo.infrastructure.llm.dynamic_llm_client import is_ai_auth_error
 
@@ -150,7 +210,7 @@ async def sse_chat_response(
                 yield (
                     "data: "
                     + json.dumps(
-                        {"type": "error", "code": "ai_auth_error", "message": msg},
+                        {"type": "error", "code": "ai_auth_error", "message": msg, "trace_id": trace_id},
                         ensure_ascii=False,
                     )
                     + "\n\n"
@@ -159,28 +219,43 @@ async def sse_chat_response(
                 yield (
                     "data: "
                     + json.dumps(
-                        {"type": "error", "message": "Error interno al procesar el mensaje. Reintenta más tarde."},
+                        {
+                            "type": "error",
+                            "message": "Error interno al procesar el mensaje. Reintenta más tarde.",
+                            "trace_id": trace_id,
+                        },
                         ensure_ascii=False,
                     )
                     + "\n\n"
                 )
 
     return StreamingResponse(
-        event_stream(),
+        with_heartbeat(event_stream()),
         media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "X-Trace-Id": trace_id,
+        },
     )
 
 
 async def sse_consistency_response(
     generator: AsyncGenerator[str],
 ) -> StreamingResponse:
+    trace_id = get_current_trace_id()
+
     async def event_stream() -> AsyncGenerator[str]:
+        yield "data: " + json.dumps({"type": "start", "trace_id": trace_id}, ensure_ascii=False) + "\n\n"
         async for chunk in generator:
             yield chunk
 
     return StreamingResponse(
-        event_stream(),  # type: ignore[reportArgumentType]
+        with_heartbeat(event_stream()),
         media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "X-Trace-Id": trace_id,
+        },
     )

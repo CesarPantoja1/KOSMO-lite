@@ -181,3 +181,25 @@ def test_consistency_output_with_impact_items() -> None:
     assert len(output.downstream_impact) == 1
     assert output.downstream_impact[0].phase == "requirements"
     assert output.downstream_impact[0].target_title == "Validación de timeout"
+
+
+@pytest.mark.unit
+def test_downstream_targets_includes_implementation_and_enforces_right_only() -> None:
+    from kosmo.contracts.ai.consistency import DOWNSTREAM_TARGETS, PHASE_ORDER
+
+    # Descubrimiento llega hasta IMPLEMENTACION
+    assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.DESCUBRIMIENTO]
+    # Características llega hasta IMPLEMENTACION
+    assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.CARACTERISTICAS]
+    # Requisitos llega hasta IMPLEMENTACION
+    assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.REQUISITOS]
+    # Modelo llega a IMPLEMENTACION
+    assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.MODELO]
+    # IMPLEMENTACION no tiene targets downstream (es hoja)
+    assert DOWNSTREAM_TARGETS[SpecPhase.IMPLEMENTACION] == []
+
+    # Verificar orden estricto hacia la derecha
+    for source, targets in DOWNSTREAM_TARGETS.items():
+        source_order = PHASE_ORDER[source]
+        for target in targets:
+            assert PHASE_ORDER[target] > source_order, f"{target} no está a la derecha de {source}"

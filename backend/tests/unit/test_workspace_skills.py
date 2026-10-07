@@ -87,6 +87,8 @@ def test_kosmo_drizzle_skill_content() -> None:
     assert "insert" in content
     assert "better-sqlite3" in content
     assert "Raw SQL" in content or "SQL Crudo" in content
+    assert "Server Actions" in content
+    assert "revalidatePath" in content
 
 
 @pytest.mark.unit
@@ -100,6 +102,8 @@ def test_kosmo_nextjs_skill_content() -> None:
     assert "NextResponse.json" in content
     assert "Bootstrap 5" in content
     assert "cn(" in content
+    assert "Server Actions" in content
+    assert "revalidatePath" in content
 
 
 @pytest.mark.unit
@@ -110,6 +114,7 @@ def test_kosmo_ui_skill_content() -> None:
     # Feature-slices desacoplados y registro de navegación
     assert "src/features/<slug>/" in content
     assert "manifest.ts" in content
+    assert "actions.ts" in content
     assert "feature-registry.ts" in content
     assert "Desacople" in content
 

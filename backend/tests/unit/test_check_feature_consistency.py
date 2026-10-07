@@ -156,3 +156,46 @@ async def test_check_feature_consistency_feature_not_found(
 
     assert exc_info.value.problem.status == 404
     assert str(missing_id) in exc_info.value.problem.detail
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_check_feature_consistency_endpoint_auth() -> None:
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from kosmo.application.features.check_feature_consistency import CheckFeatureConsistencyOutput
+    from kosmo.contracts.auth import Principal
+    from kosmo.infrastructure.api.dependencies.auth import get_principal, verify_project_owner
+    from kosmo.infrastructure.api.routers.features import router as features_router
+
+    mock_uc = AsyncMock()
+    mock_uc.execute.return_value = CheckFeatureConsistencyOutput(is_consistent=True)
+
+    app = FastAPI()
+    app.include_router(features_router)
+    app.state.container = SimpleNamespace(features=SimpleNamespace(check_feature_consistency=mock_uc))
+
+    # 1. Sin autenticacion -> 401
+    with TestClient(app) as client:
+        res = client.post(
+            "/api/v1/projects/prj_1/features/feat_1/consistency/check",
+            json={"content": {"title": "T", "description": "D"}},
+        )
+        assert res.status_code == 401
+
+    # 2. Con autenticacion
+    app.dependency_overrides[verify_project_owner] = lambda: None
+    app.dependency_overrides[get_principal] = lambda: Principal(subject="usr_1")
+    with TestClient(app) as client:
+        res = client.post(
+            "/api/v1/projects/prj_1/features/feat_1/consistency/check",
+            json={"content": {"title": "T", "description": "D"}},
+        )
+        assert res.status_code == 200
+        assert res.json()["is_consistent"] is True
+
+    app.dependency_overrides.clear()

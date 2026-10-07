@@ -7,12 +7,16 @@ from fastapi import HTTPException
 
 from kosmo.application.chat.chat_sessions import (
     CreateChatSessionUseCase,
+    DeleteChatSessionInput,
+    DeleteChatSessionUseCase,
     ListChatSessionsUseCase,
 )
 from kosmo.contracts.auth import Principal
+from kosmo.contracts.sdd.ids import ChatSessionId, ProjectId
 from kosmo.infrastructure.api.routers.chat_sessions import (
     CreateChatSessionRequestView,
     create_chat_session,
+    delete_chat_session,
     list_chat_sessions,
 )
 
@@ -65,3 +69,28 @@ async def test_create_session_returns_session_id() -> None:
     # Assert
     assert result["session_id"] == "cht_01"
     assert result["phase"] == "descubrimiento"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_delete_chat_session_passes_project_and_session_id() -> None:
+    # Arrange
+    uc = MagicMock(spec=DeleteChatSessionUseCase)
+    uc.execute = AsyncMock()
+
+    # Act
+    response = await delete_chat_session(
+        "prj_01",
+        "cht_01",
+        _principal(),
+        uc,
+    )
+
+    # Assert
+    assert response.status_code == 204
+    uc.execute.assert_awaited_once_with(
+        DeleteChatSessionInput(
+            session_id=ChatSessionId("cht_01"),
+            project_id=ProjectId("prj_01"),
+        )
+    )

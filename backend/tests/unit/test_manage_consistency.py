@@ -18,7 +18,10 @@ from kosmo.contracts.ai.consistency import (
 )
 from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.document import SpecPhase
-from kosmo.contracts.sdd.errors import ConsistencyStaleError
+from kosmo.contracts.sdd.errors import (
+    ConsistencyEvaluationNotFoundError,
+    ConsistencyStaleError,
+)
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
     ActivityDiagramId,
@@ -480,3 +483,45 @@ async def test_activity_lists_resolved_rows() -> None:
     assert len(items) == 1
     assert items[0]["status"] == "applied"
     assert items[0]["target_artifact_id"] == "feat_01"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_evaluation_rejects_cross_project_idor() -> None:
+    # Arrange — Proyecto legítimo prj_01 tiene una evaluación completada
+    seed = _Seed()
+    await seed.seed_completed(evaluation_id="cev_01")
+    apply_uc = _apply_uc(seed)
+
+    # Act & Assert — Atacante en prj_attacker intenta aplicar la evaluación ajena
+    with pytest.raises(ConsistencyEvaluationNotFoundError):
+        await apply_uc.execute(
+            ConsistencyEvaluationId("cev_01"),
+            project_id=ProjectId("prj_attacker"),
+        )
+
+    # Assert — La evaluación de la víctima NO fue modificada ni aplicada
+    row = await seed.evaluations.by_id(ConsistencyEvaluationId("cev_01"))
+    assert row is not None
+    assert row.status == ConsistencyEvaluationStatus.COMPLETED
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_discard_evaluation_rejects_cross_project_idor() -> None:
+    # Arrange — Proyecto legítimo prj_01 tiene una evaluación completada
+    seed = _Seed()
+    await seed.seed_completed(evaluation_id="cev_01")
+    discard_uc = DiscardConsistencyEvaluationUseCase(seed.evaluations)
+
+    # Act & Assert — Atacante en prj_attacker intenta descartar la evaluación ajena
+    with pytest.raises(ConsistencyEvaluationNotFoundError):
+        await discard_uc.execute(
+            ConsistencyEvaluationId("cev_01"),
+            project_id=ProjectId("prj_attacker"),
+        )
+
+    # Assert — La evaluación de la víctima NO fue descartada
+    row = await seed.evaluations.by_id(ConsistencyEvaluationId("cev_01"))
+    assert row is not None
+    assert row.status == ConsistencyEvaluationStatus.COMPLETED

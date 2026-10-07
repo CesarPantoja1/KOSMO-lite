@@ -41,22 +41,40 @@ actualiza el test junto con la implementación y vuelve a validar.
 - `.opencode/skills/kosmo-nextjs/SKILL.md`: Next.js 16 App Router con Server Components y APIs.
 - `.opencode/skills/kosmo-ui/SKILL.md`: UI funcional con Bootstrap 5, mapa navegacional y diseño consistente.
 
+## Persistencia 100% Real y Cero Mocks (NON-NEGOTIABLE)
+Toda funcionalidad que involucre datos persistentes DEBE leer y escribir en la base de datos SQLite real mediante Drizzle ORM (`src/db/`).
+1. **CERO MOCKS EN RUNTIME**:
+   - PROHIBIDO el uso de arrays en memoria (`let items = []`), `useState` como única persistencia de negocio, o datos dummy simulados al enviar formularios o ejecutar acciones.
+   - Todo envío de formulario, creación, actualización o eliminación DEBE ejecutar una mutación real en SQLite (`db.insert()`, `db.update()`, `db.delete()`).
+2. **Mutaciones con Server Actions (`"use server"`)**:
+   - Para mutar datos, crea Server Actions en `src/features/<slug>/actions.ts` con directiva `"use server"` al inicio del archivo.
+   - La acción importa `db` desde `@/db`, valida datos con `logic.ts`, ejecuta la mutación con Drizzle, llama a `revalidatePath('/<slug>')` de Next.js para refrescar la UI automáticamente, y retorna el resultado `{ success: true, ... }` o `{ success: false, error: ... }`.
+   - **PROHIBIDO importar `@/db` en componentes de cliente (`'use client'`)**: Los Client Components llaman a la Server Action asíncrona importada desde `./actions`.
+3. **Lectura de Datos en Server Components**:
+   - `src/app/<slug>/page.tsx` es un Server Component asíncrono (`async function`) que consulta directamente los datos reales de la BD con `db.select()` y los pasa como props a los componentes interactivos.
+4. **Semillas de Datos Maestros (Seed Data)**:
+   - Si la feature depende de catálogos o entidades maestras (ej. tipos de productos, sucursales, roles, categorías), la consulta o acción debe verificar si la tabla está vacía y auto-insertar registros iniciales realistas para que la app sea 100% interactiva desde el primer despliegue.
+
 ## UI, Navegación y Diseño con Bootstrap 5 (NON-NEGOTIABLE)
 Toda feature termina con una pantalla funcional que el usuario puede abrir y usar.
 **PROHIBIDO el uso de Tailwind CSS.**
 
 1. **Ruta y slice**: `src/app/<slug>/page.tsx` + `src/features/<slug>/` con `manifest.ts`,
-   `logic.ts` y `components/`. Registrar el manifest en `src/lib/feature-registry.ts`
-   (la navegación del shell se deriva del registro).
-2. **Desacople**: los slices no se importan entre sí; borrar una feature = eliminar su
-   carpeta y su entrada en el registro. El shell no depende de ninguna feature.
-3. **Modelo mental**: nav persistente con la feature activa, home con la visión del proyecto
+   `logic.ts`, `actions.ts` y `components/`. Registrar el manifest en `src/lib/feature-registry.ts`
+   (en el array `features` o agrupado en `featureGroups` según rol o dominio funcional).
+2. **Desacople y Entidades Compartidas**:
+   - Los slices en `src/features/<slug>/` no se importan directamente entre sí.
+   - Las entidades de negocio, tipos y operaciones comunes a múltiples características se
+     ubican en `src/domain/<entidad>/`. Cualquier slice puede importar de `src/domain/`.
+   - Borrar una feature = eliminar su carpeta de slice y su entrada en el registro sin romper el dominio compartido.
+3. **Modelo mental**: nav persistente con la feature activa (agrupada por actor/rol si aplica), home con la visión del proyecto
    y tarjetas de acceso, estados vacío/error/loading claros, español neutro.
 4. **Adaptación al tipo de web**: detecta la naturaleza del negocio desde las directivas UX
    (storefront, dashboard, workflow, contenido o saas_tool) y usa los componentes recomendados.
 5. **Diseño consistente**: solo componentes de `src/components/ui/` (Button, Card, Table, Stat,
    Badge, BadgeStatus, Input, Select, Label, Textarea, Modal, Tabs, Alert, Steps, EmptyState, PageHeader)
    y clases de Bootstrap 5; nada de estilos inline sueltos, degradados genéricos, emojis o lorem ipsum.
+6. **Interacción Multi-Rol (Crucial)**: Si una característica involucra a más de un actor/rol (ej. Médico y Paciente, Empleado y Administrador), la interfaz NO debe sesgarse a un solo rol. Debe ofrecer la perspectiva y controles de acción de cada rol participante (mediante `<Tabs>` por rol o selector de perspectiva) para que se pueda interactuar y validar el flujo completo de todos los roles.
 
 ## TDD (obligatorio)
 Antes de escribir cualquier test, carga la skill `.opencode/skills/tdd/SKILL.md` (o `kosmo-testing`).
@@ -67,9 +85,11 @@ Toda funcionalidad nueva debe tener al menos happy path + error path cubiertos.
 ```text
 src/
   app/           ← Next.js App Router (pages, layouts, API routes)
-  components/    ← Componentes React reutilizables
-  db/            ← Schema Drizzle, migraciones, queries
-  lib/           ← Utilidades, tipos compartidos
+  components/    ← Componentes React reutilizables y design system
+  db/            ← Schema Drizzle, migraciones, cliente de base de datos
+  domain/        ← Entidades de negocio, tipos y lógica compartida inter-feature
+  features/      ← Slices verticales por feature (consumen src/domain/ y componentes compartidos)
+  lib/           ← Utilidades, catálogo de navegación (feature-registry.ts)
   styles/        ← Estilos globales
 tests/           ← Tests Vitest
 ```

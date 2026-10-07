@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import os
 import shlex
 import time
@@ -9,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
+from ulid import ULID
 
 from kosmo.contracts.sdd.codegen import (
     CodeRunnerPort,
@@ -73,15 +75,23 @@ class EphemeralDockerCodeRunner(CodeRunnerPort):
         base_name = Path(first_token).stem.lower()
         return base_name in self._allowed_prefixes or first_token in self._allowed_prefixes
 
-    def _build_docker_args(self, workspace_dir: str, command: str) -> list[str]:
+    def _build_docker_args(
+        self,
+        workspace_dir: str,
+        command: str,
+        container_name: str | None = None,
+    ) -> list[str]:
         resolved_path = str(Path(workspace_dir).resolve())
         mount_flag = f"{resolved_path}:{self._container_workspace}"
         if self._mount_read_only:
             mount_flag += ":ro"
 
+        name_flags: list[str] = ["--name", container_name] if container_name else []
+
         return [
             self._docker_bin,
             "run",
+            *name_flags,
             "-v",
             mount_flag,
             "-w",
@@ -93,6 +103,24 @@ class EphemeralDockerCodeRunner(CodeRunnerPort):
             command,
         ]
 
+    async def _cleanup_container(self, container_name: str) -> None:
+        """Fuerza la eliminación de un contenedor huérfano en el daemon de Docker."""
+        try:
+            _log.info("docker_runner.cleanup_orphan", container_name=container_name)
+            cleanup_proc = await asyncio.create_subprocess_exec(
+                self._docker_bin,
+                "rm",
+                "-f",
+                container_name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            wait_coro = cleanup_proc.wait()
+            if inspect.isawaitable(wait_coro):
+                await asyncio.wait_for(wait_coro, timeout=10.0)
+        except Exception as exc:
+            _log.warning("docker_runner.cleanup_orphan_failed", container_name=container_name, error=str(exc))
+
     async def _execute_in_container(
         self,
         workspace_dir: str,
@@ -101,7 +129,8 @@ class EphemeralDockerCodeRunner(CodeRunnerPort):
         timeout_seconds: int,
     ) -> ValidationStepResult:
         start = time.perf_counter()
-        args = self._build_docker_args(workspace_dir, command)
+        container_name = f"kosmo_val_{ULID()!s}".lower()
+        args = self._build_docker_args(workspace_dir, command, container_name=container_name)
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -131,6 +160,11 @@ class EphemeralDockerCodeRunner(CodeRunnerPort):
         except TimeoutError:
             with contextlib.suppress(Exception):
                 proc.kill()
+            with contextlib.suppress(Exception):
+                p_wait = proc.wait()
+                if inspect.isawaitable(p_wait):
+                    await asyncio.wait_for(p_wait, timeout=2.0)
+            await self._cleanup_container(container_name)
 
             duration_ms = int((time.perf_counter() - start) * 1000)
             timeout_msg = (
@@ -138,7 +172,11 @@ class EphemeralDockerCodeRunner(CodeRunnerPort):
                 f"excedió el tiempo límite de {timeout_seconds} segundos."
             )
             _log.warning(
-                "docker_runner.timeout", workspace_dir=workspace_dir, command=command, timeout_s=timeout_seconds
+                "docker_runner.timeout",
+                workspace_dir=workspace_dir,
+                command=command,
+                timeout_s=timeout_seconds,
+                container_name=container_name,
             )
             return ValidationStepResult(
                 step=step or ValidationStep.TESTS,
@@ -149,6 +187,15 @@ class EphemeralDockerCodeRunner(CodeRunnerPort):
                 errors=(),
                 error_messages=(timeout_msg,),
             )
+        except asyncio.CancelledError:
+            with contextlib.suppress(Exception):
+                proc.kill()
+            with contextlib.suppress(Exception):
+                p_wait = proc.wait()
+                if inspect.isawaitable(p_wait):
+                    await asyncio.wait_for(p_wait, timeout=2.0)
+            await self._cleanup_container(container_name)
+            raise
 
         duration_ms = int((time.perf_counter() - start) * 1000)
         raw_output = stdout.decode("utf-8", errors="replace") if stdout else ""

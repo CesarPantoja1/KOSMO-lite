@@ -45,16 +45,13 @@ _FIDELITY_RULES = (
     "termino. Este es un cambio semantico, no cosmetico.\n"
     "7. Si el cambio modifica una REGLA DE NEGOCIO o ALCANCE FUNCIONAL, TODOS "
     "los artefactos que implementan esa regla estan afectados.\n"
-    "8. Si el contenido contiene '[…contenido truncado…]', el texto fue "
-    "recortado. Si necesitas un fragmento que no aparece, indica en la rationale "
-    "que el cambio requiere revision manual.\n"
-    "9. Prohibido usar el caracter guion largo. Usa punto, coma o dos puntos.\n"
-    "10. ORTOGRAFIA: escribe en español correcto. Usa TODAS las tildes "
+    "8. Prohibido usar el caracter guion largo. Usa punto, coma o dos puntos.\n"
+    "9. ORTOGRAFIA: escribe en español correcto. Usa TODAS las tildes "
     "(á, é, í, ó, ú), dieresis (ü) y eñes (ñ). Revisa especialmente: "
     "descripción, característica, término, análisis, único, especifico, "
     "después, automático, método, código, acción, sección, razón, lógica, "
     "ortografía, número, género, ámbito, artículo.\n"
-    "11. Usa signos de puntuacion correctos: punto final en cada oracion, "
+    "10. Usa signos de puntuacion correctos: punto final en cada oracion, "
     "comas donde corresponda, mayuscula inicial.\n\n"
 )
 
@@ -330,33 +327,37 @@ CONSISTENCY_FEATURES_MODEL_PROMPT = build_consistency_prompt(
 CONSISTENCY_VALIDATE_CREATE_FEATURE_PROMPT = (
     "Eres un analista de trazabilidad de software.\n"
     "Tu tarea es analizar un documento de Descubrimiento completo y una nueva "
-    "caracteristica propuesta, realizando DOS tareas en una sola respuesta:\n\n"
+    "característica propuesta, realizando DOS tareas en una sola respuesta:\n\n"
     "1. DERIVA EL ORIGEN: identifica las secciones del Descubrimiento que "
-    "fundamentan esta caracteristica. Recorre todas las secciones del documento "
-    "(Vision, Espacio del problema, Actores, Propuesta de valor, Metas del "
+    "fundamentan esta característica. Recorre todas las secciones del documento "
+    "(Visión, Espacio del problema, Actores, Propuesta de valor, Metas del "
     "producto, Alcance, Reglas de negocio y cualquier otra presente). "
     "Devuelve una cadena de trazabilidad en el campo 'origin' con el formato:\n"
-    '   "Derivado de [seccion(es)] del descubrimiento."\n'
-    "   Si la caracteristica no se relaciona claramente con ninguna seccion, usa:\n"
-    '   "Sin relacion directa con las secciones del descubrimiento."\n\n'
-    "2. VERIFICA COHERENCIA: determina si la caracteristica es consistente con "
-    "el contenido de TODAS las secciones del Descubrimiento. Si la caracteristica "
-    "contradice explicitamente la vision, el alcance declarado, los actores "
+    '   "Derivado de [sección(es)] del descubrimiento."\n'
+    "   Si la característica no se relaciona claramente con ninguna sección, usa:\n"
+    '   "Sin relación directa con las secciones del descubrimiento."\n\n'
+    "2. VERIFICA COHERENCIA: determina si la característica es consistente con "
+    "el contenido de TODAS las secciones del Descubrimiento. Si la característica "
+    "contradice explícitamente la visión, el alcance declarado, los actores "
     "identificados, las metas definidas o cualquier regla de negocio, indica "
     "is_consistent=false y explica el motivo en el campo 'reason'.\n\n"
-    "Responde UNICAMENTE con el siguiente JSON, sin markdown ni texto adicional:\n"
+    "REGLAS DE REDACCIÓN Y ORTOGRAFÍA:\n"
+    "- Redacta en español formal con impecable ortografía, gramática y todas las tildes normativas.\n"
+    "- Presta especial atención a: 'característica', 'descripción', 'sección', "
+    "'relación', 'semántica', 'propósito', 'inyección', 'además', 'amplía', 'más allá'.\n\n"
+    "Responde ÚNICAMENTE con el siguiente JSON, sin markdown ni texto adicional:\n"
     "{\n"
     '  "origin": "<cadena de trazabilidad derivada>",\n'
     '  "is_consistent": true,\n'
     '  "reason": ""\n'
     "}\n\n"
-    "Si la caracteristica NO es consistente:\n"
+    "Si la característica NO es consistente:\n"
     "{\n"
     '  "origin": "<cadena de trazabilidad derivada>",\n'
     '  "is_consistent": false,\n'
-    '  "reason": "<explicacion clara de la contradiccion, en español>"\n'
+    '  "reason": "<explicación clara de la contradicción, en español con ortografía y tildes correctas>"\n'
     "}\n\n"
-    "IMPORTANTE: Siempre incluye el campo origin. No uses el caracter guion largo (—)."
+    "IMPORTANTE: Siempre incluye el campo origin. No uses el carácter guion largo (—)."
 )
 
 
@@ -434,19 +435,15 @@ class ConsistencyEvaluationMode:
         changes_text = "\n".join(
             f"### Cambio en '{c.section}'\n"
             f"**Descripcion:** {c.description}\n"
-            f"**Antes:**\n{c.diff.before[:15000]}{'[…truncado…]' if len(c.diff.before) > 15000 else ''}\n"
-            f"**Despues:**\n{c.diff.after[:15000]}{'[…truncado…]' if len(c.diff.after) > 15000 else ''}\n"
+            f"**Antes:**\n{c.diff.before}\n"
+            f"**Despues:**\n{c.diff.after}\n"
             for c in context.applied_changes
         )
         artifacts_text = "\n".join(
-            f'- [{a.artifact_type}] id={a.artifact_id}, titulo="{a.title}", '
-            f'descripcion="{a.description[:12000]}'
-            f'{"[…truncado…]" if len(a.description) > 12000 else ""}"'
+            f'- [{a.artifact_type}] id={a.artifact_id}, titulo="{a.title}", descripcion="{a.description}"'
             for a in context.downstream_artifacts
         )
-        src = context.source_content
-        truncated = "\n[…contenido truncado…]" if len(src) > 30000 else ""
-        source_doc = (src[:30000] + truncated) if src else "(no disponible)"
+        source_doc = context.source_content or "(no disponible)"
 
         return (
             f"## Fase origen: {context.source_phase.value}\n"
@@ -513,16 +510,14 @@ def _render_changes(context: ConsistencyPhaseContext) -> str:
     return "\n".join(
         f"### Cambio en '{c.section}'\n"
         f"**Descripcion:** {c.description}\n"
-        f"**Antes:**\n{c.diff.before[:15000]}{'[…truncado…]' if len(c.diff.before) > 15000 else ''}\n"
-        f"**Despues:**\n{c.diff.after[:15000]}{'[…truncado…]' if len(c.diff.after) > 15000 else ''}\n"
+        f"**Antes:**\n{c.diff.before}\n"
+        f"**Despues:**\n{c.diff.after}\n"
         for c in context.applied_changes
     )
 
 
 def _render_source(context: ConsistencyPhaseContext) -> str:
-    src = context.source_content
-    truncated = "\n[…contenido truncado…]" if len(src) > 30000 else ""
-    return (src[:30000] + truncated) if src else "(no disponible)"
+    return context.source_content or "(no disponible)"
 
 
 _CORRECTION_SYSTEM_PROMPT = """Eres un analista experto en trazabilidad de requisitos de software.

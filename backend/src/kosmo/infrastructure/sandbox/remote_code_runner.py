@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
+import json
+import os
 import tarfile
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -43,7 +47,8 @@ class RemoteCodeRunner:
         return base64.b64encode(output.getvalue()).decode("ascii")
 
     async def _run(self, workspace_dir: str, payload: dict[str, object]) -> dict[str, Any]:
-        payload["archive"] = self._archive_workspace(workspace_dir)
+        loop = asyncio.get_running_loop()
+        payload["archive"] = await loop.run_in_executor(None, self._archive_workspace, workspace_dir)
         response = await self._client.post("/run", json=payload, headers={"Authorization": f"Bearer {self._token}"})
         if not response.is_success:
             raise RemoteCodeRunnerError(f"Runner returned HTTP {response.status_code}: {response.text[:500]}")
@@ -58,6 +63,51 @@ class RemoteCodeRunner:
         exit_code = int(raw.get("exit_code", 1))
         duration_ms = int(raw.get("duration_ms", 0))
         return parse_step_output(step, output, exit_code, duration_ms)
+
+    @staticmethod
+    def _persist_package_lock(workspace_dir: str, manifest_before: bytes, package_lock: str) -> None:
+        if len(package_lock.encode("utf-8")) > 5_000_000:
+            raise RemoteCodeRunnerError("Generated package-lock.json is too large")
+        workspace = Path(workspace_dir).resolve()
+        manifest_path = workspace / "package.json"
+        if manifest_path.read_bytes() != manifest_before:
+            raise RemoteCodeRunnerError("package.json changed during isolated validation")
+        try:
+            package_raw: object = json.loads(manifest_before)
+            lock_raw: object = json.loads(package_lock)
+            if not isinstance(package_raw, dict) or not isinstance(lock_raw, dict):
+                raise ValueError("Invalid package or lockfile")
+            package = cast(dict[str, Any], package_raw)
+            lock = cast(dict[str, Any], lock_raw)
+            packages_raw: object = lock.get("packages")
+            if not isinstance(packages_raw, dict):
+                raise ValueError("Missing lockfile root")
+            packages = cast(dict[str, object], packages_raw)
+            root_raw = packages.get("")
+            if not isinstance(root_raw, dict):
+                raise ValueError("Missing lockfile root")
+            root = cast(dict[str, Any], root_raw)
+            version: object = lock.get("lockfileVersion")
+            if not isinstance(version, int) or version < 2:
+                raise ValueError("Unsupported lockfile format")
+            for field in ("name", "version"):
+                if root.get(field) != package.get(field):
+                    raise ValueError(f"Lockfile does not match package.json: {field}")
+            for field in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
+                if root.get(field, {}) != package.get(field, {}):
+                    raise ValueError(f"Lockfile does not match package.json: {field}")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RemoteCodeRunnerError("Generated package-lock.json does not match package.json") from exc
+
+        temporary_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=workspace, delete=False) as temporary:
+                temporary_path = temporary.name
+                temporary.write(package_lock)
+            os.replace(temporary_path, workspace / "package-lock.json")
+        finally:
+            if temporary_path and os.path.exists(temporary_path):
+                os.unlink(temporary_path)
 
     async def run_step(
         self, workspace_dir: str, step: ValidationStep, *, timeout_seconds: int = 300
@@ -86,9 +136,15 @@ class RemoteCodeRunner:
         ),
         run_id: str = "",
     ) -> ValidationRunResult:
+        manifest_before = (Path(workspace_dir).resolve() / "package.json").read_bytes()
         data = await self._run(
             workspace_dir, {"operation": "pipeline", "steps": [str(step) for step in steps], "run_id": run_id}
         )
+        package_lock = data.get("package_lock")
+        if isinstance(package_lock, str):
+            self._persist_package_lock(workspace_dir, manifest_before, package_lock)
+        elif data.get("all_passed"):
+            raise RemoteCodeRunnerError("Runner did not return the generated package-lock.json")
         results = tuple(
             self._result(item, ValidationStep(str(item["step"])))
             for item in cast(list[dict[str, Any]], data.get("results", []))

@@ -35,6 +35,8 @@ class FakeWorkspaceManager(WorkspaceManagerPort):
         self.text_updates: list[tuple[str, str, str]] = []
         self.commit_hashes: list[str] = []
         self.reverted: list[str] = []
+        self.acquired_locks: list[ProjectId] = []
+        self.released_locks: list[ProjectId] = []
 
     async def ensure_workspace(self, project_id: ProjectId) -> CodeWorkspace:
         return CodeWorkspace(
@@ -61,10 +63,10 @@ class FakeWorkspaceManager(WorkspaceManagerPort):
         return False
 
     async def acquire_lock(self, project_id: ProjectId) -> None:
-        pass
+        self.acquired_locks.append(project_id)
 
     async def release_lock(self, project_id: ProjectId) -> None:
-        pass
+        self.released_locks.append(project_id)
 
     async def rollback_workspace(self, project_id: ProjectId) -> None:
         pass
@@ -401,3 +403,27 @@ async def test_delete_feature_code_deltas_ciudadanas_sin_jerga() -> None:
     assert any("Validando la aplicación" in d for d in deltas)
     assert any("funcione sin la funcionalidad" in d for d in deltas)
     assert any("funcionando correctamente" in d for d in deltas)
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_delete_feature_code_adquiere_y_libera_workspace_lock() -> None:
+    # Arrange
+    workspace_manager = FakeWorkspaceManager()
+    opencode_client = FakeOpenCodeClient()
+    code_runner = FakeCodeRunner(results=[True])
+    impl_repo = FakeImplementationRepository()
+    use_case = DeleteFeatureCodeUseCase(
+        workspace_manager=workspace_manager,
+        code_runner=code_runner,
+        opencode_client=opencode_client,
+        implementation_repo=impl_repo,
+    )
+    feature = _a_feature()
+
+    # Act
+    await _collect(use_case, DeleteFeatureCodeInput(feature=feature))
+
+    # Assert
+    assert workspace_manager.acquired_locks == [feature.project_id]
+    assert workspace_manager.released_locks == [feature.project_id]

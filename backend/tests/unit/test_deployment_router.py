@@ -24,6 +24,7 @@ from kosmo.contracts.sdd.ids import ProjectId, UserId
 from kosmo.contracts.sdd.project import Project
 from kosmo.infrastructure.api.composition import AppContainer
 from kosmo.infrastructure.api.routers.deployment import (
+    delete_project_deployment,
     deploy_to_railway,
     get_project_deploy_status,
 )
@@ -325,3 +326,42 @@ async def test_deploy_to_railway_api_error_502() -> None:
         )
 
     assert exc_info.value.status_code == 502
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_delete_project_deployment_success() -> None:
+    # Arrange
+    req = _mock_request(project=_mock_project("prj_123"))
+    use_case = AsyncMock()
+    use_case.execute.return_value = True
+
+    # Act
+    await delete_project_deployment(
+        project_id="prj_123",
+        request=req,
+        principal=_principal("usr_123"),
+        use_case=use_case,
+    )
+
+    # Assert
+    use_case.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_delete_project_deployment_not_owner_raises_404() -> None:
+    # Arrange
+    req = _mock_request(project=_mock_project("prj_123"))
+    use_case = AsyncMock()
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        await delete_project_deployment(
+            project_id="prj_123",
+            request=req,
+            principal=_principal("usr_other"),
+            use_case=use_case,
+        )
+
+    assert exc_info.value.status_code == 404

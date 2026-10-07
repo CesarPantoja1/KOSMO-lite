@@ -21,21 +21,32 @@ from kosmo.contracts.sdd.errors import (
 )
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.domain.pipeline.feature_resolver import resolve_feature_id
-from kosmo.infrastructure.api.dependencies.auth import get_principal
+from kosmo.infrastructure.api.dependencies.auth import get_principal, require_project_owner
 from kosmo.infrastructure.api.dependencies.container import get_container
+from kosmo.infrastructure.api.dependencies.rate_limit import ProjectGenerationRateLimiter
 
 router = APIRouter(
     prefix="/api/v1/features/{feature_id}/diagram",
     tags=["modelo"],
 )
 
+_generation_rate_limiter = ProjectGenerationRateLimiter()
+
 
 class GenerateDiagramRequest(BaseModel):
     project_id: str
 
 
-async def _get_feature_id(request: Request, project_id: str, id_or_slug: str) -> FeatureId:
-    fid = await resolve_feature_id(get_container(request).features.feature_repo, ProjectId(project_id), id_or_slug)
+async def _get_feature_id(
+    request: Request,
+    project_id: str,
+    id_or_slug: str,
+    principal: Principal | None = None,
+) -> FeatureId:
+    container = get_container(request)
+    if principal is not None:
+        await require_project_owner(container, project_id, principal)
+    fid = await resolve_feature_id(container.features.feature_repo, ProjectId(project_id), id_or_slug)
     if fid is None:
         raise FeatureNotFoundError(
             feature_id=id_or_slug,
@@ -65,8 +76,9 @@ async def generate_diagram(
     body: GenerateDiagramRequest,
     _principal: Annotated[Principal, Depends(get_principal)],
     request: Request,
+    _rate: Annotated[None, Depends(_generation_rate_limiter)] = None,
 ) -> dict[str, Any]:
-    fid = await _get_feature_id(request, body.project_id, feature_id)
+    fid = await _get_feature_id(request, body.project_id, feature_id, _principal)
     uc: GenerateActivityDiagramUseCase = get_container(request).modelo.generate_diagram
 
     output = await uc.execute(GenerateDiagramInput(project_id=ProjectId(body.project_id), feature_id=fid))
@@ -88,8 +100,9 @@ async def propagate_to_model(
     body: GenerateDiagramRequest,
     _principal: Annotated[Principal, Depends(get_principal)],
     request: Request,
+    _rate: Annotated[None, Depends(_generation_rate_limiter)] = None,
 ) -> dict[str, Any]:
-    fid = await _get_feature_id(request, body.project_id, feature_id)
+    fid = await _get_feature_id(request, body.project_id, feature_id, _principal)
     uc: GenerateActivityDiagramUseCase = get_container(request).modelo.generate_diagram
 
     output = await uc.execute(GenerateDiagramInput(project_id=ProjectId(body.project_id), feature_id=fid))
@@ -107,7 +120,7 @@ async def get_diagram(
     request: Request,
     project_id: str = Query(...),
 ) -> dict[str, Any]:
-    fid = await _get_feature_id(request, project_id, feature_id)
+    fid = await _get_feature_id(request, project_id, feature_id, _principal)
     uc: GetActivityDiagramUseCase = get_container(request).modelo.get_diagram
 
     try:
@@ -144,7 +157,7 @@ async def delete_diagram(
     request: Request,
     project_id: str = Query(...),
 ) -> dict[str, str]:
-    fid = await _get_feature_id(request, project_id, feature_id)
+    fid = await _get_feature_id(request, project_id, feature_id, _principal)
     uc: DeleteActivityDiagramUseCase = get_container(request).modelo.delete_diagram
 
     await uc.execute(

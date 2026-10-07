@@ -24,14 +24,16 @@ from kosmo.contracts.sdd.errors import (
     FeatureNotFoundError,
     LLMInvocationError,
 )
-from kosmo.contracts.sdd.ids import ActivityDiagramId, FeatureId
+from kosmo.contracts.sdd.feature import Feature
+from kosmo.contracts.sdd.ids import ActivityDiagramId, FeatureId, ProjectId, UserId
+from kosmo.contracts.sdd.project import Project
 from kosmo.infrastructure.api.routers.modelo import (
     GenerateDiagramRequest,
     generate_diagram,
     get_diagram,
     propagate_to_model,
 )
-from tests.unit.fakes import InMemoryFeatureRepository
+from tests.unit.fakes import InMemoryFeatureRepository, InMemoryProjectRepository
 
 
 def _principal() -> Principal:
@@ -40,9 +42,27 @@ def _principal() -> Principal:
 
 def _make_mock_request(generate_uc: Any = None, get_uc: Any = None) -> MagicMock:
     req = MagicMock()
+    project_repo = InMemoryProjectRepository()
+    project_repo.projects["prj_01"] = Project(
+        id=ProjectId("prj_01"),
+        name="Test Project",
+        slug="test-project",
+        description="",
+        owner_id=UserId("usr_test123"),
+    )
+    feature_repo = InMemoryFeatureRepository()
+    feature_repo.features["feat_01"] = Feature(
+        id=FeatureId("feat_01"),
+        number=1,
+        title="Test Feature",
+        slug="test-feature",
+        description="",
+        project_id=ProjectId("prj_01"),
+    )
     req.app.state.container = SimpleNamespace(
         modelo=SimpleNamespace(generate_diagram=generate_uc, get_diagram=get_uc),
-        features=SimpleNamespace(feature_repo=InMemoryFeatureRepository()),
+        features=SimpleNamespace(feature_repo=feature_repo),
+        repos=SimpleNamespace(projects=project_repo),
     )
     return req
 

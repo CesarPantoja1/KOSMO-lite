@@ -16,13 +16,14 @@ from kosmo.application.chat.chat_sessions import (
 from kosmo.contracts.auth import Principal
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import ChatSessionId, ProjectId
-from kosmo.infrastructure.api.dependencies.auth import get_principal
+from kosmo.infrastructure.api.dependencies.auth import get_principal, verify_project_owner
 from kosmo.infrastructure.api.dependencies.container import get_container
 from kosmo.infrastructure.api.schemas import HttpErrorResponse
 
 router = APIRouter(
     prefix="/api/v1/projects/{project_id}/chat-sessions",
     tags=["chat-sessions"],
+    dependencies=[Depends(verify_project_owner)],
     responses={
         401: {"model": HttpErrorResponse, "description": "Token ausente, inválido o expirado"},
         404: {"model": HttpErrorResponse, "description": "Proyecto no encontrado"},
@@ -139,10 +140,15 @@ async def create_chat_session(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_chat_session(
-    project_id: str,  # noqa: ARG001 — el id valida la ruta bajo el proyecto
+    project_id: str,
     session_id: str,
     _principal: Annotated[Principal, Depends(get_principal)],
     uc: Annotated[DeleteChatSessionUseCase, Depends(_delete_uc)],
 ) -> Response:
-    await uc.execute(DeleteChatSessionInput(session_id=ChatSessionId(session_id)))
+    await uc.execute(
+        DeleteChatSessionInput(
+            session_id=ChatSessionId(session_id),
+            project_id=ProjectId(project_id),
+        )
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

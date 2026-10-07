@@ -11,6 +11,7 @@ const emptyStatus: ConsistencyStatusResponse = {
 		features: { pending: 0, evaluating: 0, failed: 0 },
 		requirements: { pending: 0, evaluating: 0, failed: 0 },
 		model: { pending: 0, evaluating: 0, failed: 0 },
+		implementation: { pending: 0, evaluating: 0, failed: 0 },
 	},
 };
 
@@ -21,10 +22,11 @@ describe('selectors de consistencia', () => {
 				features: { pending: 2, evaluating: 1, failed: 0 },
 				requirements: { pending: 1, evaluating: 0, failed: 1 },
 				model: { pending: 0, evaluating: 2, failed: 0 },
+				implementation: { pending: 1, evaluating: 0, failed: 0 },
 			},
 		};
 
-		expect(sumPhaseStatus(status, 'pending')).toBe(3);
+		expect(sumPhaseStatus(status, 'pending')).toBe(4);
 		expect(sumPhaseStatus(status, 'evaluating')).toBe(3);
 		expect(sumPhaseStatus(status, 'failed')).toBe(1);
 	});
@@ -39,6 +41,7 @@ describe('selectors de consistencia', () => {
 				features: { pending: 0, evaluating: 0, failed: 0 },
 				requirements: { pending: 0, evaluating: 0, failed: 0 },
 				model: { pending: 4, evaluating: 0, failed: 0 },
+				implementation: { pending: 0, evaluating: 0, failed: 0 },
 			},
 		};
 
@@ -51,6 +54,7 @@ describe('selectors de consistencia', () => {
 				features: { pending: 0, evaluating: 0, failed: 0 },
 				requirements: { pending: 0, evaluating: 0, failed: 1 },
 				model: { pending: 0, evaluating: 0, failed: 1 },
+				implementation: { pending: 0, evaluating: 0, failed: 0 },
 			},
 		};
 
@@ -62,11 +66,12 @@ describe('selectors de consistencia', () => {
 		expect(firstPhaseToReview(null)).toBe('features');
 	});
 
-	it('CONSISTENCY_REVIEW_ROUTES cubre las tres fases', () => {
+	it('CONSISTENCY_REVIEW_ROUTES cubre las cuatro fases', () => {
 		expect(CONSISTENCY_REVIEW_ROUTES).toEqual({
 			features: '/proyecto/caracteristicas/consistencia',
 			requirements: '/proyecto/requisitos/consistencia',
 			model: '/proyecto/modelo/consistencia',
+			implementation: '/proyecto/codigo/consistencia',
 		});
 	});
 });

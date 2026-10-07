@@ -14,6 +14,7 @@ from kosmo.contracts.sdd.errors import FeatureNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import FeatureRepository
+from kosmo.domain.codegen.integration_rules import detect_capability_overlap
 
 
 class EditFeatureInput(BaseModel):
@@ -28,6 +29,7 @@ class EditFeatureOutput:
     is_saved: bool
     feature: Feature | None = None
     inconsistency_reason: str | None = None
+    warnings: tuple[str, ...] = ()
 
 
 class EditFeatureUseCase:
@@ -103,4 +105,9 @@ class EditFeatureUseCase:
             ],
         )
 
-        return EditFeatureOutput(is_saved=True, feature=feature)
+        all_features = await self._feature_repo.list_by_project(input_dto.project_id)
+        other_features = [f for f in all_features if f.id != feature.id]
+        overlaps = detect_capability_overlap(feature, other_features)
+        warnings = tuple(o.message for o in overlaps if o.message)
+
+        return EditFeatureOutput(is_saved=True, feature=feature, warnings=warnings)

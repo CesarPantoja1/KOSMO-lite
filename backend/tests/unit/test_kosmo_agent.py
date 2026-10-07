@@ -201,8 +201,8 @@ async def test_agent_retry_consults_knowledge_tools_on_validation_failure() -> N
     # Arrange
     from kosmo.contracts.llm.ports import LLMResponse, PromptTemplate
     from kosmo.domain.pipeline.knowledge_tool_registry import KnowledgeToolDef, KnowledgeToolRegistry
-    from kosmo.infrastructure.persistence.memory.in_memory_store import InMemoryAgentSessionStore
     from tests.factories import a_project_id
+    from tests.unit.fakes import InMemoryAgentSessionStore
 
     tool_calls = 0
 

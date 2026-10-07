@@ -5,6 +5,7 @@ estable del sistema (``contracts`` está en el nivel inferior del contrato de
 ``import-linter``), por lo que cualquier capa puede consumirla.
 """
 
+from kosmo.contracts.auth.context import current_user_id
 from kosmo.contracts.auth.errors import (
     AccountLockedError,
     AuthError,
@@ -69,4 +70,5 @@ __all__ = [
     "User",
     "UserAlreadyExistsError",
     "UserRepository",
+    "current_user_id",
 ]

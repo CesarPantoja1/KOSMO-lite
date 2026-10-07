@@ -6,6 +6,7 @@ import {
 	CONSISTENCY_REVIEW_ROUTES,
 	useConsistencyGateStore,
 } from '@/entities/consistency';
+import { useImplementationStore } from '@/entities/implementation';
 import { useModelingStore } from '@/entities/modeling';
 import { useProjectStore } from '@/entities/project';
 import { useRequirementsStore } from '@/entities/requirements';
@@ -21,6 +22,7 @@ const TARGET_LABELS: Record<ConsistencyTargetPhase, string> = {
 	features: 'Funcionalidades',
 	requirements: 'Criterios',
 	model: 'Diagramas',
+	implementation: 'Código',
 };
 
 const ROUTE_TO_TARGET: Record<string, ConsistencyTargetPhase> = {
@@ -28,12 +30,15 @@ const ROUTE_TO_TARGET: Record<string, ConsistencyTargetPhase> = {
 	requisitos: 'requirements',
 	modelo: 'model',
 	descubrimiento: 'features',
+	codigo: 'implementation',
+	implementacion: 'implementation',
 };
 
 const TARGET_TO_ROUTE: Record<ConsistencyTargetPhase, string> = {
 	features: '/proyecto/caracteristicas',
 	requirements: '/proyecto/requisitos',
 	model: '/proyecto/modelo',
+	implementation: '/proyecto/codigo',
 };
 
 const refreshArtifactStores = async (projectId: string, cards: ReviewCard[]) => {
@@ -46,6 +51,12 @@ const refreshArtifactStores = async (projectId: string, cards: ReviewCard[]) => 
 			fetches.push(useRequirementsStore.getState().getRequirements(projectId, featureId));
 		} else if (card.artifact_type === 'ActivityDiagram') {
 			fetches.push(useModelingStore.getState().getDiagram(projectId, featureId));
+		} else if (card.artifact_type === 'FeatureImplementation') {
+			fetches.push(
+				useImplementationStore
+					.getState()
+					.loadImplementation(featureId, card.target_title, card.target_display_id),
+			);
 		}
 	}
 	await Promise.allSettled(fetches);
@@ -189,21 +200,50 @@ const ConsistencyPage = () => {
 					</div>
 				</div>
 
-				{/* Selector de fase destino */}
-				<div className='flex shrink-0 items-center gap-2'>
-					{(Object.keys(TARGET_LABELS) as ConsistencyTargetPhase[]).map((phase) => (
-						<Link
-							key={phase}
-							href={CONSISTENCY_REVIEW_ROUTES[phase]}
-							className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-								phase === targetPhase
-									? 'bg-primary-500 text-neutral-0'
-									: 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-							}`}
-						>
-							{TARGET_LABELS[phase]}
-						</Link>
-					))}
+				{/* Selector de fase destino con badges */}
+				<div className='flex shrink-0 items-center gap-2 overflow-x-auto pb-1'>
+					{(Object.keys(TARGET_LABELS) as ConsistencyTargetPhase[]).map((phase) => {
+						const phaseInfo = status?.phases?.[phase];
+						const pendingCount = phaseInfo?.pending ?? 0;
+						const isEvaluating = (phaseInfo?.evaluating ?? 0) > 0;
+						const isActive = phase === targetPhase;
+
+						return (
+							<Link
+								key={phase}
+								href={CONSISTENCY_REVIEW_ROUTES[phase]}
+								className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+									isActive
+										? 'bg-primary-500 text-neutral-0 shadow-xs'
+										: 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+								}`}
+							>
+								<span>{TARGET_LABELS[phase]}</span>
+								{pendingCount > 0 && (
+									<span
+										className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
+											isActive
+												? 'bg-neutral-0 text-primary-600'
+												: 'bg-warning-500 text-neutral-0'
+										}`}
+										title={`${pendingCount} cambio(s) pendiente(s) de revisión`}
+									>
+										{pendingCount}
+									</span>
+								)}
+								{pendingCount === 0 && isEvaluating && (
+									<span
+										className={`flex h-4 w-4 items-center justify-center rounded-full ${
+											isActive ? 'bg-neutral-0/30' : 'bg-warning-500'
+										}`}
+										title='Evaluando consistencia…'
+									>
+										<span className='h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-0' />
+									</span>
+								)}
+							</Link>
+						);
+					})}
 				</div>
 
 				{evaluating > 0 && (

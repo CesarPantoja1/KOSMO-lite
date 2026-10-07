@@ -1,8 +1,9 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
+from kosmo.infrastructure.api.dependencies.auth import get_principal
 from kosmo.infrastructure.api.schemas import (
     AuthorizationCodeResponse,
     AuthorizeRequest,
@@ -16,6 +17,7 @@ from kosmo.infrastructure.api.schemas import (
     PrincipalView,
     ProjectResponse,
     RegisterRequest,
+    RegisterResponse,
     SaveSelectedFeaturesRequest,
     TokenExchangeRequest,
     TokenPairResponse,
@@ -23,7 +25,11 @@ from kosmo.infrastructure.api.schemas import (
     UserPublic,
 )
 
-router = APIRouter(prefix="/api/v1/schemas", tags=["schemas"])
+router = APIRouter(
+    prefix="/api/v1/schemas",
+    tags=["schemas"],
+    dependencies=[Depends(get_principal)],
+)
 
 
 _REGISTRY: dict[str, type[BaseModel]] = {
@@ -34,6 +40,7 @@ _REGISTRY: dict[str, type[BaseModel]] = {
     "FeatureSuggestionResponse": FeatureSuggestionResponse,
     "ProjectResponse": ProjectResponse,
     "RegisterRequest": RegisterRequest,
+    "RegisterResponse": RegisterResponse,
     "AuthorizeRequest": AuthorizeRequest,
     "AuthorizationCodeResponse": AuthorizationCodeResponse,
     "TokenExchangeRequest": TokenExchangeRequest,

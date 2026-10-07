@@ -26,14 +26,25 @@ class RegisterUser:
             raise ValueError("El nombre no puede estar vacío")
         normalized_email = email.strip().lower()
         existing = await self.user_repository.by_email(normalized_email)
+        hashed_password = await asyncio.to_thread(self.password_hasher.hash, password)
         if existing is not None:
+            await self.audit_sink.record(
+                AuditEvent(
+                    event_type="auth.register",
+                    outcome=AuditOutcome.FAILURE,
+                    occurred_at=datetime.now(UTC),
+                    actor_id=existing.id,
+                    actor_email=normalized_email,
+                )
+            )
+            record_auth_event("register_duplicate", user_id=existing.id)
             raise UserAlreadyExistsError("Email ya registrado")
         user = User(
             id=IdGenerator.generate("user"),
             email=normalized_email,
             name=normalized_name,
             avatar_url=None,
-            hashed_password=await asyncio.to_thread(self.password_hasher.hash, password),
+            hashed_password=hashed_password,
             created_at=datetime.now(UTC),
         )
         await self.user_repository.create(user)

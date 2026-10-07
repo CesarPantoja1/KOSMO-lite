@@ -166,6 +166,42 @@ describe('useOAuthIntegration', () => {
 		expect(vi.mocked(toast.success)).toHaveBeenCalled();
 	});
 
+	it('ignora mensajes postMessage duplicados con el mismo código sin mostrar error', async () => {
+		// Arrange
+		api.getIntegrationStatus.mockResolvedValue({ provider: 'github', is_connected: false });
+		api.connectIntegration.mockResolvedValue({
+			provider: 'github',
+			is_connected: true,
+			username: 'octocat',
+		});
+		window.sessionStorage.setItem('kosmo.oauth.github.state', 'github.test-state');
+		window.sessionStorage.setItem('kosmo.oauth.github.verifier', 'v'.repeat(64));
+		vi.mocked(authApi.getMe).mockResolvedValue({ subject: 'usr_1' } as never);
+		const { result } = renderHook(() => useOAuthIntegration(baseParams));
+		await waitFor(() => expect(result.current.loading).toBe(false));
+
+		// Act: emitimos el mensaje dos veces seguidas (como ocurre en re-renders del popup)
+		await act(async () => {
+			window.dispatchEvent(
+				new MessageEvent('message', {
+					origin: window.location.origin,
+					data: { type: 'github-oauth-code', code: 'duplicate-code-1', state: 'github.test-state' },
+				}),
+			);
+			window.dispatchEvent(
+				new MessageEvent('message', {
+					origin: window.location.origin,
+					data: { type: 'github-oauth-code', code: 'duplicate-code-1', state: 'github.test-state' },
+				}),
+			);
+		});
+
+		// Assert
+		expect(api.connectIntegration).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+		expect(vi.mocked(toast.success)).toHaveBeenCalledTimes(1);
+	});
+
 	it('muestra un toast de error cuando el popup reporta oauth-error', async () => {
 		// Arrange
 		api.getIntegrationStatus.mockResolvedValue({ provider: 'github', is_connected: false });

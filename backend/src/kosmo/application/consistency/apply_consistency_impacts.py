@@ -7,6 +7,7 @@ import structlog
 
 from kosmo.contracts.persistence.persistence import UnitOfWork
 from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
+from kosmo.contracts.sdd.codegen import FeatureImplementationStatus
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.domain.sdd.document_converters import document_to_markdown, markdown_to_document
@@ -71,7 +72,7 @@ class ApplyConsistencyImpactsUseCase:
                 )
                 continue
 
-            if action == "update" and not before and not after:
+            if action == "update" and not before and not after and artifact_type != "FeatureImplementation":
                 failed.append(
                     FailedImpact(target_id=target_id, artifact_type=artifact_type, reason="Sin sugerencia de cambio")
                 )
@@ -131,12 +132,38 @@ class ApplyConsistencyImpactsUseCase:
                 return None  # cascada BD: la feature padre ya se eliminó
             return await self._update_diagram(uow, feature_id, before, after)
 
+        if artifact_type == "FeatureImplementation":
+            if action == "delete":
+                return await self._delete_implementation(uow, feature_id)
+            return await self._mark_implementation_for_review(uow, feature_id)
+
         if artifact_type == "DiscoveryDocument":
             if action == "delete":
                 return "El documento de Descubrimiento no puede eliminarse"
             return await self._update_discovery(uow, project_id, before, after)
 
         return f"Tipo de artefacto desconocido: {artifact_type}"
+
+    async def _mark_implementation_for_review(self, uow: UnitOfWork, feature_id: FeatureId) -> str | None:
+        import dataclasses
+
+        impl = await uow.implementations.by_feature_id(feature_id)
+        if impl is None:
+            return "La implementación no existe"
+        updated = dataclasses.replace(
+            impl,
+            status=FeatureImplementationStatus.REQUIRES_REVIEW,
+            updated_at=datetime.now(UTC),
+        )
+        await uow.implementations.save(updated)
+        return None
+
+    async def _delete_implementation(self, uow: UnitOfWork, feature_id: FeatureId) -> str | None:
+        impl = await uow.implementations.by_feature_id(feature_id)
+        if impl is None:
+            return None
+        await uow.implementations.delete(feature_id)
+        return None
 
     async def _update_discovery(self, uow: UnitOfWork, project_id: ProjectId, before: str, after: str) -> str | None:
         document = await uow.documents.get_discovery(project_id, for_update=True)

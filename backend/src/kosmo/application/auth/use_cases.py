@@ -8,6 +8,8 @@ from kosmo.contracts.audit import AuditEvent, AuditEventSink, AuditOutcome
 from kosmo.contracts.auth import (
     InvalidTokenError,
     Principal,
+    TokenClaims,
+    TokenExpiredError,
     TokenIssuer,
     TokenPair,
     TokenReusedError,
@@ -48,20 +50,6 @@ class IssueTokenPair:
         return TokenPair(access=access, refresh=refresh)
 
 
-_JTI_CACHE: dict[str, bool] = {}
-_JTI_CACHE_MAX = 1000
-
-
-def _jti_is_cached_revoked(jti: str) -> bool | None:
-    return _JTI_CACHE.get(jti)
-
-
-def _jti_cache_set(jti: str, revoked: bool) -> None:
-    if len(_JTI_CACHE) >= _JTI_CACHE_MAX:
-        _JTI_CACHE.pop(next(iter(_JTI_CACHE)))
-    _JTI_CACHE[jti] = revoked
-
-
 @dataclass(frozen=True, slots=True)
 class VerifyAccessToken:
     verifier: TokenVerifier
@@ -70,22 +58,11 @@ class VerifyAccessToken:
     async def execute(self, token: str) -> Principal:
         claims = await asyncio.to_thread(self.verifier.verify, token, expected_type=TokenType.ACCESS)
 
-        cached = _jti_is_cached_revoked(claims.jti)
-        if cached:
-            raise TokenRevokedError("Access token revoked")
-        if cached is False and claims.family_id is not None:
-            family_cached = _jti_is_cached_revoked(claims.family_id)
-            if family_cached:
-                raise TokenRevokedError("Session revoked")
-
         if await self.revocation_store.is_access_revoked(jti=claims.jti):
-            _jti_cache_set(claims.jti, True)
             raise TokenRevokedError("Access token revoked")
         if claims.family_id is not None and not await self.revocation_store.is_family_alive(family_id=claims.family_id):
-            _jti_cache_set(claims.family_id, True)
             raise TokenRevokedError("Session revoked")
 
-        _jti_cache_set(claims.jti, False)
         return Principal(subject=claims.subject, scopes=claims.scopes)
 
 
@@ -101,6 +78,13 @@ class RefreshTokenPair:
         claims = await asyncio.to_thread(self.verifier.verify, refresh_token, expected_type=TokenType.REFRESH)
         consumed = await self.revocation_store.consume_refresh(jti=claims.jti)
         if consumed is None:
+            grace_pair = await self.revocation_store.get_grace_period(old_jti=claims.jti)
+            if grace_pair is not None:
+                family = grace_pair.refresh.family_id or claims.family_id
+                if family is not None and not await self.revocation_store.is_family_alive(family_id=family):
+                    raise TokenRevokedError("Sesión revocada")
+                return grace_pair
+
             if claims.family_id is not None and await self.revocation_store.is_family_alive(family_id=claims.family_id):
                 await self.revocation_store.revoke_family(family_id=claims.family_id)
                 await self.audit_sink.record(
@@ -134,11 +118,19 @@ class RefreshTokenPair:
             token_type=TokenType.REFRESH,
             family_id=family,
         )
+        refresh_ttl = _seconds_until(new_refresh.expires_at)
         await self.revocation_store.register_refresh(
             jti=new_refresh.jti,
             subject=claims.subject,
-            ttl_seconds=_seconds_until(new_refresh.expires_at),
+            ttl_seconds=refresh_ttl,
             family_id=family,
+        )
+        pair = TokenPair(access=access, refresh=new_refresh)
+        grace_ttl = min(30, max(refresh_ttl, 1))
+        await self.revocation_store.store_grace_period(
+            old_jti=claims.jti,
+            token_pair=pair,
+            ttl_seconds=grace_ttl,
         )
         await self.audit_sink.record(
             AuditEvent(
@@ -149,7 +141,7 @@ class RefreshTokenPair:
             )
         )
         record_auth_event("token_refresh", user_id=claims.subject)
-        return TokenPair(access=access, refresh=new_refresh)
+        return pair
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,13 +152,23 @@ class RevokeSession:
 
     @traced("auth.logout")
     async def execute(self, *, access_token: str, refresh_token: str | None = None) -> None:
-        access_claims = await asyncio.to_thread(self.verifier.verify, access_token, expected_type=TokenType.ACCESS)
-        await self.revocation_store.revoke_access(
-            jti=access_claims.jti,
-            ttl_seconds=_seconds_until(access_claims.expires_at),
-        )
-        if access_claims.family_id is not None:
-            await self.revocation_store.revoke_family(family_id=access_claims.family_id)
+        access_claims: TokenClaims | None = None
+        access_token_expired = False
+        if access_token:
+            try:
+                access_claims = await asyncio.to_thread(
+                    self.verifier.verify, access_token, expected_type=TokenType.ACCESS
+                )
+                await self.revocation_store.revoke_access(
+                    jti=access_claims.jti,
+                    ttl_seconds=_seconds_until(access_claims.expires_at),
+                )
+                if access_claims.family_id is not None:
+                    await self.revocation_store.revoke_family(family_id=access_claims.family_id)
+            except TokenExpiredError:
+                access_token_expired = True
+
+        refresh_claims: TokenClaims | None = None
         if refresh_token is not None:
             refresh_claims = await asyncio.to_thread(
                 self.verifier.verify, refresh_token, expected_type=TokenType.REFRESH
@@ -174,12 +176,22 @@ class RevokeSession:
             await self.revocation_store.revoke_refresh(jti=refresh_claims.jti)
             if refresh_claims.family_id is not None:
                 await self.revocation_store.revoke_family(family_id=refresh_claims.family_id)
+        elif access_token_expired:
+            raise TokenExpiredError("Token expired")
+        elif not access_token:
+            raise InvalidTokenError("Missing token")
+
+        subject = (
+            access_claims.subject
+            if access_claims is not None
+            else (refresh_claims.subject if refresh_claims is not None else "unknown")
+        )
         await self.audit_sink.record(
             AuditEvent(
                 event_type="auth.logout",
                 outcome=AuditOutcome.SUCCESS,
                 occurred_at=datetime.now(UTC),
-                actor_id=access_claims.subject,
+                actor_id=subject,
             )
         )
-        record_auth_event("logout", user_id=access_claims.subject)
+        record_auth_event("logout", user_id=subject)

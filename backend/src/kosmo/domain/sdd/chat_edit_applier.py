@@ -29,7 +29,7 @@ def apply_feature_attribute(current: str, *, diff_before: str, diff_after: str) 
     if diff_before in current:
         return current.replace(diff_before, diff_after, 1)
 
-    if diff_after in current:
+    if diff_after.strip() and diff_after.strip() in current and diff_before.strip() not in current:
         return current
 
     norm_before = collapse_whitespace(diff_before)

@@ -4,12 +4,12 @@ import pytest
 
 from kosmo.application.pipeline.prompt_enricher import PromptEnricher
 from kosmo.contracts.sdd.ids import ProjectId
-from kosmo.infrastructure.persistence.memory.in_memory_store import (
+from tests.factories import a_session
+from tests.unit.fakes import (
     InMemoryAgentSessionStore,
     InMemoryKnowledgePatternStore,
+    StubEmbedder,
 )
-from tests.factories import a_session
-from tests.unit.fakes import StubEmbedder
 
 _PROMPT = "## System prompt base\n\nInstrucciones del modo."
 

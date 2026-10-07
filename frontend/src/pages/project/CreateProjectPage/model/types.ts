@@ -8,7 +8,7 @@ const baseProjectSchema = z.object({
     .string()
     .min(3, 'Mínimo 3 caracteres')
     .max(25, 'Máximo 25 caracteres')
-    .regex(/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/, 'Solo se permiten letras y espacios')
+    .regex(/^[a-zA-Z\s]+$/, 'No se permiten caracteres especiales')
     .refine((val) => !hasEmoji(val), 'No se permiten emojis'),
   description: z
     .string()

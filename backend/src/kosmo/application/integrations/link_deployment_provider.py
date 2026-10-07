@@ -90,4 +90,3 @@ class LinkDeploymentPlatformUseCase:
 
 
 LinkDeploymentProviderUseCase = LinkDeploymentPlatformUseCase
-VincularPlataformaDespliegueUseCase = LinkDeploymentPlatformUseCase

@@ -11,9 +11,10 @@ class RedisLoginAttemptStore:
 
     async def record_failure(self, identifier: str) -> None:
         key = _ATTEMPTS_PREFIX + identifier
-        count = await self._client.incr(key)
-        if count == 1:
-            await self._client.expire(key, _WINDOW_SECONDS)
+        async with self._client.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, _WINDOW_SECONDS)
+            await pipe.execute()
 
     async def clear(self, identifier: str) -> None:
         await self._client.delete(_ATTEMPTS_PREFIX + identifier)

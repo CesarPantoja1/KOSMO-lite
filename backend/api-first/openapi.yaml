@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: KOSMO API
-  version: "0.1.0"
+  version: "v1"
   description: >-
     API de KOSMO - plataforma low-code de spec-driven development (SDD) asistida por IA.
     Ciclo completo: Descubrimiento -> Características -> Requisitos -> Modelo -> Código.
@@ -59,7 +59,7 @@ tags:
     description: Herramientas de contexto para agentes de código bajo protocolo MCP
   - name: Implementations
     description: Generación y consulta de código fuente / implementaciones vía OpenCode
-  - name: ai-config
+  - name: ai_config
     description: Configuración y verificación del proveedor de Inteligencia Artificial (BYOK)
   - name: integrations
     description: Gestión de vinculación OAuth con plataformas externas (GitHub, Railway)
@@ -93,6 +93,20 @@ paths:
                     example: ok
                 required: [status]
 
+  /metrics:
+    get:
+      summary: Metrics
+      description: Endpoint that serves Prometheus metrics.
+      operationId: metrics_metrics_get
+      security: []
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            text/plain:
+              schema:
+                type: string
+
   # ══════════════════════════════ AUTH ══════════════════════════════
 
   /api/v1/auth/register:
@@ -112,20 +126,17 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
-          description: Cuenta creada exitosamente. Devuelve los datos publicos del usuario.
+          description: Confirmacion generica de registro (mitiga enumeracion de usuarios CWE-204)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserPublic"
-        "409":
-          description: Email ya registrado en el sistema
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          description: Datos de registro invalidos
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/OAuthErrorResponse"
-              example:
-                error: email_already_registered
-                error_description: Email ya registrado
         "429":
           description: Rate limit excedido
           content:
@@ -391,31 +402,6 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/v1/projects/{project_id}/preview:
-    get:
-      tags: [projects]
-      summary: URL de la vista previa del proyecto (obsoleto)
-      deprecated: true
-      description: >-
-        [DEPRECATED] Devuelve la URL de la vista previa del proyecto si tiene una implementacion exitosa
-        con puerto asignado en el workspace. A partir del Sprint 6, este endpoint queda en desuso y se
-        reemplaza por el flujo de publicacion en la nube (/api/v1/projects/{project_id}/deploy/railway).
-      operationId: project_preview_get
-      parameters:
-        - $ref: "#/components/parameters/ProjectId"
-      responses:
-        "200":
-          description: URL publica de vista previa
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ProjectPreviewResponse"
-        "404":
-          description: El proyecto no tiene una vista previa activa
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HttpErrorResponse"
 
   # ══════════════════════════════ DISCOVERY ══════════════════════════════
 
@@ -433,13 +419,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  project_id:
-                    type: string
-                  content:
-                    type: string
-                required: [project_id, content]
+                $ref: "#/components/schemas/DiscoveryResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -846,6 +826,7 @@ paths:
       operationId: feature_chat_send
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -904,6 +885,7 @@ paths:
       operationId: feature_chat_stream
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -932,6 +914,7 @@ paths:
       operationId: requirements_generate
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -1040,6 +1023,7 @@ paths:
       operationId: requirements_refine
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -1097,6 +1081,7 @@ paths:
       operationId: requirement_chat_send
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -1155,6 +1140,7 @@ paths:
       operationId: requirement_chat_stream
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -1183,6 +1169,7 @@ paths:
       operationId: diagram_generate
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -1211,6 +1198,7 @@ paths:
       operationId: diagram_propagate
       parameters:
         - $ref: "#/components/parameters/FeatureId"
+        - $ref: "#/components/parameters/ProjectIdRateLimitQuery"
       requestBody:
         required: true
         content:
@@ -1313,7 +1301,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [features, requirements, model]
+            enum: [features, requirements, model, implementation]
           description: Fase destino a revisar
       responses:
         "200":
@@ -1770,12 +1758,49 @@ paths:
 
   # ══════════════════════════════ TRACEABILITY ══════════════════════════════
 
-  /traceability/{entity_id}/navigation:
+  /api/v1/projects/{project_id}/traceability/{entity_id}/navigation:
     get:
       tags: [Traceability]
-      summary: Verificar navegacion de trazabilidad
-      description: Verifica si la edicion esta permitida en este nivel de SDD o sugiere redireccion a la entidad fuente.
-      operationId: traceability_navigation_check
+      summary: Verificar navegación de trazabilidad por proyecto
+      description: Verifica si la edición está permitida en este nivel de SDD para una entidad de un proyecto.
+      operationId: check_project_traceability_navigation
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: entity_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Identificador de la entidad a verificar
+        - name: level
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/SpecPhase"
+          description: Fase de la entidad
+      responses:
+        "200":
+          description: Estado de navegación y trazabilidad
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceabilityNavigationOutputView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/v1/traceability/{entity_id}/navigation:
+    get:
+      tags: [Traceability]
+      summary: Verificar navegación de trazabilidad (Legacy)
+      deprecated: true
+      description: Ruta legacy; migrar a /api/v1/projects/{project_id}/traceability/{entity_id}/navigation.
+      operationId: check_traceability_navigation
       parameters:
         - name: entity_id
           in: path
@@ -1787,18 +1812,21 @@ paths:
           in: query
           required: true
           schema:
-            type: string
-            enum: [descubrimiento, caracteristicas, requisitos, modelo, codigo]
+            $ref: "#/components/schemas/SpecPhase"
           description: Fase de la entidad
       responses:
         "200":
-          description: Estado de navegacion y trazabilidad
+          description: Estado de navegación y trazabilidad
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/TraceabilityNavigationOutputView"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   # ══════════════════════════════ MCP TOOLS ══════════════════════════════
 
@@ -1929,6 +1957,10 @@ paths:
                 type: string
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/v1/implementations/{implementation_id}/files/content:
     get:
@@ -2009,7 +2041,7 @@ paths:
 
   /api/v1/ai-config/providers:
     get:
-      tags: [ai-config]
+      tags: [ai_config]
       summary: Obtener catálogo de proveedores y modelos de IA disponibles
       description: >-
         Devuelve el catálogo completo de proveedores de Inteligencia Artificial soportados
@@ -2030,7 +2062,7 @@ paths:
 
   /api/v1/ai-config:
     get:
-      tags: [ai-config]
+      tags: [ai_config]
       summary: Obtener configuración del proveedor de IA del usuario
       description: >-
         Devuelve las preferencias de Inteligencia Artificial del usuario autenticado (proveedor,
@@ -2047,7 +2079,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
-      tags: [ai-config]
+      tags: [ai_config]
       summary: Guardar o actualizar configuración del proveedor de IA
       description: >-
         Persiste la selección de proveedor y modelo de IA del usuario. Si se envía una nueva clave de API,
@@ -2074,7 +2106,7 @@ paths:
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
     delete:
-      tags: [ai-config]
+      tags: [ai_config]
       summary: Eliminar credenciales personalizadas de IA
       description: >-
         Elimina la clave de API personalizada del usuario de la base de datos y restablece la generación
@@ -2088,7 +2120,7 @@ paths:
 
   /api/v1/ai-config/test:
     post:
-      tags: [ai-config]
+      tags: [ai_config]
       summary: Probar conexión con proveedor de IA
       description: >-
         Ejecuta una llamada ligera de comprobación contra la API del proveedor de Inteligencia Artificial
@@ -2217,7 +2249,7 @@ paths:
       summary: Obtener estado de integración con GitHub del proyecto
       description: >-
         Devuelve los metadatos del repositorio remoto en GitHub asociado al proyecto, incluyendo la URL remota,
-        visibilidad (privado/público), fecha de la última sincronización y hash del último commit enviado.
+        visibilidad pública, fecha de la última sincronización y hash del último commit enviado.
       operationId: project_github_get_status
       parameters:
         - $ref: "#/components/parameters/ProjectId"
@@ -2240,8 +2272,8 @@ paths:
       description: >-
         Orquesta la subida del código fuente del proyecto hacia GitHub.
         1. Ejecuta la validación previa del workspace en un contenedor efímero.
-        2. Si el proyecto aún no tiene un repositorio asociado, lo crea vía API de GitHub con el nombre y visibilidad
-           indicados (privado por defecto o público previa confirmación) y configura el remote origin.
+        2. Si el proyecto aún no tiene un repositorio asociado, lo crea vía API de GitHub con visibilidad pública obligatoria
+           y configura el remote origin.
         3. Si el repositorio ya existe, realiza un push incremental con los nuevos commits.
         4. Actualiza y persiste los metadatos de sincronización en la base de datos.
       operationId: project_github_push
@@ -2312,6 +2344,24 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [deploy]
+      summary: Eliminar despliegue del proyecto
+      description: Elimina el servicio remoto en la nube y retira el registro de despliegue del proyecto.
+      operationId: delete_project_deployment
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "204":
+          description: Despliegue eliminado exitosamente
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/projects/{project_id}/deploy/railway:
     post:
@@ -2426,6 +2476,14 @@ components:
       schema:
         $ref: "#/components/schemas/IntegrationProviderEnum"
       description: Identificador del proveedor de integración externa (github | railway)
+    ProjectIdRateLimitQuery:
+      name: project_id
+      in: query
+      required: false
+      schema:
+        type: string
+        default: ""
+      description: Identificador opcional del proyecto para aplicar rate limiting cuando se invoca fuera de una ruta anidada de proyecto.
 
   responses:
     Unauthorized:
@@ -2434,6 +2492,18 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/HttpErrorResponse"
+    Forbidden:
+      description: Acceso no autorizado al recurso del proyecto
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/HttpErrorResponse"
+    Conflict:
+      description: Conflicto con el estado actual del recurso
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
     NotFound:
       description: Recurso no encontrado
       content:
@@ -2520,6 +2590,12 @@ components:
       type: object
       additionalProperties: false
       properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Nombre completo del usuario
+          example: Gianfranco
         email:
           type: string
           format: email
@@ -2531,7 +2607,7 @@ components:
           maxLength: 128
           description: Contrasena en texto plano (se hashea con Argon2id)
           example: "M1ContrasenaSegura!"
-      required: [email, password]
+      required: [name, email, password]
 
     AuthorizeRequest:
       type: object
@@ -2617,6 +2693,19 @@ components:
           description: JWT de tipo refresh a revocar junto con el access token
       required: []
 
+    RegisterResponse:
+      type: object
+      description: Confirmacion generica de registro para mitigar enumeracion de usuarios (CWE-204)
+      properties:
+        email:
+          type: string
+          format: email
+          example: usuario@ejemplo.com
+        message:
+          type: string
+          example: Si el correo no estaba registrado previamente, la cuenta ha sido creada exitosamente.
+      required: [email, message]
+
     UserPublic:
       type: object
       description: Datos publicos del usuario registrado
@@ -2625,15 +2714,24 @@ components:
           type: string
           description: Identificador unico (usr_ + ULID)
           example: usr_01HXYAZABCDEFGHIJKLMNOP
+        name:
+          type: string
+          description: Nombre completo del usuario
+          example: Gianfranco
         email:
           type: string
           format: email
           example: usuario@ejemplo.com
+        avatar_url:
+          type: string
+          nullable: true
+          description: URL del avatar del usuario
+          example: https://avatars.githubusercontent.com/u/123456?v=4
         created_at:
           type: string
           format: date-time
           example: "2026-01-15T10:30:00Z"
-      required: [id, email, created_at]
+      required: [id, name, email, created_at]
 
     AuthorizationCodeResponse:
       type: object
@@ -2687,6 +2785,22 @@ components:
           type: string
           description: Identificador del usuario propietario del token
           example: usr_01HXYAZABCDEFGHIJKLMNOP
+        name:
+          type: string
+          nullable: true
+          description: Nombre completo del usuario
+          example: Gianfranco
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Correo electronico del usuario
+          example: usuario@ejemplo.com
+        avatar_url:
+          type: string
+          nullable: true
+          description: URL de la foto de perfil o avatar del usuario
+          example: https://avatars.githubusercontent.com/u/123456?v=4
         scopes:
           type: array
           items:
@@ -2761,15 +2875,6 @@ components:
           format: date-time
       required: [id, name, slug, description, owner_id, created_at, updated_at]
 
-    ProjectPreviewResponse:
-      type: object
-      properties:
-        url:
-          type: string
-          description: URL publica de la vista previa del proyecto
-          example: http://localhost:5173
-      required: [url]
-
     # ── Discovery ──
 
     DiscoveryResponse:
@@ -2836,6 +2941,12 @@ components:
         display_id:
           type: string
           example: C01
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Advertencias sobre solapamientos funcionales o inconsistencias menores
+          default: []
       required: [id, project_id, number, title, slug, description, origin, display_id]
 
     FeatureSuggestionItem:
@@ -2932,6 +3043,12 @@ components:
           type: string
           nullable: true
           description: Presente solo si is_saved=false por inconsistencia
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Advertencias sobre solapamientos funcionales o inconsistencias menores
+          default: []
       required: [is_saved, origin, is_consistent]
 
     CheckConsistencyRequestView:
@@ -3477,7 +3594,7 @@ components:
           description: Accion a ejecutar (apply | discard)
         target_phase:
           type: string
-          enum: [features, requirements, model]
+          enum: [features, requirements, model, implementation]
           description: Fase destino a resolver
       required: [action, target_phase]
 
@@ -3836,11 +3953,41 @@ components:
             type: string
           default: []
           description: Archivos generados en el workspace
+        features_count:
+          type: integer
+          default: 1
+          description: Cantidad de caracteristicas implementadas
+        screens_count:
+          type: integer
+          default: 0
+          description: Cantidad de pantallas y componentes generados
+        requirements_count:
+          type: integer
+          default: 0
+          description: Cantidad de requisitos de negocio cubiertos
+        validations_passed:
+          type: integer
+          default: 0
+          description: Pasos de validacion exitosos
+        validations_total:
+          type: integer
+          default: 0
+          description: Total de pasos de validacion
+        traceability_edges_count:
+          type: integer
+          default: 0
+          description: Total de aristas de trazabilidad registradas
+        technologies:
+          type: array
+          items:
+            type: string
+          default: []
+          description: Tecnologias principales del proyecto
         updated_at:
           type: string
           format: date-time
           description: Ultima actualizacion del registro
-      required: [implementation_id, feature_id, project_id, status, generated_files, updated_at]
+      required: [implementation_id, feature_id, project_id, status, updated_at]
 
     # ── Validación Efímera (HU-23 CA-05 / Codegen) ──
 
@@ -3908,7 +4055,7 @@ components:
 
     AIProviderEnum:
       type: string
-      enum: [openai, anthropic, google, openrouter, custom, kosmo_default]
+      enum: [openai, anthropic, google, deepseek, custom, kosmo_default]
       description: Identificador del proveedor de Inteligencia Artificial
       example: anthropic
 
@@ -3936,7 +4083,7 @@ components:
       properties:
         value:
            type: string
-           description: Identificador único del proveedor (anthropic, openai, google, openrouter)
+           description: Identificador único del proveedor (anthropic, openai, google, deepseek)
            example: anthropic
         label:
            type: string
@@ -4126,8 +4273,8 @@ components:
         is_public:
           type: boolean
           nullable: true
-          description: Visibilidad del repositorio (True = público, False = privado)
-          example: false
+          description: Visibilidad del repositorio (True = público)
+          example: true
         last_push_at:
           type: string
           format: date-time
@@ -4167,9 +4314,9 @@ components:
           example: "kosmo-gestion-inventarios"
         is_public:
           type: boolean
-          default: false
-          description: Visibilidad del repositorio (privado por defecto; público requiere confirmación previa)
-          example: false
+          default: true
+          description: Visibilidad del repositorio (siempre público; no se permiten repositorios privados)
+          example: true
         commit_message:
           type: string
           maxLength: 300
@@ -4246,3 +4393,28 @@ components:
             NODE_ENV: "production"
             LOG_LEVEL: "info"
       required: []
+
+    SpecPhase:
+      type: string
+      enum:
+        - descubrimiento
+        - caracteristicas
+        - requisitos
+        - modelo
+        - implementacion
+      description: Fase del ciclo de vida Spec-Driven Development (SDD)
+
+    CodeChallengeMethod:
+      type: string
+      enum: [S256]
+      description: Método de transformación para PKCE (RFC 7636)
+
+    GrantType:
+      type: string
+      enum: [authorization_code]
+      description: Tipo de concesión OAuth 2.0 para intercambio de código (RFC 6749)
+
+    RefreshGrantType:
+      type: string
+      enum: [refresh_token]
+      description: Tipo de concesión OAuth 2.0 para refresco de token (RFC 6749)

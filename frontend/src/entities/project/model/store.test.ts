@@ -66,6 +66,40 @@ describe('useProjectStore', () => {
 		expect(useProjectStore.getState().projects).toEqual([{ id: 'p2' }]);
 	});
 
+	it('deleteProject limpia currentProject si coincide con el proyecto eliminado', async () => {
+		// Arrange
+		useProjectStore.getState().setProjects([
+			{ id: 'p1' } as never,
+			{ id: 'p2' } as never,
+		]);
+		useProjectStore.getState().setCurrentProject({ id: 'p1' } as never);
+		api.deleteProject.mockResolvedValue(undefined);
+
+		// Act
+		await useProjectStore.getState().deleteProject('p1');
+
+		// Assert
+		expect(useProjectStore.getState().projects).toEqual([{ id: 'p2' }]);
+		expect(useProjectStore.getState().currentProject).toBeNull();
+	});
+
+	it('deleteProject preserva currentProject si no coincide con el proyecto eliminado', async () => {
+		// Arrange
+		useProjectStore.getState().setProjects([
+			{ id: 'p1' } as never,
+			{ id: 'p2' } as never,
+		]);
+		useProjectStore.getState().setCurrentProject({ id: 'p2' } as never);
+		api.deleteProject.mockResolvedValue(undefined);
+
+		// Act
+		await useProjectStore.getState().deleteProject('p1');
+
+		// Assert
+		expect(useProjectStore.getState().projects).toEqual([{ id: 'p2' }]);
+		expect(useProjectStore.getState().currentProject).toEqual({ id: 'p2' });
+	});
+
 	it('addProject agrega un proyecto a la lista', () => {
 		// Act
 		useProjectStore.getState().addProject({ id: 'p1' } as never);

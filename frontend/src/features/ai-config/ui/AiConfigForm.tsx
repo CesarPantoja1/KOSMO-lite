@@ -23,9 +23,7 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 		useAiConfigStore();
 
 	const [provider, setProvider] = useState<AIProvider>(
-		config?.provider && config.provider !== 'kosmo_default'
-			? config.provider
-			: DEFAULT_AI_PROVIDER,
+		config?.provider ?? DEFAULT_AI_PROVIDER,
 	);
 	const [model, setModel] = useState(config?.model ?? DEFAULT_AI_MODEL);
 	const [apiKey, setApiKey] = useState('');
@@ -71,7 +69,9 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 	const handleDelete = async () => {
 		try {
 			await deleteConfig();
-			toast.success('Clave de API eliminada. Se restauró el proveedor predeterminado.');
+			toast.success(
+				'Clave de API eliminada. Configura una nueva clave para usar funciones de IA.',
+			);
 			setIsEditing(false);
 			setApiKey('');
 			setShowApiKey(false);
@@ -85,9 +85,9 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 		setIsEditing(true);
 		setApiKey('');
 		setShowApiKey(false);
-		if (config && config.provider !== 'kosmo_default') {
+		if (config?.provider) {
 			setProvider(config.provider);
-			setModel(config.model);
+			setModel(config.model ?? DEFAULT_AI_MODEL);
 		}
 	};
 
@@ -95,9 +95,9 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 		setIsEditing(false);
 		setApiKey('');
 		setShowApiKey(false);
-		if (config && config.provider !== 'kosmo_default') {
+		if (config?.provider) {
 			setProvider(config.provider);
-			setModel(config.model);
+			setModel(config.model ?? DEFAULT_AI_MODEL);
 		} else {
 			setProvider(DEFAULT_AI_PROVIDER);
 			setModel(DEFAULT_AI_MODEL);

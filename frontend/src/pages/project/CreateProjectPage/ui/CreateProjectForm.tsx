@@ -9,20 +9,18 @@ import {
 import { formatApiError } from '@/shared/api';
 import {
 	CharacterCounter,
-	ConfirmacionVisibilidadRepositorio,
 	GitHub,
-	InfoCircleIcon,
 	Send,
 	toast,
-	WarningIcon,
 } from '@/shared/ui';
+import { useAppStore } from '@/features/app-state';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useController, useForm } from 'react-hook-form';
 import { createProjectSchema, type ProjectFormData } from '../model/types';
 
-const alphaRegex = /[^a-zA-ZáéíóúñÁÉÍÓÚÑ\s]/g;
+const alphaRegex = /[^a-zA-Z\s]/g;
 
 const CreateProjectForm = () => {
 	const router = useRouter();
@@ -30,23 +28,20 @@ const CreateProjectForm = () => {
 	const projects = useProjectStore((s) => s.projects);
 	const getProjects = useProjectStore((s) => s.getProjects);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [phase, setPhase] = useState<'creating-project' | 'creating-repo' | null>(null);
-	const [showPublicConfirm, setShowPublicConfirm] = useState(false);
-	const [pendingValues, setPendingValues] = useState<ProjectFormData | null>(null);
 	const createdProjectRef = useRef<Project | null>(null);
 
 	useEffect(() => {
-		if (projects.length === 0) getProjects();
+		if (projects.length === 0) void getProjects();
 	}, [projects.length, getProjects]);
 
-	const { control, handleSubmit, setValue, watch } = useForm<ProjectFormData>({
+	const { control, handleSubmit, setValue } = useForm<ProjectFormData>({
 		mode: 'onSubmit',
 		resolver: zodResolver(createProjectSchema(projects)),
 		defaultValues: {
 			name: '',
 			description: '',
 			repo_name: 'kosmo-repositorio',
-			is_public: false,
+			is_public: true,
 		},
 	});
 
@@ -65,19 +60,6 @@ const CreateProjectForm = () => {
 		fieldState: { error: repoNameError },
 	} = useController({ name: 'repo_name', control });
 
-	const {
-		field: { value: isPublic, onChange: isPublicOnChange },
-	} = useController({ name: 'is_public', control });
-
-	const watchedName = watch('name');
-
-	useEffect(() => {
-		const repoName = watchedName.trim()
-			? `kosmo-${watchedName.toLowerCase().replace(/\s+/g, '-')}`
-			: 'kosmo-repositorio';
-		setValue('repo_name', repoName);
-	}, [watchedName, setValue]);
-
 	const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		let value = e.target.value;
 		value = value.replace(alphaRegex, '');
@@ -85,6 +67,10 @@ const CreateProjectForm = () => {
 			value = value.slice(0, 25);
 		}
 		nameOnChange(value);
+		const repoName = value.trim()
+			? `kosmo-${value.toLowerCase().replace(/\s+/g, '-')}`
+			: 'kosmo-repositorio';
+		setValue('repo_name', repoName);
 	};
 
 	const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -97,53 +83,55 @@ const CreateProjectForm = () => {
 
 	const doSubmit = async (data: ProjectFormData) => {
 		setIsSubmitting(true);
-		setPhase('creating-project');
 		try {
 			const project =
 				createdProjectRef.current ??
 				(await createProject({ name: data.name, description: data.description }));
 			createdProjectRef.current = project;
 
-			setPhase('creating-repo');
-			await pushProjectToGitHub(project.id, {
+			useProjectStore.getState().addProject(project);
+			useProjectStore.getState().setGithubSyncing(project.id, true);
+			setProjectState(project);
+			void useAppStore.getState().initializeProject(project.id);
+
+			toast.success('Proyecto creado correctamente');
+
+			// Se inicia la creación del repositorio en GitHub en segundo plano
+			// sin bloquear la navegación inmediata del usuario a Descubrimiento.
+			pushProjectToGitHub(project.id, {
 				repo_name: data.repo_name,
 				is_public: data.is_public,
-			});
+			})
+				.then(() => {
+					useProjectStore.getState().setGithubSyncing(project.id, false);
+				})
+				.catch((err) => {
+					console.error('Error al inicializar repositorio en segundo plano:', err);
+					useProjectStore.getState().setGithubSyncing(project.id, false);
+					toast.warning(
+						'No se pudo inicializar el repositorio en GitHub en segundo plano. Podrás reintentarlo desde Implementación.',
+					);
+				});
 
-			useProjectStore.getState().addProject(project);
-			setProjectState(project);
 			router.replace('/proyecto/descubrimiento');
 		} catch (err) {
-			toast.error(formatApiError(err, 'Error al crear el repositorio'));
-			setPhase(null);
+			toast.error(formatApiError(err, 'Error al crear el proyecto'));
 			setIsSubmitting(false);
 		}
 	};
 
 	const onSubmit = (data: ProjectFormData) => {
-		if (data.is_public) {
-			setPendingValues(data);
-			setShowPublicConfirm(true);
-			return;
-		}
-		doSubmit(data);
+		void doSubmit(data);
 	};
 
-	const handleConfirmPublic = () => {
-		setShowPublicConfirm(false);
-		if (pendingValues) doSubmit(pendingValues);
-	};
-
-	const handleCancelConfirm = () => {
-		setShowPublicConfirm(false);
-		setPendingValues(null);
-		setValue('is_public', false);
+	const handleFormSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
+		void handleSubmit(onSubmit)(e);
 	};
 
 	return (
 		<>
 			<form
-				onSubmit={handleSubmit(onSubmit)}
+				onSubmit={handleFormSubmit}
 				className='flex-1 flex flex-col gap-5 px-0.5'
 				noValidate
 			>
@@ -246,89 +234,11 @@ const CreateProjectForm = () => {
 								</p>
 							) : (
 								<p className='text-neutral-400 text-xs'>
-									Se genera automáticamente a partir del nombre del proyecto.
+									Se creará automáticamente en segundo plano en tu cuenta de GitHub.
 								</p>
 							)}
 						</div>
 
-						{/* Visibility toggle */}
-						<div className='flex flex-col gap-2'>
-							<span className='text-xs font-semibold text-neutral-500 uppercase tracking-wider'>
-								Visibilidad
-							</span>
-							<div className='flex gap-2'>
-								<button
-									type='button'
-									onClick={() => isPublicOnChange(false)}
-									className={`flex-1 rounded-lg border px-4 py-3 text-left transition-all duration-150 ${
-										!isPublic
-											? 'border-primary-500 bg-primary-50 shadow-sm'
-											: 'border-neutral-200 bg-neutral-50 hover:border-neutral-300'
-									}`}
-								>
-									<span
-										className={`block text-sm font-semibold ${
-											!isPublic ? 'text-primary-600' : 'text-neutral-800'
-										}`}
-									>
-										Privado
-									</span>
-									<span className='text-xs text-neutral-500'>
-										Solo tú y los colaboradores que invites podrán ver el código.
-									</span>
-								</button>
-								<button
-									type='button'
-									onClick={() => isPublicOnChange(true)}
-									className={`flex-1 rounded-lg border px-4 py-3 text-left transition-all duration-150 ${
-										isPublic
-											? 'border-warning-500 bg-warning-50 shadow-sm'
-											: 'border-neutral-200 bg-neutral-50 hover:border-neutral-300'
-									}`}
-								>
-									<span
-										className={`block text-sm font-semibold ${
-											isPublic ? 'text-warning-600' : 'text-neutral-800'
-										}`}
-									>
-										Público
-									</span>
-									<span className='text-xs text-neutral-500'>
-										Cualquier persona podrá ver el código fuente.
-									</span>
-								</button>
-							</div>
-						</div>
-
-						{/* Railway deployment notice */}
-						{!isPublic ? (
-							<div className='flex items-start gap-3 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 mt-2'>
-								<WarningIcon size={20} color='text-warning-600' />
-								<div className='flex flex-col gap-1'>
-									<p className='text-sm font-semibold text-warning-700'>
-										No podrás desplegar en Railway
-									</p>
-									<p className='text-sm text-warning-700/80'>
-										Los repositorios privados no son compatibles con el despliegue en
-										Railway. Si deseas publicar tu aplicación, selecciona la visibilidad{' '}
-										<span className='font-semibold'>Pública</span>.
-									</p>
-								</div>
-							</div>
-						) : (
-							<div className='flex items-start gap-3 rounded-lg border border-info-200 bg-info-50 px-4 py-3 mt-2'>
-								<InfoCircleIcon size={20} color='text-info-600' />
-								<div className='flex flex-col gap-1'>
-									<p className='text-sm font-semibold text-info-700'>
-										Despliegue en Railway disponible
-									</p>
-									<p className='text-sm text-info-700/80'>
-										Con un repositorio público podrás publicar tu aplicación en Railway
-										directamente desde la plataforma.
-									</p>
-								</div>
-							</div>
-						)}
 					</div>
 
 					{/* Actions — al final del formulario */}
@@ -342,24 +252,12 @@ const CreateProjectForm = () => {
 						</button>
 						<button type='submit' disabled={isSubmitting} className='btn btn-primary'>
 							<Send color='-rotate-45' size={18} />
-							{phase === 'creating-project'
-								? 'Creando proyecto...'
-								: phase === 'creating-repo'
-									? 'Creando repositorio...'
-									: 'Crear proyecto'}
+							{isSubmitting ? 'Creando proyecto...' : 'Crear proyecto'}
 						</button>
 					</div>
 				</div>
 			</form>
 
-			{showPublicConfirm && pendingValues && (
-				<ConfirmacionVisibilidadRepositorio
-					repoName={pendingValues.repo_name}
-					onCancel={handleCancelConfirm}
-					onConfirm={handleConfirmPublic}
-					confirmLoading={isSubmitting}
-				/>
-			)}
 		</>
 	);
 };

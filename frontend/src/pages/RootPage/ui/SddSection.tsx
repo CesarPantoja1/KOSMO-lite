@@ -60,8 +60,8 @@ export function SddSection() {
 							</h3>
 						</div>
 
-						<div className='flex h-12 w-12 items-center justify-center rounded-xl bg-ai-50 text-xl text-ai-500'>
-							<Ai size={20} color='text-ai-500' />
+						<div className='flex h-12 w-12 items-center justify-center rounded-xl border bg-neutral-100 border-neutral-200'>
+							<Ai size={20} color='text-neutral-500' />
 						</div>
 					</div>
 

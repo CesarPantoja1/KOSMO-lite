@@ -21,7 +21,7 @@ export function ProjectNavigation({
 			{isSidebarExpanded ? (
 				<div className='flex flex-col gap-1'>
 					<button
-						className='flex items-center px-3 py-2.5 gap-2.5 cursor-pointer rounded-md transition-colors text-neutral-300 hover:bg-neutral-800 hover:text-neutral-0 border-l-2 border-transparent'
+						className='flex items-center px-3 py-2.5 gap-2.5 cursor-pointer rounded-md transition-colors text-neutral-300 hover:bg-neutral-800 hover:text-neutral-0 border-transparent'
 						onClick={onHomeClick}
 						title='Inicio'
 					>
@@ -39,8 +39,8 @@ export function ProjectNavigation({
 								type='button'
 								className={`flex items-center px-3 py-2.5 gap-2.5 cursor-pointer rounded-md transition-colors text-left ${
 									isActive
-										? 'bg-neutral-700 text-neutral-0 border-l-2 border-primary-500'
-										: 'text-neutral-300 hover:bg-neutral-800 hover:text-neutral-0 border-l-2 border-transparent'
+										? 'bg-neutral-700 text-neutral-0'
+										: 'text-neutral-300 hover:bg-neutral-800 hover:text-neutral-0 border-transparent'
 								}`}
 								onClick={() => onProjectClick(project)}
 								title={project.name}

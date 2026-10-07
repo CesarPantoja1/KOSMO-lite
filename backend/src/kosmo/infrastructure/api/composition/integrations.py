@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from kosmo.application.integrations.delete_deployment import (
+    DeleteDeploymentUseCase,
+)
 from kosmo.application.integrations.execute_ephemeral_validation import (
     ExecuteEphemeralValidationUseCase,
 )
@@ -46,6 +49,7 @@ class IntegrationsComponents:
     orchestrate_cloud_deployment: OrchestrateCloudDeploymentUseCase
     monitor_deployment_status: MonitorDeploymentStatusUseCase
     handle_deployment_failure: HandleDeploymentFailureUseCase
+    delete_deployment: DeleteDeploymentUseCase
     railway_client: DeploymentProviderPort
     deployment_worker: DeploymentPollingWorker
 
@@ -113,6 +117,7 @@ def build_integrations_components(
         project_github_repo=repos.project_integrations,
         deployment_client=railway_client,
         cipher=cipher,
+        sync_github_use_case=sync_github_repository,
     )
 
     monitor_deployment_status = MonitorDeploymentStatusUseCase(
@@ -131,6 +136,14 @@ def build_integrations_components(
         failure_handler=handle_deployment_failure,
     )
 
+    delete_deployment = DeleteDeploymentUseCase(
+        project_deployment_repo=repos.project_deployments,
+        user_deployment_repo=repos.user_deployment_integrations,
+        deployment_client=railway_client,
+        cipher=cipher,
+        deployment_worker=deployment_worker,
+    )
+
     return IntegrationsComponents(
         link_github_account=link_github_account,
         sync_github_repository=sync_github_repository,
@@ -141,6 +154,7 @@ def build_integrations_components(
         orchestrate_cloud_deployment=orchestrate_cloud_deployment,
         monitor_deployment_status=monitor_deployment_status,
         handle_deployment_failure=handle_deployment_failure,
+        delete_deployment=delete_deployment,
         railway_client=railway_client,
         deployment_worker=deployment_worker,
     )

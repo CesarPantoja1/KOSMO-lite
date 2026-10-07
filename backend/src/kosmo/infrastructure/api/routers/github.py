@@ -66,7 +66,7 @@ async def get_project_github_status(
             has_repository=False,
             repo_name=None,
             repo_url=None,
-            is_public=False,
+            is_public=True,
             last_push_at=None,
             last_commit_hash=None,
             sync_status=GitHubSyncStatus.NOT_CREATED.value,
@@ -111,7 +111,7 @@ async def push_to_github(
         project_id=proj_id,
         project_name=project.name,
         repo_name=body.repo_name if body else None,
-        is_public=body.is_public if body else False,
+        is_public=body.is_public if body is not None else True,
         commit_message=body.commit_message if body else None,
     )
 

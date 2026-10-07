@@ -1,6 +1,11 @@
 import { useState, type ElementType } from 'react';
 import type { CharacteristicResponse } from '@/entities/characteristic';
-import { CloseMarkdownContent, OpenMarkdownContent, Trash } from '@/shared/ui';
+import {
+	CloseMarkdownContent,
+	OpenMarkdownContent,
+	Trash,
+	WarningIcon,
+} from '@/shared/ui';
 
 type AsideCharacteristicProps = {
 	title?: string;
@@ -9,6 +14,7 @@ type AsideCharacteristicProps = {
 	onSelectCharacteristic: (id: string) => void;
 	onDeleteCharacteristic?: (id: string) => void;
 	hasIcon: Record<string, boolean>;
+	warningByFeature?: Record<string, boolean>;
 	defaultExpanded?: boolean;
 	isExpanded?: boolean;
 	onToggleExpand?: (expanded: boolean) => void;
@@ -22,6 +28,7 @@ const AsideCharacteristic = ({
 	onSelectCharacteristic,
 	onDeleteCharacteristic,
 	hasIcon,
+	warningByFeature,
 	defaultExpanded = true,
 	isExpanded: isExpandedProp,
 	onToggleExpand,
@@ -46,7 +53,9 @@ const AsideCharacteristic = ({
 			{isExpanded ? (
 				<>
 					<div className='flex items-center justify-between px-4 py-3 border-b border-neutral-200 shrink-0'>
-						<h3 className='text-xs font-semibold uppercase tracking-wider text-neutral-500'>{title}</h3>
+						<h3 className='text-xs font-semibold uppercase tracking-wider text-neutral-500'>
+							{title}
+						</h3>
 						<button
 							onClick={() => toggleExpand(false)}
 							className='cursor-pointer p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded transition-colors'
@@ -61,57 +70,66 @@ const AsideCharacteristic = ({
 								No hay funcionalidades disponibles.
 							</p>
 						)}
-					{characteristics.map((c) => {
-						const isSelected = c.id === selectedId;
-						return (
-							<button
-								key={c.id}
-								onClick={() => onSelectCharacteristic(c.id)}
-								className={`group w-full px-3 py-2.5 flex justify-start items-start gap-2.5 text-left cursor-pointer transition-colors rounded-md ${
-									isSelected
-										? 'bg-primary-50 border-l-4 border-primary-500'
-										: 'border-l-4 border-transparent hover:bg-neutral-100'
-								}`}
-							>
-								<span
-									className={`text-xs font-bold mt-0.5 shrink-0 ${
-										isSelected ? 'text-primary-500' : 'text-neutral-400'
+						{characteristics.map((c) => {
+							const isSelected = c.id === selectedId;
+							return (
+								<button
+									key={c.id}
+									onClick={() => onSelectCharacteristic(c.id)}
+									className={`group w-full px-3 py-2.5 flex justify-start items-start gap-2.5 text-left cursor-pointer transition-colors rounded-md ${
+										isSelected ? 'bg-neutral-200/75' : 'hover:bg-neutral-50'
 									}`}
 								>
-									{c.display_id}
-								</span>
-								<p
-									className={`flex-1 text-xs font-medium leading-snug pt-0.5 ${
-										isSelected ? 'text-primary-600' : 'text-neutral-600'
-									}`}
-								>
-									{c.title}
-								</p>
-							{hasIcon[c.id] && (
-								<div className='relative shrink-0 mt-0.5 w-4 h-4'>
-									<span className='absolute inset-0 opacity-100 group-hover:opacity-0 transition-opacity flex items-center justify-center'>
-										<Icon
-											size={16}
-											color={isSelected ? 'text-primary-500' : 'text-neutral-400'}
-										/>
+									<span
+										className={`text-xs font-medium mt-0.5 shrink-0 ${
+											isSelected ? 'text-base-950' : 'text-neutral-500'
+										}`}
+									>
+										{c.display_id}
 									</span>
-									{onDeleteCharacteristic && (
-										<span
-											onClick={(e) => {
-												e.stopPropagation();
-												onDeleteCharacteristic(c.id);
-											}}
-											className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer hover:bg-error-50 rounded'
-											title='Eliminar'
+									<p
+										className={`flex-1 text-xs font-medium leading-snug pt-0.5 ${
+											isSelected ? 'text-base-950 font-semibold!' : 'text-neutral-500'
+										}`}
+									>
+										{c.title}
+									</p>
+									{hasIcon[c.id] && (
+										<div
+											className='relative shrink-0 mt-0.5 w-4 h-4'
+											title={
+												warningByFeature?.[c.id]
+													? 'Requiere actualización por cambios en especificaciones'
+													: undefined
+											}
 										>
-											<Trash size={15} color='text-error-500' />
-										</span>
+											<span className='absolute inset-0 opacity-100 group-hover:opacity-0 transition-opacity flex items-center justify-center'>
+												{warningByFeature?.[c.id] ? (
+													<WarningIcon size={16} color='text-warning-500' />
+												) : (
+													<Icon
+														size={16}
+														color={isSelected ? 'text-neutral-600' : 'text-neutral-400'}
+													/>
+												)}
+											</span>
+											{onDeleteCharacteristic && (
+												<span
+													onClick={(e) => {
+														e.stopPropagation();
+														onDeleteCharacteristic(c.id);
+													}}
+													className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer hover:bg-error-50 rounded'
+													title='Eliminar'
+												>
+													<Trash size={15} color='text-error-500' />
+												</span>
+											)}
+										</div>
 									)}
-								</div>
-							)}
-							</button>
-						);
-					})}
+								</button>
+							);
+						})}
 					</div>
 				</>
 			) : (
@@ -129,46 +147,55 @@ const AsideCharacteristic = ({
 						{characteristics.map((c) => {
 							const isSelected = c.id === selectedId;
 							return (
-						<button
-							key={c.id}
-							onClick={() => onSelectCharacteristic(c.id)}
-							title={c.title}
-							className={`group w-full py-2 flex flex-col items-center gap-1 cursor-pointer transition-colors rounded-md ${
-								isSelected
-									? 'bg-primary-50 border-l-2 border-primary-500'
-									: 'border-l-2 border-transparent hover:bg-neutral-100'
-							}`}
-						>
-							<span
-								className={`text-[10px] font-bold ${
-									isSelected ? 'text-primary-500' : 'text-neutral-400'
-								}`}
-							>
-								{c.display_id}
-							</span>
-							{hasIcon[c.id] && (
-								<div className='relative shrink-0 w-3.5 h-3.5'>
-									<span className='absolute inset-0 opacity-100 group-hover:opacity-0 transition-opacity flex items-center justify-center'>
-										<Icon
-											size={14}
-											color={isSelected ? 'text-primary-500' : 'text-neutral-400'}
-										/>
+								<button
+									key={c.id}
+									onClick={() => onSelectCharacteristic(c.id)}
+									title={c.title}
+									className={`group w-full py-2 flex flex-col items-center gap-1 cursor-pointer transition-colors rounded-md ${
+										isSelected ? 'bg-neutral-200' : 'hover:bg-neutral-100'
+									}`}
+								>
+									<span
+										className={`text-[10px] font-bold ${
+											isSelected ? 'text-neutral-500' : 'text-neutral-400'
+										}`}
+									>
+										{c.display_id}
 									</span>
-									{onDeleteCharacteristic && (
-										<span
-											onClick={(e) => {
-												e.stopPropagation();
-												onDeleteCharacteristic(c.id);
-											}}
-											className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer hover:bg-error-50 rounded'
-											title='Eliminar'
+									{hasIcon[c.id] && (
+										<div
+											className='relative shrink-0 w-3.5 h-3.5'
+											title={
+												warningByFeature?.[c.id]
+													? 'Requiere actualización por cambios en especificaciones'
+													: undefined
+											}
 										>
-											<Trash size={13} color='text-error-500' />
-										</span>
+											<span className='absolute inset-0 opacity-100 group-hover:opacity-0 transition-opacity flex items-center justify-center'>
+												{warningByFeature?.[c.id] ? (
+													<WarningIcon size={14} color='text-warning-500' />
+												) : (
+													<Icon
+														size={14}
+														color={isSelected ? 'text-neutral-600' : 'text-neutral-400'}
+													/>
+												)}
+											</span>
+											{onDeleteCharacteristic && (
+												<span
+													onClick={(e) => {
+														e.stopPropagation();
+														onDeleteCharacteristic(c.id);
+													}}
+													className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer hover:bg-error-50 rounded'
+													title='Eliminar'
+												>
+													<Trash size={13} color='text-error-500' />
+												</span>
+											)}
+										</div>
 									)}
-								</div>
-							)}
-						</button>
+								</button>
 							);
 						})}
 					</div>

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector  # pyright: ignore[reportMissingTypeStubs]
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -72,9 +72,15 @@ class ProjectModel(Base):
 
 class FeatureModel(Base):
     __tablename__ = "features"
+    __table_args__ = (UniqueConstraint("project_id", "number", name="uq_features_project_number"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     number: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -87,7 +93,12 @@ class FeatureModel(Base):
 class RequirementModel(Base):
     __tablename__ = "requirements"
 
-    feature_id: Mapped[str] = mapped_column(String(64), primary_key=True, nullable=False)
+    feature_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("features.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
     markdown: Mapped[str] = mapped_column(Text(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -110,6 +121,7 @@ class DiscoveryDocumentModel(Base):
 
     project_id: Mapped[str] = mapped_column(
         String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         primary_key=True,
         nullable=False,
     )
@@ -122,7 +134,12 @@ class AgentSessionModel(Base):
     __tablename__ = "agent_sessions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     session_type: Mapped[str] = mapped_column(String(32), nullable=False)
     phase: Mapped[str] = mapped_column(String(32), nullable=False)
     skill_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -158,7 +175,13 @@ class ActivityDiagramModel(Base):
     __tablename__ = "activity_diagrams"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    feature_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, unique=True)
+    feature_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("features.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        unique=True,
+    )
     diagram_syntax: Mapped[str] = mapped_column(Text(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -166,6 +189,7 @@ class ActivityDiagramModel(Base):
 
 class KnowledgePatternModel(Base):
     __tablename__ = "knowledge_patterns"
+    __table_args__ = (UniqueConstraint("phase", "pattern_text", name="uq_knowledge_patterns_phase_pattern"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     phase: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
@@ -179,7 +203,12 @@ class ChatMessageModel(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     phase: Mapped[str] = mapped_column(String(32), nullable=False)
     context_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
@@ -194,7 +223,12 @@ class ChatSessionModel(Base):
     __tablename__ = "chat_sessions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     phase: Mapped[str] = mapped_column(String(32), nullable=False)
     context_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -204,7 +238,12 @@ class DocumentVersionModel(Base):
     __tablename__ = "document_versions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     phase: Mapped[str] = mapped_column(String(32), nullable=False)
     markdown: Mapped[str] = mapped_column(Text(), nullable=False)
     change_ids: Mapped[list[Any]] = mapped_column(pg.JSONB(), nullable=False, server_default=text("'[]'::jsonb"))
@@ -213,6 +252,7 @@ class DocumentVersionModel(Base):
 
 class OutboxJobModel(Base):
     __tablename__ = "outbox_jobs"
+    __table_args__ = (Index("ix_outbox_pending", "status", "created_at"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     job_type: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -236,7 +276,12 @@ class ConsistencyEvaluationModel(Base):
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     source_phase: Mapped[str] = mapped_column(String(32), nullable=False)
     target_phase: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     target_artifact_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -266,7 +311,12 @@ class ConsistencyEvaluationModel(Base):
 class UserPreferenceModel(Base):
     __tablename__ = "user_preferences"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     rule_text: Mapped[str] = mapped_column(Text(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -383,7 +433,7 @@ class ProjectIntegrationModel(Base):
     provider: Mapped[str] = mapped_column(String(32), nullable=False, default="github")
     repo_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     repo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     default_branch: Mapped[str] = mapped_column(String(100), nullable=False, default="main")
     last_push_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_commit_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)

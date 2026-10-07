@@ -111,8 +111,8 @@ class KOSMOAgent:
 
         El flujo incluye pre-consulta de knowledge tools, validación del output
         con un reintento, y persistencia de la sesión en memoria del agente.
-        Las excepciones del LLM propagan hacia arriba para que el caso de uso
-        las maneje con reintentos (tenacity) o las convierta en ErrorChat.
+        Las excepciones del LLM son gestionadas con reintentos en el adaptador
+        de infraestructura o convertidas en ErrorChat.
         """
         if self._skill_registry is None:
             raise ValueError("SkillRegistry no configurado")

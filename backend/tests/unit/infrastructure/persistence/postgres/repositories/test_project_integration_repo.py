@@ -101,7 +101,7 @@ async def test_save_inserts_new_project_integration_when_none_exists() -> None:
         project_id="prj_01J00000000000000000000001",
         repo_name="kosmo-gestion-inventarios",
         repo_url="https://github.com/octocat/kosmo-gestion-inventarios",
-        is_public=False,
+        is_public=True,
         default_branch="main",
         sync_status=GitHubSyncStatus.CREATED,
     )
@@ -123,7 +123,7 @@ async def test_save_inserts_new_project_integration_when_none_exists() -> None:
     assert added_model.provider == "github"
     assert added_model.repo_name == "kosmo-gestion-inventarios"
     assert added_model.repo_url == "https://github.com/octocat/kosmo-gestion-inventarios"
-    assert added_model.is_public is False
+    assert added_model.is_public is True
     assert added_model.default_branch == "main"
     assert added_model.sync_status == "created"
     mock_session.commit.assert_awaited_once()

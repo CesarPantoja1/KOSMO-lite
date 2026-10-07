@@ -12,6 +12,7 @@ from kosmo.contracts.sdd.codegen import (
     CodeRunnerPort,
     CodeWorkspace,
     ValidationErrorDetail,
+    ValidationRunResult,
     ValidationSeverity,
     ValidationStep,
     ValidationStepResult,
@@ -49,12 +50,16 @@ async def test_execute_ephemeral_validation_success_all_steps_pass(
 ) -> None:
     # Arrange
     workspace_path = "/tmp/workspaces/proj-valid"
-    code_runner.run_step.side_effect = [
-        ValidationStepResult(step=ValidationStep.TYPECHECK, success=True, duration_ms=100),
-        ValidationStepResult(step=ValidationStep.LINT, success=True, duration_ms=80),
-        ValidationStepResult(step=ValidationStep.TESTS, success=True, duration_ms=250),
-        ValidationStepResult(step=ValidationStep.BUILD, success=True, duration_ms=400),
-    ]
+    code_runner.run_pipeline.return_value = ValidationRunResult(
+        steps=(
+            ValidationStepResult(step=ValidationStep.TYPECHECK, success=True, duration_ms=100),
+            ValidationStepResult(step=ValidationStep.LINT, success=True, duration_ms=80),
+            ValidationStepResult(step=ValidationStep.TESTS, success=True, duration_ms=250),
+            ValidationStepResult(step=ValidationStep.BUILD, success=True, duration_ms=400),
+        ),
+        all_passed=True,
+        total_duration_ms=830,
+    )
 
     cmd = ExecuteEphemeralValidationCommand(workspace_path=workspace_path)
 
@@ -69,15 +74,16 @@ async def test_execute_ephemeral_validation_success_all_steps_pass(
     assert result.total_duration_ms == 830
     assert result.run_result.all_passed is True
 
-    # Verificar que se invocaron los pasos en orden
-    assert code_runner.run_step.call_count == 4
-    calls = [call[1]["step"] for call in code_runner.run_step.call_args_list]
-    assert calls == [
-        ValidationStep.TYPECHECK,
-        ValidationStep.LINT,
-        ValidationStep.TESTS,
-        ValidationStep.BUILD,
-    ]
+    code_runner.run_pipeline.assert_awaited_once_with(
+        workspace_dir=workspace_path,
+        steps=(
+            ValidationStep.TYPECHECK,
+            ValidationStep.LINT,
+            ValidationStep.TESTS,
+            ValidationStep.BUILD,
+        ),
+        run_id="ephemeral-validation",
+    )
 
 
 @pytest.mark.asyncio
@@ -95,16 +101,20 @@ async def test_execute_ephemeral_validation_fails_on_broken_step(
         message="Type 'string' is not assignable to type 'number'.",
         severity=ValidationSeverity.ERROR,
     )
-    code_runner.run_step.side_effect = [
-        ValidationStepResult(
-            step=ValidationStep.TYPECHECK,
-            success=False,
-            duration_ms=120,
-            exit_code=1,
-            errors=(error_detail,),
-            error_messages=("Type error in src/index.ts",),
+    code_runner.run_pipeline.return_value = ValidationRunResult(
+        steps=(
+            ValidationStepResult(
+                step=ValidationStep.TYPECHECK,
+                success=False,
+                duration_ms=120,
+                exit_code=1,
+                errors=(error_detail,),
+                error_messages=("Type error in src/index.ts",),
+            ),
         ),
-    ]
+        all_passed=False,
+        total_duration_ms=120,
+    )
 
     cmd = ExecuteEphemeralValidationCommand(workspace_path=workspace_path)
 
@@ -118,8 +128,7 @@ async def test_execute_ephemeral_validation_fails_on_broken_step(
     assert "Type error in src/index.ts" in result.error_summary
     assert result.run_result.all_passed is False
 
-    # Early termination: no se ejecutaron los siguientes pasos tras el fallo
-    assert code_runner.run_step.call_count == 1
+    code_runner.run_pipeline.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -136,10 +145,10 @@ async def test_execute_ephemeral_validation_resolves_workspace_from_project_id(
         project_id=project_id,
         workspace_dir="/tmp/resolved/workspace/path",
     )
-    code_runner.run_step.return_value = ValidationStepResult(
-        step=ValidationStep.TYPECHECK,
-        success=True,
-        duration_ms=50,
+    code_runner.run_pipeline.return_value = ValidationRunResult(
+        steps=(ValidationStepResult(step=ValidationStep.TYPECHECK, success=True, duration_ms=50),),
+        all_passed=True,
+        total_duration_ms=50,
     )
 
     cmd = ExecuteEphemeralValidationCommand(
@@ -153,10 +162,10 @@ async def test_execute_ephemeral_validation_resolves_workspace_from_project_id(
     # Assert
     assert result.is_valid is True
     workspace_manager.ensure_workspace.assert_called_once_with(project_id)
-    code_runner.run_step.assert_called_once_with(
+    code_runner.run_pipeline.assert_awaited_once_with(
         workspace_dir="/tmp/resolved/workspace/path",
-        step=ValidationStep.TYPECHECK,
-        timeout_seconds=300,
+        steps=(ValidationStep.TYPECHECK,),
+        run_id="ephemeral-validation",
     )
 
 

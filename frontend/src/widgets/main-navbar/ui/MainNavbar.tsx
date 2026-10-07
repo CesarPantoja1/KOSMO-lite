@@ -8,6 +8,7 @@ import { useAppStore } from '@/features/app-state';
 import { Project, useProjectStore } from '@/entities/project';
 import { useAuthStore } from '@/entities/user';
 import { WizardNavegacion } from '@/widgets/wizard-navegacion';
+import { GitHubSyncBanner } from '@/features/github-sync';
 
 import { ProjectNavigation } from './ProjectNavigation';
 import { SidebarBrand } from './SidebarBrand';
@@ -33,7 +34,7 @@ export function MainNavbar({ children }: MainNavbarProps) {
 				console.error('Failed to load projects', error);
 			}
 		};
-		fetchProjects();
+		void fetchProjects();
 	}, [getProjectsStore]);
 
 	const currentProject = useProjectStore((s) => s.currentProject);
@@ -88,6 +89,7 @@ export function MainNavbar({ children }: MainNavbarProps) {
 					{!isEditorMaximized && (
 						<div className='z-50 shrink-0'>
 							<WizardNavegacion />
+							<GitHubSyncBanner />
 						</div>
 					)}
 					<section className='min-h-0 flex-1 overflow-hidden'>{children}</section>
