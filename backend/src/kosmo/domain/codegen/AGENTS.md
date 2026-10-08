@@ -2,7 +2,7 @@
 
 ## Responsabilidad y Propósito
 
-El módulo `domain/codegen/` concentra la lógica de dominio pura que gobierna la fase de implementación de software en el motor Spec-Driven Development (SDD) de KOSMO. 
+El módulo `domain/codegen/` concentra la lógica de dominio pura que gobierna la fase de implementación de software en el motor Spec-Driven Development (SDD) de KOSMO.
 
 Opera estrictamente en la Capa 2 (Dominio) de la arquitectura hexagonal:
 - **Cero I/O y Cero Async**: No realiza llamadas de red, invocaciones a bases de datos ni lecturas directas del sistema de archivos mediante llamadas nativas del SO. Cualquier inspección de workspace se realiza a través de puertos de lectura (`FileSystemReader`).

@@ -1,8 +1,8 @@
 # Manual Técnico y Operativo del Backend de KOSMO para Agentes de IA
 
-> **Destinatario:** Agentes de IA y desarrolladores senior que operen, mantengan o extiendan el backend de KOSMO.  
-> **Ubicación:** `backend/AGENTS.md`  
-> **Fuente de Verdad:** Código fuente en `src/kosmo/`, pruebas en `tests/` y configuración del repositorio.  
+> **Destinatario:** Agentes de IA y desarrolladores senior que operen, mantengan o extiendan el backend de KOSMO.
+> **Ubicación:** `backend/AGENTS.md`
+> **Fuente de Verdad:** Código fuente en `src/kosmo/`, pruebas en `tests/` y configuración del repositorio.
 > **Principio Rector:** Simplicidad, minimalismo, pragmatismo y YAGNI bajo Arquitectura Hexagonal estricta.
 
 ---
@@ -52,7 +52,7 @@ Todo agente que interactúe con el backend de KOSMO debe regirse por principios 
 
 ```
                        LA ESCALERA DE DECISIÓN (THE LADDER)
-                                     
+
            1. ¿Necesita existir? (YAGNI) ──> Si no se requiere, OMITIRLO.
            2. ¿Ya existe en el código?  ──> REUTILIZAR funciones/tipos existentes.
            3. ¿La stdlib lo resuelve?   ──> Usar standard library de Python 3.12+.
