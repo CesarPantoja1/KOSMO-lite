@@ -128,6 +128,10 @@ El proyecto sigue una metodología ágil basada en Scrum, con entregas increment
 
 Actualmente en desarrollo de la versión 1.0, enfocada en la generación asistida por IA de requisitos estructurados y modelos arquitectónicos con trazabilidad bidireccional.
 
+## Desarrolladores
+
+* **Gianfranco Pupiales** – Desarrollador y responsable del Back-End
+
 ## Licencia
 
 Este proyecto se encuentra en desarrollo con fines académicos y de investigación.

@@ -49,13 +49,13 @@ jobs:
           case "$BASE_BRANCH" in
             main)
               if [[ ! "$HEAD_BRANCH" =~ ^(release|hotfix|docs)/ ]]; then
-                echo "::error::Only release/*, hotfix/* and docs/* branches may target main; received $HEAD_BRANCH."
+                echo "::error::Solo las ramas release/*, hotfix/* y docs/* pueden apuntar a main; se recibió $HEAD_BRANCH."
                 exit 1
               fi
               ;;
             develop)
-              if [[ ! "$HEAD_BRANCH" =~ ^(feature|release|hotfix)/ ]]; then
-                echo "::error::Only feature/*, release/* and hotfix/* branches may target develop; received $HEAD_BRANCH."
+              if [[ ! "$HEAD_BRANCH" =~ ^(feature|release|hotfix|docs)/ ]]; then
+                echo "::error::Solo las ramas feature/*, release/*, hotfix/* y docs/* pueden apuntar a develop; se recibió $HEAD_BRANCH."
                 exit 1
               fi
               ;;
