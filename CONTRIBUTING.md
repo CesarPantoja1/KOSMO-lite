@@ -33,11 +33,11 @@ El desarrollo en KOSMO sigue Git Flow y usa las siguientes ramas:
 * **`main`**: Código estable y listo para producción.
 * **`develop`**: Rama de integración del desarrollo.
 * **`feature/hu-<id>-<descripcion-corta>`**: Ramas creadas desde `develop` para implementar historias de usuario o características (ej. `feature/hu-12-generacion-diagrama-actividad-ia`). Sus Pull Requests se dirigen a `develop`.
-* **`release/<version>`**: Ramas de preparación de una versión, creadas desde `develop`. Sus Pull Requests se dirigen a `main` y luego se sincronizan con `develop`.
-* **`hotfix/<version>-<descripcion-corta>`**: Ramas para corregir incidencias urgentes de producción, creadas desde `main`. Sus Pull Requests se dirigen a `main` y luego se sincronizan con `develop`.
-* **`docs/<descripcion-corta>`**: Ramas para cambios exclusivamente documentales, creadas desde `main` (ej. `docs/guia-despliegue`). Sus Pull Requests se dirigen a `main`.
+* **`release/<version>`**: Ramas de preparación de una versión, creadas desde `develop`. Sus Pull Requests de entrega se dirigen a `main`. Si contienen ajustes que deben continuar en desarrollo, la misma rama se integra mediante PR en `develop`; no se fusiona `main` hacia `develop`.
+* **`hotfix/<version>-<descripcion-corta>`**: Ramas para corregir incidencias urgentes de producción, creadas desde `main`. Sus Pull Requests se dirigen a `main` y, si procede, la misma rama se integra mediante PR en `develop`; no se fusiona `main` hacia `develop`.
+* **`docs/<descripcion-corta>`**: Ramas para cambios exclusivamente documentales, creadas desde `main` (ej. `docs/guia-despliegue`). La misma rama abre Pull Requests hacia `main` y hacia `develop` para mantener ambas líneas actualizadas, sin fusionar `main` hacia `develop`.
 
-> **Nota:** No trabajes directamente sobre `main`. Todas las modificaciones deben integrarse mediante Pull Requests revisados. Después de integrar una rama `docs/*` en `main`, incorpora el mismo cambio en `develop` para mantener ambas ramas sincronizadas.
+> **Nota:** No trabajes directamente sobre `main` ni sobre `develop`. Todas las modificaciones deben integrarse mediante Pull Requests revisados. Los cambios que deban pasar de una línea de trabajo a otra se integran desde su rama de origen, nunca mediante un PR de `main` hacia `develop`.
 
 ---
 
@@ -76,8 +76,8 @@ En KOSMO seguimos la convención **Conventional Commits** vinculada a Azure Boar
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/CesarPantoja1/KOSMO.git
-   cd KOSMO
+   git clone https://github.com/CesarPantoja1/KOSMO-lite.git
+   cd KOSMO-lite
    ```
 
 2. **Configurar variables de entorno:**
@@ -122,7 +122,7 @@ En KOSMO seguimos la convención **Conventional Commits** vinculada a Azure Boar
    git pull origin develop
    git switch -c feature/hu-XX-mi-funcionalidad
 
-   # Documentación que se publicará directamente
+   # Documentación
    git switch main
    git pull origin main
    git switch -c docs/guia-despliegue
@@ -133,7 +133,7 @@ En KOSMO seguimos la convención **Conventional Commits** vinculada a Azure Boar
    ```bash
    git push -u origin <nombre-de-tu-rama>
    ```
-5. Abre un **Pull Request** en GitHub / Azure DevOps: hacia `develop` para `feature/*`; hacia `main` para `release/*`, `hotfix/*` y `docs/*`. Describe:
+5. Abre un **Pull Request** en GitHub / Azure DevOps: hacia `develop` para `feature/*`; hacia `main` para `release/*` y `hotfix/*`; y, para `docs/*`, abre Pull Requests de la misma rama hacia `main` y `develop`. Describe:
    * El objetivo de la historia de usuario o corrección.
    * Los cambios principales realizados.
    * El plan de verificación o pruebas realizadas.
