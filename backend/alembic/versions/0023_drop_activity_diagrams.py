@@ -1,6 +1,6 @@
-"""drop_activity_diagrams_table
+"""drop_activity_diagrams
 
-Revision ID: 0023_drop_activity_diagrams_table
+Revision ID: 0023_drop_activity_diagrams
 Revises: 0022_add_performance_indexes
 Create Date: 2026-11-02 23:30:00.000000
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "0023_drop_activity_diagrams_table"
+revision: str = "0023_drop_activity_diagrams"
 down_revision: str | Sequence[str] | None = "0022_add_performance_indexes"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
