@@ -27,7 +27,6 @@ from kosmo.contracts.sdd.codegen import (
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     RequirementRepository,
@@ -84,14 +83,12 @@ class EvaluateConsistencyUseCase:
         agent: AgentPort,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         document_repo: DocumentRepository,
         implementation_repo: FeatureImplementationRepository | None = None,
     ) -> None:
         self._agent = agent
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._document_repo = document_repo
         self._implementation_repo = implementation_repo
 
@@ -291,25 +288,17 @@ class EvaluateConsistencyUseCase:
                 return "consistency_evaluate_features_implementation"
             if source_phase == SpecPhase.REQUISITOS:
                 return "consistency_evaluate_requirements_implementation"
-            if source_phase == SpecPhase.MODELO:
-                return "consistency_evaluate_model_implementation"
             return "consistency_evaluate_implementation"
         if source_phase == SpecPhase.REQUISITOS and target_phase == SpecPhase.CARACTERISTICAS:
             return "consistency_evaluate_requirements"
         if source_phase == SpecPhase.REQUISITOS and target_phase == SpecPhase.DESCUBRIMIENTO:
             return "consistency_evaluate_requirements_upstream"
-        if source_phase == SpecPhase.REQUISITOS and target_phase == SpecPhase.MODELO:
-            return "consistency_evaluate_requirements_model"
         if source_phase == SpecPhase.CARACTERISTICAS and target_phase == SpecPhase.REQUISITOS:
             return "consistency_evaluate_features_downstream"
-        if source_phase == SpecPhase.CARACTERISTICAS and target_phase == SpecPhase.MODELO:
-            return "consistency_evaluate_features_model"
         if source_phase == SpecPhase.DESCUBRIMIENTO and target_phase == SpecPhase.CARACTERISTICAS:
             return "consistency_evaluate_discovery_features"
         if source_phase == SpecPhase.DESCUBRIMIENTO and target_phase == SpecPhase.REQUISITOS:
             return "consistency_evaluate_discovery_requirements"
-        if source_phase == SpecPhase.DESCUBRIMIENTO and target_phase == SpecPhase.MODELO:
-            return "consistency_evaluate_discovery_model"
         if target_phase == SpecPhase.DESCUBRIMIENTO:
             return "consistency_evaluate_upstream"
         return "consistency_evaluate"
@@ -424,9 +413,6 @@ class EvaluateConsistencyUseCase:
             return f"Título: {feature.title}\nDescripción: {desc}"
         if target_phase == SpecPhase.REQUISITOS:
             return await self._requirement_repo.by_feature_id(FeatureId(artifact_id))
-        if target_phase == SpecPhase.MODELO:
-            diagram = await self._diagram_repo.by_feature_id(FeatureId(artifact_id))
-            return diagram.diagram_syntax if diagram is not None else None
         if target_phase == SpecPhase.IMPLEMENTACION:
             if self._implementation_repo is None:
                 return None
@@ -514,8 +500,6 @@ class EvaluateConsistencyUseCase:
             return await self._fetch_features(project_id)
         if target_phase == SpecPhase.REQUISITOS:
             return await self._fetch_requirements(project_id)
-        if target_phase == SpecPhase.MODELO:
-            return await self._fetch_models(project_id)
         if target_phase == SpecPhase.IMPLEMENTACION:
             return await self._fetch_implementations(project_id)
         return []
@@ -544,26 +528,6 @@ class EvaluateConsistencyUseCase:
                         artifact_type="EARSRequirement",
                         title=f"Requisitos de {f.title}",
                         description=req_md,
-                    )
-                )
-        return artifacts
-
-    async def _fetch_models(self, project_id: ProjectId) -> list[DownstreamArtifact]:
-        features = await self._feature_repo.list_by_project(project_id)
-        artifacts: list[DownstreamArtifact] = []
-        for f in features:
-            diagram_exists = await self._diagram_repo.exists(f.id)
-            if diagram_exists:
-                diagram = await self._diagram_repo.by_feature_id(f.id)
-                syntax = diagram.diagram_syntax[:8000] if diagram else ""
-                if diagram and len(diagram.diagram_syntax) > 8000:
-                    syntax += "\n[…contenido truncado…]"
-                artifacts.append(
-                    DownstreamArtifact(
-                        artifact_id=str(f.id),
-                        artifact_type="ActivityDiagram",
-                        title=f"Diagrama de {f.title}",
-                        description=syntax,
                     )
                 )
         return artifacts

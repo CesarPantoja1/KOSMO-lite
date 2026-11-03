@@ -38,7 +38,6 @@ def test_repository_registry_builds_distinct_repositories() -> None:
         repos.documents,
         repos.features,
         repos.requirements,
-        repos.diagrams,
         repos.chat,
         repos.traceability,
         repos.users,
@@ -61,7 +60,6 @@ async def test_build_app_components_reuses_registry_instances() -> None:
         assert components.discovery.document_repo is components.repos.documents
         assert components.features.feature_repo is components.repos.features
         assert components.requirements.requirement_repo is components.repos.requirements
-        assert components.modelo.diagram_repo is components.repos.diagrams
         assert components.pipeline.chat_repo is components.repos.chat
         assert components.pipeline.traceability_repo is components.repos.traceability
         assert components.discovery.consistency_evaluator is components.pipeline.consistency_evaluator

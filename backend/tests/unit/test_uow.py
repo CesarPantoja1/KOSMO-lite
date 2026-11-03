@@ -8,9 +8,6 @@ import pytest
 
 from kosmo.infrastructure.persistence.postgres.models import OutboxJobModel
 from kosmo.infrastructure.persistence.postgres.outbox import OutboxStore
-from kosmo.infrastructure.persistence.postgres.repositories.activity_diagram_repo import (
-    SqlAlchemyActivityDiagramRepository,
-)
 from kosmo.infrastructure.persistence.postgres.repositories.chat_repo import SqlAlchemyChatRepository
 from kosmo.infrastructure.persistence.postgres.repositories.document_repo import SqlAlchemyDocumentRepository
 from kosmo.infrastructure.persistence.postgres.repositories.feature_repo import SqlAlchemyFeatureRepository
@@ -125,7 +122,6 @@ async def test_uow_creates_fresh_session_per_enter_and_binds_repos() -> None:
         docs = uow.documents
         features = uow.features
         requirements = uow.requirements
-        diagrams = uow.diagrams
         chat = uow.chat
         traceability = uow.traceability
 
@@ -138,7 +134,6 @@ async def test_uow_creates_fresh_session_per_enter_and_binds_repos() -> None:
     assert isinstance(docs, SqlAlchemyDocumentRepository)
     assert isinstance(features, SqlAlchemyFeatureRepository)
     assert isinstance(requirements, SqlAlchemyRequirementRepository)
-    assert isinstance(diagrams, SqlAlchemyActivityDiagramRepository)
     assert isinstance(chat, SqlAlchemyChatRepository)
     assert isinstance(traceability, SqlAlchemyTraceabilityRepository)
 

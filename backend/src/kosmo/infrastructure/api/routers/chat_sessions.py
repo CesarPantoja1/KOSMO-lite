@@ -34,7 +34,6 @@ _PHASE_MAP: dict[str, SpecPhase] = {
     "discovery": SpecPhase.DESCUBRIMIENTO,
     "features": SpecPhase.CARACTERISTICAS,
     "requirements": SpecPhase.REQUISITOS,
-    "model": SpecPhase.MODELO,
 }
 
 

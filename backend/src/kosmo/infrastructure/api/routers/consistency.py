@@ -286,7 +286,6 @@ def _resolve_origin_phase(phase_name: str) -> SpecPhase:
         "discovery": SpecPhase.DESCUBRIMIENTO,
         "features": SpecPhase.CARACTERISTICAS,
         "requirements": SpecPhase.REQUISITOS,
-        "model": SpecPhase.MODELO,
         "implementation": SpecPhase.IMPLEMENTACION,
     }
     if phase_name not in reverse:
@@ -302,7 +301,6 @@ def _to_spec_phase(api_phase: str) -> SpecPhase:
         "discovery": SpecPhase.DESCUBRIMIENTO,
         "features": SpecPhase.CARACTERISTICAS,
         "requirements": SpecPhase.REQUISITOS,
-        "model": SpecPhase.MODELO,
         "implementation": SpecPhase.IMPLEMENTACION,
     }
     if api_phase not in reverse:
@@ -325,7 +323,7 @@ def _resolve_targets(phase_origin: str, phase_destination: str | None) -> list[s
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     "La dirección de evaluación no está permitida: la trazabilidad se verifica "
-                    "solo hacia la derecha (Descubrimiento → Características → Requisitos → Modelo)."
+                    "solo hacia la derecha (Descubrimiento → Características → Requisitos → Implementación)."
                 ),
             )
         return [phase_destination]

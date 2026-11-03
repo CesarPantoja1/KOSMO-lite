@@ -4,7 +4,6 @@ from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     RequirementRepository,
@@ -26,7 +25,6 @@ async def fetch_snapshot_parts(
     document_repo: DocumentRepository,
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
-    diagram_repo: ActivityDiagramRepository,
     implementation_repo: FeatureImplementationRepository | None = None,
 ) -> list[str]:
     """Entradas canonicas del hash de frescura: contenido fuente + contenido destino."""
@@ -41,9 +39,6 @@ async def fetch_snapshot_parts(
     elif source_phase == SpecPhase.REQUISITOS:
         markdown = await requirement_repo.by_feature_id(_feature_scope(target_artifact_id))
         parts.append(markdown or "none")
-    elif source_phase == SpecPhase.MODELO:
-        diagram = await diagram_repo.by_feature_id(_feature_scope(target_artifact_id))
-        parts.append(diagram.diagram_syntax if diagram is not None else "none")
     else:
         parts.append("none")
 
@@ -53,9 +48,6 @@ async def fetch_snapshot_parts(
     elif artifact_type == "EARSRequirement":
         markdown = await requirement_repo.by_feature_id(_feature_scope(target_artifact_id))
         parts.append(markdown or "none")
-    elif artifact_type == "ActivityDiagram":
-        diagram = await diagram_repo.by_feature_id(_feature_scope(target_artifact_id))
-        parts.append(diagram.diagram_syntax if diagram is not None else "none")
     elif artifact_type == "DiscoveryDocument":
         target_doc = await document_repo.get_discovery(project_id)
         parts.append(document_to_markdown(target_doc) if target_doc is not None else "none")

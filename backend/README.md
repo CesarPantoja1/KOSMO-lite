@@ -17,8 +17,7 @@ Su responsabilidad técnica dentro de la plataforma abarca:
   1. *Descubrimiento:* Visión del producto y reglas de negocio estructuradas en 8 secciones canónicas.
   2. *Características:* Capacidades funcionales del sistema definidas en 4 campos estándar.
   3. *Requisitos:* Especificación formal no ambigua bajo sintaxis EARS (*Easy Approach to Requirements Syntax*) con criterios de aceptación Dado-Cuando-Entonces (*Given-When-Then*).
-  4. *Modelo:* Diagramas de actividad UML generados en sintaxis PlantUML con particiones por rol y decisiones.
-  5. *Implementación:* Generación de código ejecutable full-stack sobre Next.js (App Router, React 19, TypeScript, Vitest, Tailwind CSS, Drizzle ORM y SQLite/libsql).
+    4. *Implementación:* Generación de código ejecutable full-stack sobre Next.js (App Router, React 19, TypeScript, Vitest, Tailwind CSS, Drizzle ORM y SQLite/libsql).
 - **Consistencia y trazabilidad continua:** Mantenimiento de una matriz de trazabilidad persistida (`traceability_edges`) que vincula requisitos con características y archivos fuente generados. Evaluación de impacto y propagación de inconsistencias en cascada (upstream y downstream) con guardrails de frescura mediante hashing de snapshots.
 - **Generación de código y aislamiento de procesos:** Coordinación de sesiones de codificación con el motor **OpenCode**, aprovisionamiento y control de concurrencia sobre workspaces locales mediante locks en base de datos, ejecución de suites de validación determinística (`tsc`, `eslint`, `vitest`, `next build`) con auto-corrección de errores y streaming de eventos en tiempo real (SSE).
 - **Integraciones externas:** Vinculación OAuth y sincronización con repositorios de GitHub y orquestación de despliegues en la nube en Railway.
@@ -165,7 +164,6 @@ backend/
 │   │   ├── features/                           #   Generación, sugerencia, edición manual y borrado
 │   │   ├── integrations/                       #   Sincronización con GitHub y despliegue en la nube
 │   │   ├── knowledge/                          #   Consolidación de patrones de conocimiento cross-project
-│   │   ├── modelo/                             #   Generación y consulta de diagramas de actividad PlantUML
 │   │   ├── pipeline/                           #   KOSMOAgent, GenerationLoop, ContextBuilder, SessionRecorder
 │   │   ├── projects/                           #   CRUD y borrado en cascada de proyectos
 │   │   ├── requirements/                       #   Generación EARS, refinamiento y regeneración
@@ -312,8 +310,7 @@ flowchart LR
   - `get_phase_document`: Obtiene el contenido de un documento de fase previa.
   - `get_downstream_artifacts`: Lista artefactos derivados downstream.
   - `get_requirements_for_feature`: Recupera requisitos EARS asociados a una característica.
-  - `get_diagram_for_feature`: Recupera la sintaxis PlantUML de una característica.
-  - `get_impact`: Consulta aristas de trazabilidad para predecir impacto de modificaciones.
+    - `get_impact`: Consulta aristas de trazabilidad para predecir impacto de modificaciones.
 - **`GenerationLoop` (`application/pipeline/generation_loop.py`):** Bucle de ejecución que llama al LLM mediante `complete_typed()`, valida la respuesta contra `mode.validate_output()`, y en caso de detectar errores, reinyecta el feedback en el prompt iterando hasta alcanzar la validez o agotar el límite de iteraciones (por defecto 8).
 - **`SessionRecorder` (`application/pipeline/session_recorder.py`):** Persiste la sesión completa (`AgentSessionModel`) con logs de razonamiento, respuestas y métricas. Inserta un registro en `outbox_jobs` con el trabajo `reflect_and_consolidate`.
 
@@ -323,7 +320,6 @@ El registro `SkillRegistry` mapea nombres canónicos con instancias de `PhaseMod
 - `discovery_generate` y `discovery_refine`: Generación y refinamiento del documento de visión (8 secciones).
 - `features_generate`: Extracción de características funcionales a nivel de usuario (4 campos: código, título, descripción, origen).
 - `ears_generate` y `requirements_refine`: Generación y ajuste de requisitos bajo sintaxis EARS formal y criterios de aceptación.
-- `modelo_generate`: Generación del diagrama de actividad UML en sintaxis PlantUML.
 - `discovery_chat`, `features_chat`, `requirements_chat`: Diálogo conversacional especializado por nivel de abstracción.
 - `consistency_evaluate` (y sus variantes upstream/downstream entre cada par de fases): Evaluación de consistencia e impacto cruzado.
 - `consistency_correct`: Generación de texto de reemplazo para resolver inconsistencias.
@@ -411,7 +407,7 @@ flowchart TD
 
 ## 9. Generación de código
 
-El ciclo de generación de código traduce la especificación formal (Requisitos EARS + Diagrama de Actividad UML) en una aplicación full-stack Next.js ejecutable:
+El ciclo de generación de código traduce la especificación formal (Requisitos EARS) en una aplicación full-stack Next.js ejecutable:
 
 ```mermaid
 flowchart TD
@@ -521,7 +517,6 @@ Persistencia estructurada en 22 modelos ORM declarados en `src/kosmo/infrastruct
 | `traceability_edges` | `TraceabilityEdgeModel` | `id` (String 64, ULID) | Grafo de trazabilidad entre artefactos (`source_type`, `target_type`, IDs) |
 | `discovery` | `DiscoveryDocumentModel` | `project_id` (FK a projects) | Documento de visión y reglas de negocio del proyecto en Markdown |
 | `agent_sessions` | `AgentSessionModel` | `id` (String 64, ULID) | Historial de ejecuciones del agente, logs de razonamiento, métricas y embedding vectorial (`Vector`) |
-| `activity_diagrams` | `ActivityDiagramModel` | `id` (String 64, ULID) | Diagramas de actividad PlantUML por característica (`feature_id` único) |
 | `knowledge_patterns` | `KnowledgePatternModel` | `id` (String 64, ULID) | Patrones de conocimiento y reglas consolidadas por fase |
 | `chat_sessions` | `ChatSessionModel` | `id` (String 64, ULID) | Hilos de conversación organizados por proyecto, fase y contexto |
 | `chat_messages` | `ChatMessageModel` | `id` (String 64, ULID) | Mensajes individuales con rol, contenido y diffs de cambio sugeridos |
@@ -602,10 +597,6 @@ La API REST expone 20 routers bajo el prefijo canónico `/api/v1` y `/mcp`:
 | **Chat Sessions** | `GET` | `/api/v1/projects/{project_id}/chat-sessions` | Bearer | Lista hilos de conversación por fase y contexto |
 | | `POST` | `/api/v1/projects/{project_id}/chat-sessions` | Bearer | Crea un nuevo hilo de chat |
 | | `DELETE` | `/api/v1/projects/{project_id}/chat-sessions/{session_id}` | Bearer | Elimina un hilo de chat y sus mensajes asociados |
-| **Modelo (Diagrams)** | `POST` | `/api/v1/features/{feature_id}/diagram/generate` | Bearer | Genera diagrama de actividad PlantUML desde requisitos |
-| | `POST` | `/api/v1/features/{feature_id}/diagram/propagate` | Bearer | Regenera diagrama tras cambios upstream |
-| | `GET` | `/api/v1/features/{feature_id}/diagram` | Bearer | Obtiene sintaxis PlantUML del diagrama de actividad |
-| | `DELETE` | `/api/v1/features/{feature_id}/diagram` | Bearer | Elimina el diagrama de actividad de la característica |
 | **Consistency** | `GET` | `/api/v1/projects/{project_id}/consistency/status` | Bearer | Consulta resumen de inconsistencias pendientes por fase |
 | | `GET` | `/api/v1/projects/{project_id}/consistency/review` | Bearer | Tarjetas de revisión por fase destino (Review Gate) |
 | | `POST` | `/api/v1/projects/{project_id}/consistency/evaluations/{id}/apply` | Bearer | Aplica sugerencia con guardrail de frescura |
@@ -633,7 +624,6 @@ La API REST expone 20 routers bajo el prefijo canónico `/api/v1` y `/mcp`:
 | | `POST` | `/api/v1/projects/{project_id}/deploy` | Bearer | Inicia despliegue en la nube en Railway |
 | | `DELETE` | `/api/v1/projects/{project_id}/deploy` | Bearer | Elimina el servicio publicado en Railway |
 | **MCP Tools** | `POST` | `/mcp/tools/get_requirements` | Bearer | Endpoint MCP para consulta de requisitos por OpenCode |
-| | `POST` | `/mcp/tools/get_activity_diagram` | Bearer | Endpoint MCP para consulta de diagramas por OpenCode |
 | **Knowledge** | `POST` | `/api/v1/knowledge/consolidate` | Bearer (admin)| Fuerza consolidación manual de patrones de conocimiento |
 | **Schemas** | `GET` | `/api/v1/schemas` | Bearer | Lista los nombres de esquemas DTO registrados |
 | | `GET` | `/api/v1/schemas/{name}` | Bearer | Retorna JSON Schema OpenAPI de un DTO específico |

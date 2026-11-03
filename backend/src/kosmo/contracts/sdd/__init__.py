@@ -1,8 +1,5 @@
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
-from kosmo.contracts.sdd.errors import DiagramNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
-    ActivityDiagramId,
     ApiKey,
     AuditId,
     ChatHistoryId,
@@ -16,7 +13,6 @@ from kosmo.contracts.sdd.ids import (
     UserId,
 )
 from kosmo.contracts.sdd.project import Project
-from kosmo.contracts.sdd.repositories import ActivityDiagramRepository
 from kosmo.contracts.sdd.ux_context import (
     BootstrapDesignTokens,
     BusinessArchetype,
@@ -27,8 +23,6 @@ from kosmo.contracts.sdd.ux_context import (
 )
 
 __all__ = [
-    "ActivityDiagramId",
-    "ActivityDiagramRepository",
     "ApiKey",
     "AuditId",
     "BootstrapDesignTokens",
@@ -36,8 +30,6 @@ __all__ = [
     "ChatHistoryId",
     "ChatMessageId",
     "DataDensity",
-    "DiagramNotFoundError",
-    "DiagramaActividad",
     "Feature",
     "FeatureId",
     "PipelineId",

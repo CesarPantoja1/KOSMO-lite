@@ -115,13 +115,13 @@ def test_impact_item_minimal_creation() -> None:
     # Arrange & Act
     item = ImpactItem(
         id="imp_min",
-        phase="model",
-        target_id="feat_02",
-        artifact_type="ActivityDiagram",
-        target_display_id="C02",
-        target_title="Diagrama de inventario",
-        section="estructura UML",
-        rationale="El cambio podría requerir actualizar el diagrama.",
+        phase="requirements",
+        target_id="req_02",
+        artifact_type="EARSRequirement",
+        target_display_id="REQ-1.2",
+        target_title="Requisito de inventario",
+        section="enunciado",
+        rationale="El cambio podría requerir actualizar el requisito.",
     )
 
     # Assert
@@ -193,8 +193,6 @@ def test_downstream_targets_includes_implementation_and_enforces_right_only() ->
     assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.CARACTERISTICAS]
     # Requisitos llega hasta IMPLEMENTACION
     assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.REQUISITOS]
-    # Modelo llega a IMPLEMENTACION
-    assert SpecPhase.IMPLEMENTACION in DOWNSTREAM_TARGETS[SpecPhase.MODELO]
     # IMPLEMENTACION no tiene targets downstream (es hoja)
     assert DOWNSTREAM_TARGETS[SpecPhase.IMPLEMENTACION] == []
 

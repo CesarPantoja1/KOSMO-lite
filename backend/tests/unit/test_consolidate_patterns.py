@@ -103,8 +103,8 @@ async def test_consolidate_skips_phase_with_insufficient_sessions() -> None:
     await memory.save_session(
         a_session(
             is_completed=True,
-            phase=SpecPhase.MODELO,
-            reflection="simplifica el diagrama de actividad",
+            phase=SpecPhase.REQUISITOS,
+            reflection="simplifica los requisitos",
         )
     )
 
@@ -154,14 +154,14 @@ async def test_count_completed_by_phase_in_memory() -> None:
     for _ in range(3):
         await memory.save_session(a_session(is_completed=True, phase=SpecPhase.DESCUBRIMIENTO))
     for _ in range(2):
-        await memory.save_session(a_session(is_completed=True, phase=SpecPhase.MODELO))
+        await memory.save_session(a_session(is_completed=True, phase=SpecPhase.REQUISITOS))
     await memory.save_session(a_session(is_completed=False, phase=SpecPhase.DESCUBRIMIENTO))
 
     # Act
     counts = await memory.count_completed_by_phase()
 
     # Assert
-    assert counts == {"descubrimiento": 3, "modelo": 2}
+    assert counts == {"descubrimiento": 3, "requisitos": 2}
 
 
 @pytest.mark.asyncio

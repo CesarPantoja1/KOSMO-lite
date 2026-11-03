@@ -122,7 +122,6 @@ def build_codegen_components(
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=repos.features,
         requirement_repo=repos.requirements,
-        activity_diagram_repo=repos.diagrams,
         workspace_manager=ws_manager,
         opencode_client=opencode_client,
         code_runner=runner,

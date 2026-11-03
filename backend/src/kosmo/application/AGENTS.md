@@ -87,9 +87,6 @@ application/
 │   ├── delete_requirements.py           # Eliminación de requisitos de una característica
 │   ├── save_requirements.py             # Guardado y serialización Markdown
 │   └── get_requirement_chat_history.py  # Historial de chat de requisitos
-├── modelo/                              # Diagramas de actividad PlantUML
-│   ├── generate_diagram.py              # Generación de diagrama con swimlanes
-│   ├── get_diagram.py                   # Consulta de diagrama por característica
 │   └── delete_diagram.py                # Eliminación de diagrama
 ├── integrations/                        # Servicios cloud y control de versiones
 │   ├── link_github_account.py           # Vinculación OAuth2 de cuenta de GitHub
@@ -190,10 +187,6 @@ application/
 ### 8. `requirements/` — Requisitos de Software EARS
 
 - Generación automatizada de 3 a 15 requisitos en notación EARS (`generate_ears.py`), refinamiento iterativo (`refine_requirements.py`), regeneración (`regenerate_requirements.py`), persistencia en Markdown con criterios BDD (`save_requirements.py`) y eliminación (`delete_requirements.py`).
-
-### 9. `modelo/` — Diagramas de Actividad PlantUML
-
-- Generación de diagramas de actividad estructurados por carriles/swimlanes (`generate_diagram.py`), lectura estructurada (`get_diagram.py`) y eliminación (`delete_diagram.py`).
 
 ### 10. `integrations/` — Servicios Cloud y Control de Versiones
 

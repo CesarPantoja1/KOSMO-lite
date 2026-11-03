@@ -32,7 +32,6 @@ from kosmo.infrastructure.llm.dynamic_llm_client import (
 from kosmo.infrastructure.llm.embedder import OpenAIEmbedder
 from kosmo.infrastructure.llm.knowledge_tools import (
     build_find_similar_sessions,
-    build_get_diagram_for_feature,
     build_get_downstream_artifacts,
     build_get_impact,
     build_get_phase_document,
@@ -132,7 +131,6 @@ def build_pipeline_components(
     knowledge_tools.register(*build_get_phase_document(repos.documents))
     knowledge_tools.register(*build_get_downstream_artifacts(repos.features))
     knowledge_tools.register(*build_get_requirements_for_feature(repos.requirements))
-    knowledge_tools.register(*build_get_diagram_for_feature(repos.diagrams))
     if embedding_generator is not None:
         knowledge_tools.register(*build_find_similar_sessions(agent_memory, embedding_generator))
     knowledge_tools.register(*build_get_impact(repos.traceability))
@@ -155,7 +153,6 @@ def build_pipeline_components(
         agent=agent,
         feature_repo=repos.features,
         requirement_repo=repos.requirements,
-        diagram_repo=repos.diagrams,
         document_repo=repos.documents,
         implementation_repo=repos.implementations,
     )

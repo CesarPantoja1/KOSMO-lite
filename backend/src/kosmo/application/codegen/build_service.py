@@ -67,7 +67,6 @@ class BuildService:
         *,
         feature: Feature,
         req_markdown: str,
-        diagram_syntax: str,
         ux_prompt_block: str,
         project_context: str,
         impl_plan: ImplementationPlan,
@@ -86,7 +85,6 @@ class BuildService:
         build_prompt = self._context_builder.build_build_prompt(
             feature=feature,
             req_markdown=req_markdown,
-            diagram_syntax=diagram_syntax,
             ux_prompt_block=ux_prompt_block,
             project_context=project_context,
             plan_lines=plan_lines,

@@ -11,9 +11,8 @@ from kosmo.contracts.ai.ai_config import (
 )
 from kosmo.contracts.auth.secrets import EncryptedSecret
 from kosmo.contracts.memory.agent_memory import AgentSession, AgentSessionSummary
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.document import SpecPhase
-from kosmo.contracts.sdd.ids import ActivityDiagramId, AgentMemoryId, FeatureId, ProjectId, RequirementId
+from kosmo.contracts.sdd.ids import AgentMemoryId, FeatureId, ProjectId, RequirementId
 
 
 def a_session_id() -> AgentMemoryId:
@@ -111,33 +110,12 @@ def a_session_summary(
     )
 
 
-def a_activity_diagram_id() -> ActivityDiagramId:
-    return ActivityDiagramId("dia_01KT01FABRICATED01")
-
-
 def a_feature_id() -> FeatureId:
     return FeatureId("feat_01KT01FABRICATED01")
 
 
 def a_requirement_id() -> RequirementId:
     return RequirementId("req_01KT01FABRICATED01")
-
-
-def a_diagrama_actividad(
-    *,
-    diagram_id: ActivityDiagramId | None = None,
-    feature_id: FeatureId | None = None,
-    diagram_syntax: str | None = None,
-    created_at: datetime | None = None,
-    updated_at: datetime | None = None,
-) -> DiagramaActividad:
-    return DiagramaActividad(
-        id=diagram_id or a_activity_diagram_id(),
-        feature_id=feature_id or a_feature_id(),
-        diagram_syntax=diagram_syntax or "@startuml\nstart\n:Do something;\nstop\n@enduml",
-        created_at=created_at or datetime.now(UTC),
-        updated_at=updated_at or datetime.now(UTC),
-    )
 
 
 def a_user_ai_config(

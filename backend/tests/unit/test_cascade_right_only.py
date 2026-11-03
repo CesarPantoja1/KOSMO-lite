@@ -24,18 +24,15 @@ def test_downstream_targets_are_right_only() -> None:
     discovery_targets = DOWNSTREAM_TARGETS[SpecPhase.DESCUBRIMIENTO]
     features_targets = DOWNSTREAM_TARGETS[SpecPhase.CARACTERISTICAS]
     requirements_targets = DOWNSTREAM_TARGETS[SpecPhase.REQUISITOS]
-    model_targets = DOWNSTREAM_TARGETS[SpecPhase.MODELO]
 
     # Assert
     assert discovery_targets == [
         SpecPhase.CARACTERISTICAS,
         SpecPhase.REQUISITOS,
-        SpecPhase.MODELO,
         SpecPhase.IMPLEMENTACION,
     ]
-    assert features_targets == [SpecPhase.REQUISITOS, SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
-    assert requirements_targets == [SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
-    assert model_targets == [SpecPhase.IMPLEMENTACION]
+    assert features_targets == [SpecPhase.REQUISITOS, SpecPhase.IMPLEMENTACION]
+    assert requirements_targets == [SpecPhase.IMPLEMENTACION]
 
 
 @pytest.mark.unit
@@ -91,7 +88,7 @@ async def test_evaluate_consistency_defaults_to_right_phases_of_origin() -> None
 
     # Assert
     input_data = uc.execute.await_args.args[0]
-    assert input_data.target_phases == [SpecPhase.MODELO, SpecPhase.IMPLEMENTACION]
+    assert input_data.target_phases == [SpecPhase.IMPLEMENTACION]
 
 
 @pytest.mark.unit
@@ -119,7 +116,7 @@ async def test_evaluate_consistency_stream_rejects_upstream_destination() -> Non
     uc = MagicMock()
     uc.execute_stream = AsyncMock(return_value=MagicMock())
     request_body = EvaluateConsistencyRequestView(
-        phase_origin="model",
+        phase_origin="requirements",
         phase_destination="discovery",
         changes=[],
     )

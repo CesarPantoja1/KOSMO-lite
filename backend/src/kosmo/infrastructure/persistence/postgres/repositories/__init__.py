@@ -1,6 +1,3 @@
-from kosmo.infrastructure.persistence.postgres.repositories.activity_diagram_repo import (
-    SqlAlchemyActivityDiagramRepository,
-)
 from kosmo.infrastructure.persistence.postgres.repositories.agent_memory_repo import (
     SqlAlchemyAgentSessionStore,
     SqlAlchemyKnowledgePatternStore,
@@ -47,7 +44,6 @@ from kosmo.infrastructure.persistence.postgres.repositories.workspace_repo impor
 )
 
 __all__ = [
-    "SqlAlchemyActivityDiagramRepository",
     "SqlAlchemyAgentSessionStore",
     "SqlAlchemyAuditEventSink",
     "SqlAlchemyChatRepository",

@@ -97,40 +97,6 @@ async def test_manage_traceability_navigation_redirects_at_requirements_level(
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_manage_traceability_navigation_redirects_at_model_level(
-    use_case: ManageTraceabilityNavigationUseCase,
-    feature_repo: InMemoryFeatureRepository,
-) -> None:
-    # Arrange
-    project_id = ProjectId(ULID().hex)
-    feature = Feature(
-        id=FeatureId(ULID().hex),
-        project_id=project_id,
-        number=2,
-        title="Calcular balances",
-        slug="calcular-balances",
-        description="Feature de prueba",
-    )
-    await feature_repo.save(feature)
-
-    input_data = TraceabilityNavigationInput(
-        entity_id=str(feature.id),
-        level=SpecPhase.MODELO,
-    )
-
-    # Act
-    result = await use_case.execute(input_data)
-
-    # Assert
-    assert result.permitted is False
-    assert result.redirect_message is not None
-    assert "Calcular balances" in result.redirect_message
-    assert result.source_entity_name == "Calcular balances"
-    assert result.source_level == SpecPhase.REQUISITOS.value
-
-
-@pytest.mark.asyncio
-@pytest.mark.unit
 async def test_manage_traceability_navigation_raises_when_feature_not_found(
     use_case: ManageTraceabilityNavigationUseCase,
 ) -> None:
@@ -180,7 +146,7 @@ async def test_manage_traceability_navigation_redirects_at_implementation_level(
     assert result.redirect_message is not None
     assert "Exportar reportes" in result.redirect_message
     assert result.source_entity_name == "Exportar reportes"
-    assert result.source_level == SpecPhase.MODELO.value
+    assert result.source_level == SpecPhase.REQUISITOS.value
 
 
 @pytest.mark.asyncio

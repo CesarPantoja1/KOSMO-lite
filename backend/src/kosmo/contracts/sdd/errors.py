@@ -171,23 +171,6 @@ class AIProviderAuthError(SpecError):
         super().__init__(problem)
 
 
-class DiagramNotFoundError(SpecError):
-    def __init__(
-        self,
-        *,
-        feature_id: str,
-        instance: str = "/api/v1/diagrams",
-    ) -> None:
-        problem = ProblemDetail(
-            type="urn:kosmo:diagrams:not-found",
-            title="Diagrama no encontrado",
-            status=404,
-            detail=f"La feature {feature_id} no tiene un diagrama de actividad generado",
-            instance=instance,
-        )
-        super().__init__(problem)
-
-
 class PlanChangeNotFoundError(SpecError):
     def __init__(
         self,

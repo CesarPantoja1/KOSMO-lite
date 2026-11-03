@@ -171,22 +171,6 @@ class AgentSessionModel(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
-class ActivityDiagramModel(Base):
-    __tablename__ = "activity_diagrams"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    feature_id: Mapped[str] = mapped_column(
-        String(64),
-        ForeignKey("features.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        unique=True,
-    )
-    diagram_syntax: Mapped[str] = mapped_column(Text(), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-
 class KnowledgePatternModel(Base):
     __tablename__ = "knowledge_patterns"
     __table_args__ = (UniqueConstraint("phase", "pattern_text", name="uq_knowledge_patterns_phase_pattern"),)

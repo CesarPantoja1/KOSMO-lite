@@ -17,14 +17,12 @@ from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId, UserId
 from kosmo.contracts.sdd.project import Project
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
     RequirementRepository,
 )
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryDocumentRepository,
     InMemoryFeatureRepository,
     InMemoryProjectRepository,
@@ -102,7 +100,6 @@ def _make_uc(
     document_repo: DocumentRepository,
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
-    diagram_repo: ActivityDiagramRepository,
     agent: StubRegenerateAgent,
 ) -> RegenerateDiscoveryUseCase:
     return RegenerateDiscoveryUseCase(
@@ -110,7 +107,6 @@ def _make_uc(
         document_repo=document_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
         agent=agent,
     )
 
@@ -132,11 +128,8 @@ async def test_regenerate_discovery_with_features() -> None:
 
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(FeatureId("feat_01"), "# REQ-1.1\nRequisito de catálogo.")
-
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     agent = StubRegenerateAgent()
-    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, diagram_repo, agent)
+    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, agent)
 
     # Act
     result = await uc.execute(RegenerateDiscoveryInput(project_id=ProjectId("prj_001")))
@@ -162,9 +155,8 @@ async def test_regenerate_discovery_project_not_found() -> None:
     document_repo = InMemoryDocumentRepository()
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     agent = StubRegenerateAgent()
-    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, diagram_repo, agent)
+    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, agent)
 
     # Act & Assert
     with pytest.raises(ProjectNotFoundError):
@@ -184,10 +176,8 @@ async def test_regenerate_discovery_agent_failure_raises_llm_error() -> None:
 
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     agent = StubRegenerateAgent(should_fail=True)
-    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, diagram_repo, agent)
+    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, agent)
 
     # Act & Assert
     with pytest.raises(LLMInvocationError, match="Error al regenerar"):
@@ -207,10 +197,8 @@ async def test_regenerate_discovery_without_downstream_artifacts() -> None:
 
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     agent = StubRegenerateAgent()
-    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, diagram_repo, agent)
+    uc = _make_uc(project_repo, document_repo, feature_repo, requirement_repo, agent)
 
     # Act
     result = await uc.execute(RegenerateDiscoveryInput(project_id=ProjectId("prj_003")))

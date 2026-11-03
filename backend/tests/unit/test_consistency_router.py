@@ -26,7 +26,6 @@ from kosmo.infrastructure.api.schemas import (
     EvaluateConsistencyRequestView,
 )
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryFeatureRepository,
     InMemoryProjectRepository,
     InMemoryRequirementRepository,
@@ -55,7 +54,6 @@ async def _make_uc(
     evaluator: StubConsistencyEvaluator,
     feature_repo: InMemoryFeatureRepository,
     requirement_repo: InMemoryRequirementRepository,
-    diagram_repo: InMemoryActivityDiagramRepository,
 ) -> EvaluateProjectConsistencyUseCase:
     from kosmo.contracts.sdd.project import Project
 
@@ -73,7 +71,6 @@ async def _make_uc(
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         feature_repo=feature_repo,  # type: ignore[reportArgumentType]
         requirement_repo=requirement_repo,  # type: ignore[reportArgumentType]
-        diagram_repo=diagram_repo,  # type: ignore[reportArgumentType]
     )
 
 
@@ -99,8 +96,7 @@ async def test_evaluate_consistency_returns_report_with_affected_features() -> N
     await feature_repo.save(feature)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
-    uc = await _make_uc(evaluator, feature_repo, requirement_repo, diagram_repo)
+    uc = await _make_uc(evaluator, feature_repo, requirement_repo)
 
     request_body = EvaluateConsistencyRequestView(
         phase_origin="discovery",
@@ -139,8 +135,7 @@ async def test_evaluate_consistency_no_destination_evaluates_all_phases() -> Non
     await feature_repo.save(feature)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
-    uc = await _make_uc(evaluator, feature_repo, requirement_repo, diagram_repo)
+    uc = await _make_uc(evaluator, feature_repo, requirement_repo)
 
     request_body = EvaluateConsistencyRequestView(
         phase_origin="discovery",
@@ -166,8 +161,7 @@ async def test_evaluate_consistency_unknown_origin_phase_raises_400() -> None:
     evaluator = StubConsistencyEvaluator()
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
-    uc = await _make_uc(evaluator, feature_repo, requirement_repo, diagram_repo)
+    uc = await _make_uc(evaluator, feature_repo, requirement_repo)
 
     request_body = EvaluateConsistencyRequestView(
         phase_origin="unknown_phase",

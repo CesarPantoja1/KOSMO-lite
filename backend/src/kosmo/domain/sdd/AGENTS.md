@@ -198,22 +198,6 @@ domain/sdd/
     - `MODELO` → `modelo_example.md`
   - Utiliza `@lru_cache(maxsize=8)` para eliminar sobrecarga de lectura en disco durante ejecuciones repetidas.
 
-### 15. `validators/activity_diagram_validator.py` — Validador PlantUML
-
-- **`wrap_diagram_fragment(fragment: str) -> str`**:
-  - Asegura que cualquier fragmento de diagrama cuente con las directivas `@startuml` y `@enduml`.
-- **`validate_activity_diagram_syntax(diagram: str, ...) -> ValidationResult`**:
-  - **Errores sintácticos**:
-    - Presencia obligatoria de encabezado `@startuml` y cierre `@enduml`.
-    - Balance de condicionales: cantidad de `if` / `if(` debe coincidir exactamente con `endif` / `end if`.
-    - Balance de concurrencia: cantidad de `fork` debe coincidir exactamente con `end merge` / `endmerge`.
-  - **Advertencias y límites de complejidad**:
-    - Presencia recomendada de nodo inicial `start` y nodo final (`stop` o `end`).
-    - Presencia obligatoria de carriles/swimlanes (`|NombreCarril|`).
-    - Nodos de acción máximos recomendados: 20 (`_DEFAULT_MAX_ACTION_NODES = 20`).
-    - Carriles máximos recomendados: 4 (`_DEFAULT_MAX_SWIMLANES = 4`).
-    - Nivel de anidamiento máximo recomendado: 3 (`_DEFAULT_MAX_NESTING_DEPTH = 3`).
-
 ### 16. `validators/ears_validator.py` — Validador de Requisitos EARS
 
 - **`validate_ears_syntax(requirements: list[Any]) -> ValidationResult`**:
@@ -243,9 +227,6 @@ domain/sdd/
 | `_INSTRUCTION_MAX_LENGTH` | `2000` caracteres | `output_guardrails.py` | Longitud máxima permitida en entradas de usuario |
 | `_BUSINESS_TERMS` | 15 términos | `discovery_diff.py` | Palabras clave para clasificar cambios como `BUSINESS_RULE` |
 | `_STOPWORDS` | 52 palabras | `consistency_filter.py` | Filtro de términos irrelevantes en consistencia downstream |
-| `_DEFAULT_MAX_ACTION_NODES` | `20` | `activity_diagram_validator.py` | Umbral recomendado de nodos de acción por diagrama |
-| `_DEFAULT_MAX_SWIMLANES` | `4` | `activity_diagram_validator.py` | Umbral recomendado de carriles por diagrama |
-| `_DEFAULT_MAX_NESTING_DEPTH` | `3` | `activity_diagram_validator.py` | Máximo nivel de anidamiento recomendado en diagramas |
 | Rango de requisitos por feature | `3` a `15` | `ears_validator.py` | Cantidad admisible de requisitos EARS por característica |
 | Mínimo de categorías EARS | `4` | `ears_validator.py` | Cobertura mínima de patrones sintácticos distintos |
 | Mínimo de criterios por requisito | `2` | `ears_validator.py` | Escenarios de aceptación mínimos requeridos por requisito |

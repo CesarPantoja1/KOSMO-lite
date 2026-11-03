@@ -76,7 +76,6 @@ def test_build_codegen_components_cablea_use_case_con_adaptadores() -> None:
     assert isinstance(components.code_runner, SubprocessCodeRunner)
     assert use_case._feature_repo is repos.features
     assert use_case._requirement_repo is repos.requirements
-    assert use_case._activity_diagram_repo is repos.diagrams
     assert use_case._workspace_manager is components.workspace_manager
     assert use_case._opencode_client is components.opencode_client
     assert use_case._code_runner is components.code_runner

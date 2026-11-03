@@ -13,10 +13,6 @@ from kosmo.contracts.pipeline.phase_outputs import (
     ValidationResult,
 )
 from kosmo.contracts.sdd.document import SpecPhase
-from kosmo.domain.sdd.validators.activity_diagram_validator import (
-    validate_activity_diagram_syntax,
-    wrap_diagram_fragment,
-)
 
 # ═══════════════════════════════════════════════════════════════════
 # Bloques compartidos del builder de prompts
@@ -154,15 +150,6 @@ _REQUIREMENTS_DOWNSTREAM_EXAMPLES = (
     'razon: "La funcionalidad de facturacion electronica fue eliminada."\n\n'
 )
 
-_LEVEL_RULES_MODEL = (
-    "## NIVEL DE ANALISIS: Diagramas de Actividad\n\n"
-    "Los diagramas representan flujos de proceso (actores, pasos, decisiones). "
-    "Analiza a nivel de flujo, no de formato PlantUML. Si cambia el numero de "
-    "pasos o la logica de un proceso, el diagrama esta afectado. Si el cambio "
-    "es cosmetico o solo afecta criterios de aceptacion, el diagrama NO esta "
-    "afectado.\n\n"
-)
-
 _LEVEL_RULES_DISCOVERY = (
     "## NIVEL DE ANALISIS: Descubrimiento\n\n"
     "El Descubrimiento define vision, alcance y reglas de negocio. Evalua "
@@ -183,11 +170,6 @@ def _output_schema(target_artifact: str) -> str:
             '    {{"artifact_id": "<id exacto de la feature, tal como aparece en la lista>", '
             '"action": "update" | "delete", '
             '"rationale": "<explicacion. Incluye codigos REQ-X.Y afectados>"}}'
-        ),
-        "ActivityDiagram": (
-            '    {{"artifact_id": "<id exacto de la feature>", '
-            '"action": "update" | "delete", '
-            '"rationale": "<explicacion en español>"}}'
         ),
         "DiscoveryDocument": (
             '    {{"artifact_id": "<id EXACTO del documento, tal como aparece en la lista de artefactos>", '
@@ -296,32 +278,11 @@ CONSISTENCY_FEATURES_DOWNSTREAM_SYSTEM_PROMPT = build_consistency_prompt(
     extra_rules=_LEVEL_RULES_REQUIREMENTS_DOWNSTREAM + _REQUIREMENTS_DOWNSTREAM_EXAMPLES,
 )
 
-CONSISTENCY_REQUIREMENTS_MODEL_SYSTEM_PROMPT = build_consistency_prompt(
-    direction="downstream",
-    source_label="Requisitos",
-    target_artifact="ActivityDiagram",
-    extra_rules=_LEVEL_RULES_MODEL,
-)
-
 CONSISTENCY_DISCOVERY_REQUIREMENTS_PROMPT = build_consistency_prompt(
     direction="downstream",
     source_label="Descubrimiento",
     target_artifact="EARSRequirement",
     extra_rules=_LEVEL_RULES_REQUIREMENTS_DOWNSTREAM + _REQUIREMENTS_DOWNSTREAM_EXAMPLES,
-)
-
-CONSISTENCY_DISCOVERY_MODEL_PROMPT = build_consistency_prompt(
-    direction="downstream",
-    source_label="Descubrimiento",
-    target_artifact="ActivityDiagram",
-    extra_rules=_LEVEL_RULES_MODEL,
-)
-
-CONSISTENCY_FEATURES_MODEL_PROMPT = build_consistency_prompt(
-    direction="downstream",
-    source_label="Caracteristicas",
-    target_artifact="ActivityDiagram",
-    extra_rules=_LEVEL_RULES_MODEL,
 )
 
 CONSISTENCY_VALIDATE_CREATE_FEATURE_PROMPT = (
@@ -415,20 +376,6 @@ class ConsistencyEvaluationMode:
                     "required": ["feature_id"],
                 },
             ),
-            ToolDefinition(
-                name="get_diagram_for_feature",
-                description="Recupera el diagrama de actividad PlantUML de una caracteristica",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "feature_id": {
-                            "type": "string",
-                            "description": "ID de la caracteristica a consultar (ej. feat_01KT...)",
-                        },
-                    },
-                    "required": ["feature_id"],
-                },
-            ),
         ]
 
     def build_user_prompt(self, context: ConsistencyPhaseContext) -> str:
@@ -462,7 +409,7 @@ class ConsistencyEvaluationMode:
             "Responde UNICAMENTE en el formato JSON especificado."
         )
 
-    def validate_output(self, output: Any, *, context: Any = None) -> ValidationResult:  # noqa: ARG002
+    def validate_output(self, output: Any, *, context: Any = None) -> ValidationResult:  # noqa: ARG002  # noqa: ARG002
         errors: list[str] = []
         if not isinstance(output, ConsistencyDetectionReport):
             errors.append("El output debe ser un ConsistencyDetectionReport.")
@@ -536,8 +483,6 @@ que fue marcado como afectado por cambios aplicados en una fase anterior.
      o 'statement'. 'suggested_before'/'suggested_after' son fragmentos del markdown
      EARS (enunciado, clausula o bloque de requisito). Copia el texto exacto tal como
      aparece en el artefacto. Manten los codigos REQ-X.Y y el formato original.
-   - ActivityDiagram: fragmentos PlantUML. Preserva la sintaxis: @startuml/@enduml,
-     balance de if/endif y fork/end merge.
    - DiscoveryDocument: 'suggested_field' es el titulo de la seccion
      (ej. '## Vision'). 'suggested_before'/'suggested_after' son el contenido
      de la seccion a modificar.
@@ -553,14 +498,6 @@ Responde UNICAMENTE con el siguiente JSON, sin markdown ni texto adicional:
   "suggested_after": "<fragmento corregido>"
 }
 """
-
-
-def _is_diagram_context(context: object) -> bool:
-    return (
-        isinstance(context, ConsistencyPhaseContext)
-        and bool(context.downstream_artifacts)
-        and context.downstream_artifacts[0].artifact_type == "ActivityDiagram"
-    )
 
 
 class ConsistencyCorrectionMode:
@@ -614,7 +551,7 @@ class ConsistencyCorrectionMode:
             "corregido en 'suggested_after'. Responde UNICAMENTE con el JSON especificado."
         )
 
-    def validate_output(self, output: Any, *, context: Any = None) -> ValidationResult:
+    def validate_output(self, output: Any, *, context: Any = None) -> ValidationResult:  # noqa: ARG002
         errors: list[str] = []
         if isinstance(output, ConsistencyCorrection):
             before = output.suggested_before
@@ -628,10 +565,6 @@ class ConsistencyCorrectionMode:
             return ValidationResult(is_valid=False, errors=errors)
         if not before and not after:
             errors.append("La correccion debe incluir 'suggested_before' o 'suggested_after'.")
-        if after and _is_diagram_context(context):
-            diagram_validation = validate_activity_diagram_syntax(wrap_diagram_fragment(after))
-            if not diagram_validation.is_valid:
-                errors.append("El fragmento PlantUML sugerido no es valido: " + "; ".join(diagram_validation.errors))
         return ValidationResult(is_valid=len(errors) == 0, errors=errors)
 
     def build_validation_feedback(self, errors: list[str]) -> str:

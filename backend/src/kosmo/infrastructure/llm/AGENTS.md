@@ -12,7 +12,7 @@ Este módulo implementa los adaptadores de infraestructura para la interacción 
 - **Generación de embeddings vectoriales**:
   - `OpenAIEmbedder`: Generación remota contra `text-embedding-3-small` (1536 dimensiones) para búsqueda semántica en PostgreSQL (pgvector).
   - `FastembedEmbedder`: Alternativa local sin dependencias de API externa basada en `BAAI/all-MiniLM-L6-v2`, ejecutada en hilos asíncronos (`asyncio.to_thread`) para no bloquear el bucle de eventos.
-- **6 Factories de Knowledge Tools**: Herramientas de lectura de contexto inyectables al agente del pipeline SDD para consultar documentos previos, sesiones similares, artefactos downstream, requisitos EARS, diagramas PlantUML y dependencias de trazabilidad.
+- **5 Factories de Knowledge Tools**: Herramientas de lectura de contexto inyectables al agente del pipeline SDD para consultar documentos previos, sesiones similares, artefactos downstream, requisitos EARS, diagramas PlantUML y dependencias de trazabilidad.
 - **Verificación de conectividad HTTP**: Comprobador sin envío de prompts que consulta endpoints de modelos de los proveedores mediante peticiones HTTP GET limpias.
 - **Adaptador No-Op para desarrollo y tests**: Mock completo que devuelve especificaciones sintéticas coherentes (Discovery de 7 secciones, 5 características y requisitos EARS) permitiendo ejecutar el pipeline SDD sin conexión a internet ni consumo de saldo.
 
@@ -145,7 +145,6 @@ Provee 6 funciones constructoras que generan tuplas `(KnowledgeToolDef, Knowledg
 | `build_find_similar_sessions` | `find_similar_sessions` | `query: str`, `project_id: str` (opcional) | `AgentMemoryPort`, `Embedder` | Genera embedding de la consulta, busca k-NN (límite 3 sesiones) excluyendo el proyecto actual. Retorna lista con proyecto, fase, llamadas LLM e instrucciones. | Límite 3 sesiones |
 | `build_get_downstream_artifacts` | `get_downstream_artifacts` | `feature_id: str` | `FeatureRepository` | Recupera la feature por ID y retorna JSON formateado con `id`, `number`, `title`, `description` y `origin`. | Objeto único |
 | `build_get_requirements_for_feature` | `get_requirements_for_feature` | `feature_id: str` | `RequirementRepository` | Llama a `requirement_repo.by_feature_id()`. Retorna el markdown de requisitos EARS de la feature. | Truncado a `4000` chars |
-| `build_get_diagram_for_feature` | `get_diagram_for_feature` | `feature_id: str` | `ActivityDiagramRepository` | Llama a `diagram_repo.by_feature_id()`. Retorna la sintaxis PlantUML del diagrama de actividad. | Truncado a `4000` chars |
 | `build_get_impact` | `get_impact` | `artifact_id: str` | `TraceabilityRepository` | Llama a `traceability_repo.get_impact(artifact_id)`. Lista artefactos `upstream` (de los que depende) y `downstream` (que dependen de él). | Sin truncar |
 
 ---
@@ -233,7 +232,6 @@ No es un simple stub vacío: es un **simulador determinista del pipeline SDD** d
 | `_MAX_AGENTS` | `32` | `pydantic_ai_adapter.py` | Límite LRU de agentes PydanticAI cacheados por `system_prompt` |
 | `_RETRY_ATTEMPTS` | `2` | `pydantic_ai_adapter.py` | Intentos máximos de llamada ante fallos de red en PydanticAI |
 | Truncamiento Requirements EARS | `4000` chars | `knowledge_tools.py` | Máximo de caracteres retornado por `get_requirements_for_feature` |
-| Truncamiento Diagrama PlantUML | `4000` chars | `knowledge_tools.py` | Máximo de caracteres retornado por `get_diagram_for_feature` |
 | Truncamiento Embedding OpenAI | `8000` chars | `embedder.py` | Límite de caracteres enviados a `text-embedding-3-small` |
 | Truncamiento Embedding Local | `2000` chars | `local_embedder.py` | Límite de caracteres enviados a FastEmbed |
 | Timeout Embedder OpenAI | `30` s | `embedder.py` | Timeout de la petición HTTP a la API de embeddings |

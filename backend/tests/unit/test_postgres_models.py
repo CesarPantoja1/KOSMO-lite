@@ -4,7 +4,6 @@ import pytest
 from sqlalchemy import UniqueConstraint
 
 from kosmo.infrastructure.persistence.postgres.models import (
-    ActivityDiagramModel,
     AgentSessionModel,
     ChatMessageModel,
     DiscoveryDocumentModel,
@@ -54,15 +53,6 @@ def test_agent_session_model_has_fk_to_projects() -> None:
     assert fk is not None
     assert fk.parent.name == "project_id"
     assert fk.target_fullname == "projects.id"
-    assert fk.ondelete == "CASCADE"
-
-
-def test_activity_diagram_model_has_fk_to_features() -> None:
-    table = ActivityDiagramModel.__table__
-    fk = next((fk for fk in table.foreign_keys if fk.column.table.name == "features"), None)
-    assert fk is not None
-    assert fk.parent.name == "feature_id"
-    assert fk.target_fullname == "features.id"
     assert fk.ondelete == "CASCADE"
 
 

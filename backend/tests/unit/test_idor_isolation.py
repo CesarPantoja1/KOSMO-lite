@@ -96,7 +96,6 @@ async def test_consistency_evaluation_cross_project_apply_prevented() -> None:
         document_repo=AsyncMock(),
         feature_repo=AsyncMock(),
         requirement_repo=AsyncMock(),
-        diagram_repo=AsyncMock(),
     )
 
     # Act & Assert: Atacante intenta aplicar evaluacion de Alice usando prj_bob

@@ -22,7 +22,6 @@ from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import ConsistencyEvaluationId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
@@ -53,7 +52,6 @@ async def _has_target_artifacts(
     project_id: ProjectId,
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
-    diagram_repo: ActivityDiagramRepository,
     implementation_repo: FeatureImplementationRepository | None = None,
 ) -> bool:
     features = await feature_repo.list_by_project(project_id)
@@ -65,8 +63,6 @@ async def _has_target_artifacts(
 
     for feature in features:
         if target_phase == SpecPhase.REQUISITOS and await requirement_repo.by_feature_id(feature.id):
-            return True
-        if target_phase == SpecPhase.MODELO and await diagram_repo.exists(feature.id):
             return True
         if (
             target_phase == SpecPhase.IMPLEMENTACION
@@ -83,7 +79,6 @@ async def run_consistency_evaluation(
     project_repo: ProjectRepository,
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
-    diagram_repo: ActivityDiagramRepository,
     document_repo: DocumentRepository,
     evaluator: ConsistencyEvaluator,
     evaluation_repo: ConsistencyEvaluationRepository,
@@ -122,7 +117,6 @@ async def run_consistency_evaluation(
                     project_id=project_id,
                     feature_repo=feature_repo,
                     requirement_repo=requirement_repo,
-                    diagram_repo=diagram_repo,
                     implementation_repo=implementation_repo,
                 )
                 if not has_artifacts:
@@ -205,7 +199,6 @@ async def run_consistency_evaluation(
                 source_phase,
                 feature_repo,
                 requirement_repo,
-                diagram_repo,
             )
 
             kept_keys: set[str] = set()
@@ -222,7 +215,6 @@ async def run_consistency_evaluation(
                         document_repo=document_repo,
                         feature_repo=feature_repo,
                         requirement_repo=requirement_repo,
-                        diagram_repo=diagram_repo,
                         implementation_repo=implementation_repo,
                     )
                     snapshot_hash = compute_snapshot_hash(*parts)

@@ -257,14 +257,12 @@ def test_build_prompts() -> None:
     plan_prompt = builder.build_plan_prompt(
         feature=feat,
         req_markdown="REQ-01: Al hacer click en emitir...",
-        diagram_syntax="stateDiagram-v2\n[*] --> Emitir",
         ux_prompt_block="[UX Directives: Admin/Table]",
         project_context="## Contexto del proyecto\n- Nombre: Facturador",
     )
     assert "[UX Directives: Admin/Table]" in plan_prompt
     assert "Facturador" in plan_prompt
     assert "REQ-01: Al hacer click" in plan_prompt
-    assert "stateDiagram-v2" in plan_prompt
     assert "src/features/<slug>/" in plan_prompt
     assert "CERO MOCKS" in plan_prompt
     assert "actions.ts" in plan_prompt
@@ -272,7 +270,6 @@ def test_build_prompts() -> None:
     build_prompt = builder.build_build_prompt(
         feature=feat,
         req_markdown="REQ-01: Al hacer click en emitir...",
-        diagram_syntax="stateDiagram-v2\n[*] --> Emitir",
         ux_prompt_block="[UX Directives: Admin/Table]",
         project_context="## Contexto del proyecto\n- Nombre: Facturador",
         plan_lines="- [create] src/app/facturacion/page.tsx",
@@ -445,7 +442,6 @@ def test_format_product_map_context_and_prompts() -> None:
     plan_prompt = builder.build_plan_prompt(
         feature=feature,
         req_markdown="### REQ-2.1 Cancelar",
-        diagram_syntax="@startuml\n@enduml",
         ux_prompt_block="UX",
         project_context="CTX",
         product_map=pmap,
@@ -459,7 +455,6 @@ def test_format_product_map_context_and_prompts() -> None:
     build_prompt = builder.build_build_prompt(
         feature=feature,
         req_markdown="### REQ-2.1 Cancelar",
-        diagram_syntax="@startuml\n@enduml",
         ux_prompt_block="UX",
         project_context="CTX",
         plan_lines="- [create] src/app/cancelar-cita/page.tsx",

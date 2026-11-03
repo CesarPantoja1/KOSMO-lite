@@ -7,7 +7,6 @@ from kosmo.contracts.memory.agent_memory import AgentMemoryPort
 from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     RequirementRepository,
@@ -188,46 +187,12 @@ def build_get_requirements_for_feature(
     return tool_def, handler
 
 
-def build_get_diagram_for_feature(
-    diagram_repo: ActivityDiagramRepository,
-) -> tuple[KnowledgeToolDef, KnowledgeToolHandler]:
-    tool_def = KnowledgeToolDef(
-        name="get_diagram_for_feature",
-        description="Recupera el diagrama de actividad PlantUML de una caracteristica",
-        parameters={
-            "type": "object",
-            "properties": {
-                "feature_id": {
-                    "type": "string",
-                    "description": "ID de la caracteristica a consultar (ej. feat_01KT...)",
-                },
-            },
-            "required": ["feature_id"],
-        },
-    )
-
-    async def handler(input_data: dict[str, Any]) -> str:
-        feature_id_str = input_data.get("feature_id", "")
-        if not feature_id_str:
-            return "Error: parametro 'feature_id' requerido"
-
-        diagram = await diagram_repo.by_feature_id(FeatureId(feature_id_str))
-        if diagram is None:
-            return f"No se encontro diagrama para la caracteristica {feature_id_str}"
-
-        return diagram.diagram_syntax[:4000]
-
-    return tool_def, handler
-
-
 def build_get_impact(
     traceability_repo: Any,
 ) -> tuple[KnowledgeToolDef, KnowledgeToolHandler]:
     tool_def = KnowledgeToolDef(
         name="get_impact",
-        description=(
-            "Consulta que artefactos dependen de uno dado (features de un requisito, diagramas de un requisito, etc.)"
-        ),
+        description=("Consulta que artefactos dependen de uno dado (features de un requisito, etc.)"),
         parameters={
             "type": "object",
             "properties": {

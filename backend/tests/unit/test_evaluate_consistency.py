@@ -11,13 +11,11 @@ from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId, UserId
 from kosmo.contracts.sdd.project import Project
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     RequirementRepository,
 )
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryDocumentRepository,
     InMemoryFeatureRepository,
     InMemoryProjectRepository,
@@ -106,14 +104,12 @@ def _make_uc(
     agent: AgentPort,
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
-    diagram_repo: ActivityDiagramRepository,
     document_repo: DocumentRepository,
 ) -> EvaluateConsistencyUseCase:
     return EvaluateConsistencyUseCase(
         agent=agent,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
         document_repo=document_repo,
     )
 
@@ -131,11 +127,10 @@ async def test_evaluate_identifies_affected_features() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["feat_01"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_01", before="Alcance original", after="Alcance LATAM")
 
@@ -166,11 +161,10 @@ async def test_evaluate_agent_failure_returns_empty() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(should_fail=True)
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_01")
 
@@ -196,11 +190,10 @@ async def test_evaluate_no_downstream_artifacts_returns_empty() -> None:
 
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["should_not_appear"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_01")
 
@@ -229,11 +222,10 @@ async def test_evaluate_filters_out_unknown_ids() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["feat_04", "feat_fantasma"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_01")
 
@@ -262,11 +254,10 @@ async def test_evaluate_deduplicates_repeated_artifact_ids() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["feat_01", "feat_01"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_01")
 
@@ -298,12 +289,11 @@ async def test_evaluate_fetch_source_content_for_features() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
     document_repo.discovery_docs["prj_005"] = markdown_to_document("## Visión\n\nVisión original.")
 
     agent = StubConsistencyAgent(affected_ids=["prj_005"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_01")
 
@@ -333,11 +323,10 @@ async def test_evaluate_requirements_to_features_uses_correct_skill() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["feat_r2f"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change(
         "chg_r2f", before="procesar pagos con tarjeta", after="procesar pagos con cualquier método"
@@ -375,11 +364,10 @@ async def test_evaluate_fetch_source_content_for_requirements() -> None:
         FeatureId("feat_srcr"),
         "### REQ-1.1\n\nEl sistema shall procesar inventario en tiempo real.\n",
     )
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["feat_srcr"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_srcr", before="procesar inventario", after="procesar inventario en tiempo real")
 
@@ -427,12 +415,11 @@ async def test_evaluate_requirements_to_discovery_uses_upstream_skill() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
     document_repo.discovery_docs["prj_r2d"] = markdown_to_document("## Visión\n\nVisión original.")
 
     agent = StubConsistencyAgent(affected_ids=["prj_r2d"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_r2d")
 
@@ -479,7 +466,6 @@ async def test_evaluate_empty_changes_uses_automatic_diff() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
     await document_repo.save_version(
         ProjectId("prj_diff"),
@@ -492,7 +478,7 @@ async def test_evaluate_empty_changes_uses_automatic_diff() -> None:
     )
 
     agent = StubConsistencyAgent(affected_ids=["feat_diff"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     # Act
     result = await uc.evaluate(
@@ -526,11 +512,10 @@ async def test_evaluate_empty_changes_without_previous_version_returns_no_impact
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = StubConsistencyAgent(affected_ids=["feat_nov"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     # Act
     result = await uc.evaluate(
@@ -659,7 +644,6 @@ async def test_evaluate_logs_actions_discarded_summary() -> None:
     await feature_repo.save(_make_feature("feat_bad", "prj_sum", "Feature con Mismatch", number=2))
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = _DictOutputAgent(
@@ -687,7 +671,7 @@ async def test_evaluate_logs_actions_discarded_summary() -> None:
             },
         ]
     )
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_sum")
 
@@ -733,8 +717,6 @@ async def test_enrich_impact_logs_when_ears_parsing_fails() -> None:
         FeatureId("feat_enr"),
         "### REQ-1.1\n\nEl sistema shall registrar el catálogo.\n",
     )
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     result = ConsistencyEvaluationOutput(
         report_id="cnr_enr",
         status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
@@ -758,7 +740,6 @@ async def test_enrich_impact_logs_when_ears_parsing_fails() -> None:
             SpecPhase.DESCUBRIMIENTO,
             feature_repo,
             requirement_repo,
-            diagram_repo,
         )
 
     # Assert
@@ -783,7 +764,6 @@ async def test_evaluate_detection_keeps_impact_despite_mismatched_before() -> No
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = _TwoPhaseAgent(
@@ -807,7 +787,7 @@ async def test_evaluate_detection_keeps_impact_despite_mismatched_before() -> No
             }
         },
     )
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_p1")
 
@@ -841,7 +821,6 @@ async def test_evaluate_delete_action_skips_correction_call() -> None:
     await feature_repo.save(feat)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = _TwoPhaseAgent(
@@ -856,7 +835,7 @@ async def test_evaluate_delete_action_skips_correction_call() -> None:
             "overall_rationale": "Eliminación",
         }
     )
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_del")
 
@@ -891,20 +870,10 @@ async def test_evaluate_correction_receives_full_artifact_content() -> None:
     feat = _make_feature("feat_full", "prj_full", "Flujo complejo", number=1)
     await feature_repo.save(feat)
 
-    diagram_repo = InMemoryActivityDiagramRepository()
-    from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
-    from kosmo.contracts.sdd.ids import ActivityDiagramId
-
-    long_syntax = "@startuml\nstart\n" + (":procesar paso;\n" * 700) + "stop\n@enduml"
-    await diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("feat_full"),
-            feature_id=FeatureId("feat_full"),
-            diagram_syntax=long_syntax,
-        )
-    )
-
     requirement_repo = InMemoryRequirementRepository()
+    long_syntax = "### REQ-1.1\n" + (":procesar paso;\n" * 700) + "stop\n"
+    await requirement_repo.save(FeatureId("feat_full"), long_syntax)
+
     document_repo = InMemoryDocumentRepository()
 
     agent = _TwoPhaseAgent(
@@ -920,31 +889,31 @@ async def test_evaluate_correction_receives_full_artifact_content() -> None:
         },
         corrections={
             "feat_full": {
-                "suggested_before": "stop\n@enduml",
-                "suggested_after": "fin\n@enduml",
+                "suggested_before": "stop\n",
+                "suggested_after": "fin\n",
             }
         },
     )
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_full")
 
     # Act
     result = await uc.evaluate(
-        source_phase=SpecPhase.REQUISITOS,
-        target_phase=SpecPhase.MODELO,
+        source_phase=SpecPhase.DESCUBRIMIENTO,
+        target_phase=SpecPhase.REQUISITOS,
         project_id=ProjectId("prj_full"),
         applied_changes=[change],
     )
 
-    # Assert: el contexto de corrección trae el diagrama completo (sin marca de truncado)
+    # Assert: el contexto de corrección trae el contenido completo (sin marca de truncado)
     assert result.affected_artifact_ids == ["feat_full"]
     correction_ctx = agent.contexts[1]
     assert isinstance(correction_ctx, ConsistencyPhaseContext)
     full_description = correction_ctx.downstream_artifacts[0].description
     assert len(full_description) > 8000
     assert "[…contenido truncado…]" not in full_description
-    assert full_description.endswith("stop\n@enduml")
+    assert full_description.endswith("stop\n")
 
 
 @pytest.mark.unit
@@ -963,7 +932,6 @@ async def test_evaluate_prefilters_artifacts_before_detection() -> None:
     await feature_repo.save(_make_feature("feat_other", "prj_pref", "Gestión de pagos", number=2))
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     agent = _TwoPhaseAgent(
@@ -978,7 +946,7 @@ async def test_evaluate_prefilters_artifacts_before_detection() -> None:
             }
         },
     )
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_pref", before="se elimina el producto X", after="se elimina el producto Y")
 
@@ -1010,7 +978,6 @@ def test_consistency_evaluation_mode_exposes_knowledge_tools() -> None:
 
     # Assert
     assert "get_requirements_for_feature" in tool_names
-    assert "get_diagram_for_feature" in tool_names
     assert getattr(mode, "requires_tool_consultation", True) is True
     assert mode.requires_enrichment is False
 
@@ -1031,7 +998,6 @@ async def test_evaluate_skips_when_only_cosmetic_changes() -> None:
     await feature_repo.save(_make_feature("feat_cos", "prj_cos", "Gestión de catálogo", number=1))
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
     await document_repo.save_version(
         ProjectId("prj_cos"),
@@ -1042,7 +1008,7 @@ async def test_evaluate_skips_when_only_cosmetic_changes() -> None:
     document_repo.discovery_docs["prj_cos"] = markdown_to_document("## Visión\n\nVisión  original.")
 
     agent = StubConsistencyAgent(affected_ids=["feat_cos"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     # Act
     result = await uc.evaluate(
@@ -1072,12 +1038,11 @@ async def test_evaluate_runs_with_chat_change_despite_cosmetic_diff() -> None:
     await feature_repo.save(_make_feature("feat_cos2", "prj_cos2", "Gestión de catálogo", number=1))
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
     document_repo.discovery_docs["prj_cos2"] = markdown_to_document("## Visión\n\nVisión original.")
 
     agent = StubConsistencyAgent(affected_ids=["feat_cos2"])
-    uc = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    uc = _make_uc(agent, feature_repo, requirement_repo, document_repo)
 
     change = _applied_change("chg_cos2", before="visión original", after="visión ampliada")
 
@@ -1118,8 +1083,6 @@ async def test_enrich_impact_requirements_with_statement_fragment() -> None:
     )
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(FeatureId("feat_pedidos"), req_md)
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     result = ConsistencyEvaluationOutput(
         report_id="cnr_req_test",
         status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
@@ -1149,7 +1112,6 @@ async def test_enrich_impact_requirements_with_statement_fragment() -> None:
         SpecPhase.DESCUBRIMIENTO,
         feature_repo,
         requirement_repo,
-        diagram_repo,
     )
 
     # Assert
@@ -1193,8 +1155,6 @@ async def test_enrich_impact_requirements_with_actor_subphrase_fragment() -> Non
     )
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(FeatureId("feat_pedidos2"), req_md)
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     result = ConsistencyEvaluationOutput(
         report_id="cnr_req_test2",
         status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
@@ -1217,7 +1177,6 @@ async def test_enrich_impact_requirements_with_actor_subphrase_fragment() -> Non
         SpecPhase.DESCUBRIMIENTO,
         feature_repo,
         requirement_repo,
-        diagram_repo,
     )
 
     # Assert
@@ -1259,8 +1218,6 @@ async def test_enrich_impact_requirements_direct_match_by_display_id() -> None:
     )
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(FeatureId("feat_pedidos3"), req_md)
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     result = ConsistencyEvaluationOutput(
         report_id="cnr_req_direct",
         status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
@@ -1283,7 +1240,6 @@ async def test_enrich_impact_requirements_direct_match_by_display_id() -> None:
         SpecPhase.DESCUBRIMIENTO,
         feature_repo,
         requirement_repo,
-        diagram_repo,
     )
 
     assert len(items) == 1
@@ -1337,8 +1293,6 @@ async def test_enrich_impact_feature_diff_no_muestra_origen() -> None:
         ],
     )
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     # Act
     items = await enrich_impact_items(
         result,
@@ -1346,7 +1300,6 @@ async def test_enrich_impact_feature_diff_no_muestra_origen() -> None:
         SpecPhase.DESCUBRIMIENTO,
         feature_repo,
         requirement_repo,
-        diagram_repo,
     )
 
     # Assert — el usuario solo ve la descripción, sin "Origen:"
@@ -1364,8 +1317,6 @@ async def test_enrich_impact_feature_diff_no_muestra_origen() -> None:
 async def test_cascading_consistency_end_to_end_actor_removal() -> None:
     """La eliminación de un actor genera impactos en características, requisitos y modelo."""
     from kosmo.application.consistency.cascade_consistency import CascadingConsistencyUseCase
-    from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
-    from kosmo.contracts.sdd.ids import ActivityDiagramId
 
     # Arrange
     project = _make_project("prj_cascade")
@@ -1385,18 +1336,6 @@ async def test_cascading_consistency_end_to_end_actor_removal() -> None:
     )
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(FeatureId("feat_pedidos"), req_md)
-
-    diagram_repo = InMemoryActivityDiagramRepository()
-    diagram_syntax = (
-        "@startuml\n|Colaborador de tienda|\nstart\n:Confirmar pedido;\n|Sistema|\n:Descontar stock;\nstop\n@enduml"
-    )
-    await diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("feat_pedidos"),
-            feature_id=FeatureId("feat_pedidos"),
-            diagram_syntax=diagram_syntax,
-        )
-    )
 
     document_repo = InMemoryDocumentRepository()
 
@@ -1427,12 +1366,11 @@ async def test_cascading_consistency_end_to_end_actor_removal() -> None:
         },
     )
 
-    evaluator = _make_uc(agent, feature_repo, requirement_repo, diagram_repo, document_repo)
+    evaluator = _make_uc(agent, feature_repo, requirement_repo, document_repo)
     cascade_uc = CascadingConsistencyUseCase(
         project_repo=project_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
         evaluator=evaluator,
     )
 
@@ -1495,7 +1433,6 @@ async def test_evaluate_implementation_marks_status_requires_review() -> None:
     await feature_repo.save(feature)
 
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     impl_repo = InMemoryFeatureImplementationRepository()
@@ -1518,7 +1455,6 @@ async def test_evaluate_implementation_marks_status_requires_review() -> None:
         agent=agent,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
         document_repo=document_repo,
         implementation_repo=impl_repo,
     )
@@ -1543,7 +1479,6 @@ async def test_evaluate_implementation_marks_status_requires_review() -> None:
 async def test_fetch_downstream_artifacts_does_not_truncate_large_documents() -> None:
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    diagram_repo = InMemoryActivityDiagramRepository()
     document_repo = InMemoryDocumentRepository()
 
     project = _make_project("prj_large_doc")
@@ -1580,7 +1515,6 @@ async def test_fetch_downstream_artifacts_does_not_truncate_large_documents() ->
         agent=StubConsistencyAgent(),
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
         document_repo=document_repo,
     )
 
@@ -1625,8 +1559,6 @@ async def test_enrich_impact_concurrent_preloading_and_deduplication() -> None:
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(FeatureId("feat_batch_1"), req_md1)
     await requirement_repo.save(FeatureId("feat_batch_2"), req_md2)
-    diagram_repo = InMemoryActivityDiagramRepository()
-
     original_by_id = feature_repo.by_id
     by_id_calls: list[str] = []
 
@@ -1660,7 +1592,6 @@ async def test_enrich_impact_concurrent_preloading_and_deduplication() -> None:
         SpecPhase.DESCUBRIMIENTO,
         feature_repo,
         requirement_repo,
-        diagram_repo,
     )
 
     # Solo debe haber consultado 2 veces por ID único a pesar de tener 3 IDs en affected_artifact_ids
@@ -1671,51 +1602,3 @@ async def test_enrich_impact_concurrent_preloading_and_deduplication() -> None:
     assert items[0].target_id == "feat_batch_1"
     assert items[1].target_id == "feat_batch_2"
     assert items[2].target_id == "feat_batch_1"
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_enrich_impact_modelo_concurrent_preloading() -> None:
-    """Verifica que enrich_impact_items para modelo verifique existencia concurrentemente."""
-    from kosmo.application.consistency.enrich_impact import enrich_impact_items
-    from kosmo.contracts.ai.consistency import (
-        ArtifactAction,
-        ConsistencyEvaluationOutput,
-        ConsistencyStatus,
-    )
-    from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
-    from kosmo.contracts.sdd.ids import ActivityDiagramId
-
-    feature_repo = InMemoryFeatureRepository()
-    feat = _make_feature("feat_m1", "prj_m", "Modelo Feature", number=1)
-    await feature_repo.save(feat)
-
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("feat_m1"),
-            feature_id=FeatureId("feat_m1"),
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
-    requirement_repo = InMemoryRequirementRepository()
-
-    result = ConsistencyEvaluationOutput(
-        report_id="cnr_m",
-        status=ConsistencyStatus.ANALIZADO_CON_IMPACTO,
-        affected_artifact_ids=["feat_m1"],
-        actions=[ArtifactAction(artifact_id="feat_m1", action="update", rationale="Cambio UML")],
-    )
-
-    items = await enrich_impact_items(
-        result,
-        SpecPhase.MODELO,
-        SpecPhase.REQUISITOS,
-        feature_repo,
-        requirement_repo,
-        diagram_repo,
-    )
-
-    assert len(items) == 1
-    assert items[0].artifact_type == "ActivityDiagram"
-    assert items[0].target_id == "feat_m1"

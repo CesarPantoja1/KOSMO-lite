@@ -27,7 +27,7 @@ def _make_evaluation(
         id=ConsistencyEvaluationId(eval_id),
         project_id=ProjectId(project_id),
         source_phase=SpecPhase.REQUISITOS,
-        target_phase=SpecPhase.MODELO,
+        target_phase=SpecPhase.IMPLEMENTACION,
         target_artifact_id="art_01",
         artifact_type="feature",
         snapshot_hash="hash123",

@@ -533,7 +533,7 @@ async def test_agents_md_content_and_structure() -> None:
         assert "TypeScript" in content
         assert "Tailwind CSS" in content
         assert "get_requirements" in content
-        assert "get_activity_diagram" in content
+        assert "get_activity_diagram" not in content
         assert "src/" in content
         assert "tests/" in content
 

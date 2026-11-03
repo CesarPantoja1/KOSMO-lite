@@ -16,7 +16,6 @@ from kosmo.contracts.sdd.document import SPEC_TO_API_PHASE, SpecPhase
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.ids import ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     FeatureRepository,
     ProjectRepository,
     RequirementRepository,
@@ -43,13 +42,11 @@ class CascadingConsistencyUseCase:
         project_repo: ProjectRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         evaluator: ConsistencyEvaluator,
     ) -> None:
         self._project_repo = project_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._evaluator = evaluator
 
     async def execute(
@@ -96,7 +93,6 @@ class CascadingConsistencyUseCase:
                     source_phase,
                     self._feature_repo,
                     self._requirement_repo,
-                    self._diagram_repo,
                 )
                 return [impact_item_to_dict(item) for item in items]
             except Exception:
@@ -205,7 +201,6 @@ class CascadingConsistencyUseCase:
                     source_phase,
                     self._feature_repo,
                     self._requirement_repo,
-                    self._diagram_repo,
                 )
             except Exception:
                 _log.warning(
@@ -297,7 +292,6 @@ def _phase_label(spec: SpecPhase) -> str:
         SpecPhase.DESCUBRIMIENTO: "Descubrimiento",
         SpecPhase.CARACTERISTICAS: "Características",
         SpecPhase.REQUISITOS: "Requisitos",
-        SpecPhase.MODELO: "Modelo",
         SpecPhase.IMPLEMENTACION: "Implementación",
     }
     return labels.get(spec, spec.value)

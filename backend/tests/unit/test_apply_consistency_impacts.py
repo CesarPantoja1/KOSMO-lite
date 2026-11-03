@@ -8,7 +8,6 @@ from kosmo.contracts.sdd.ids import FeatureId, ProjectId, UserId
 from kosmo.contracts.sdd.project import Project
 from kosmo.domain.sdd.document_converters import document_to_markdown, markdown_to_document
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryDocumentRepository,
     InMemoryFeatureRepository,
     InMemoryProjectRepository,
@@ -47,7 +46,6 @@ def _make_uc(
     *,
     feature_repo: InMemoryFeatureRepository | None = None,
     requirement_repo: InMemoryRequirementRepository | None = None,
-    diagram_repo: InMemoryActivityDiagramRepository | None = None,
     traceability: InMemoryTraceabilityRepository | None = None,
 ) -> ApplyConsistencyImpactsUseCase:
     uow = InMemoryUnitOfWork(
@@ -55,7 +53,6 @@ def _make_uc(
         documents=document_repo,
         features=feature_repo,
         requirements=requirement_repo,
-        diagrams=diagram_repo,
         traceability=traceability,
     )
     return ApplyConsistencyImpactsUseCase(uow=uow)
@@ -216,7 +213,7 @@ async def test_apply_requirement_update_rebuilds_traceability_edges() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_apply_feature_delete_cascades_requirements_and_diagram() -> None:
+async def test_apply_feature_delete_cascades_requirements() -> None:
     # Arrange: feature con requisitos y diagrama — el delete debe borrarlos en cascada
     project = _make_project()
     project_repo = InMemoryProjectRepository()
@@ -229,14 +226,11 @@ async def test_apply_feature_delete_cascades_requirements_and_diagram() -> None:
         FeatureId("feat_01"),
         "### REQ-1.1 Procesamiento de pagos\n\nEl sistema debe procesar pagos.\n",
     )
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await _seed_diagram(diagram_repo, "feat_01")
     uc = _make_uc(
         project_repo,
         document_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
     )
 
     # Act
@@ -259,7 +253,6 @@ async def test_apply_feature_delete_cascades_requirements_and_diagram() -> None:
     assert len(result.failed) == 0
     assert await feature_repo.by_id(FeatureId("feat_01")) is None
     assert await requirement_repo.by_feature_id(FeatureId("feat_01")) is None
-    assert await diagram_repo.by_feature_id(FeatureId("feat_01")) is None
 
 
 @pytest.mark.unit
@@ -440,7 +433,7 @@ async def test_apply_feature_origin_field_se_mantiene_directo() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_apply_locks_requirement_and_diagram_rows() -> None:
+async def test_apply_locks_requirement_rows() -> None:
     # Arrange
     project = _make_project()
     project_repo = InMemoryProjectRepository()
@@ -453,16 +446,14 @@ async def test_apply_locks_requirement_and_diagram_rows() -> None:
         FeatureId("feat_01"),
         "### REQ-1.1 Procesamiento de pagos\n\nEl sistema debe procesar pagos.\n",
     )
-    diagram_repo = InMemoryActivityDiagramRepository()
     uc = _make_uc(
         project_repo,
         document_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
     )
 
-    # Act — dos impactos, cada uno sobre su artefacto destino
+    # Act
     result = await uc.execute(
         project_id=project.id,
         impacts=[
@@ -474,126 +465,13 @@ async def test_apply_locks_requirement_and_diagram_rows() -> None:
                 "before": "El sistema debe procesar pagos.",
                 "after": "El sistema debe procesar pagos con tarjeta.",
             },
-            {
-                "artifact_type": "ActivityDiagram",
-                "target_id": "feat_01",
-                "action": "update",
-                "field": "estructura UML",
-                "before": "@startuml",
-                "after": "@enduml",
-            },
-        ],
-    )
-
-    # Assert — requisitos aplicado; diagrama sin datos existentes falla con lock registrado
-    assert len(result.applied) == 1
-    assert len(result.failed) == 1
-    assert "feat_01" in requirement_repo.locked_feature_ids
-    assert "feat_01" in diagram_repo.locked_feature_ids
-
-
-_VALID_DIAGRAM = "@startuml\nstart\n|Sistema|\n:Registrar pago;\nstop\n@enduml"
-
-
-async def _seed_diagram(diagram_repo: InMemoryActivityDiagramRepository, feature_id: str) -> None:
-    from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
-    from kosmo.contracts.sdd.ids import ActivityDiagramId
-
-    await diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId(feature_id),
-            feature_id=FeatureId(feature_id),
-            diagram_syntax=_VALID_DIAGRAM,
-        )
-    )
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_apply_diagram_update_breaking_validation_fails() -> None:
-    """Un apply que rompe la sintaxis PlantUML debe fallar sin persistir el diagrama."""
-    # Arrange
-    project = _make_project()
-    project_repo = InMemoryProjectRepository()
-    await project_repo.save(project)
-    document_repo = InMemoryDocumentRepository()
-    feature_repo = InMemoryFeatureRepository()
-    await feature_repo.save(_make_feature(project.id))
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await _seed_diagram(diagram_repo, "feat_01")
-    uc = _make_uc(
-        project_repo,
-        document_repo,
-        feature_repo=feature_repo,
-        diagram_repo=diagram_repo,
-    )
-
-    # Act
-    result = await uc.execute(
-        project_id=project.id,
-        impacts=[
-            {
-                "artifact_type": "ActivityDiagram",
-                "target_id": "feat_01",
-                "action": "update",
-                "field": "estructura UML",
-                "before": "@enduml",
-                "after": "",
-            }
-        ],
-    )
-
-    # Assert: el apply falla con error claro y el diagrama original sigue intacto
-    assert len(result.applied) == 0
-    assert len(result.failed) == 1
-    assert "sintaxis" in result.failed[0].reason
-    saved = await diagram_repo.by_feature_id(FeatureId("feat_01"))
-    assert saved is not None
-    assert saved.diagram_syntax.endswith("@enduml")
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_apply_diagram_valid_update_persists() -> None:
-    """Un apply que mantiene la sintaxis PlantUML válida debe persistirse correctamente."""
-    # Arrange
-    project = _make_project()
-    project_repo = InMemoryProjectRepository()
-    await project_repo.save(project)
-    document_repo = InMemoryDocumentRepository()
-    feature_repo = InMemoryFeatureRepository()
-    await feature_repo.save(_make_feature(project.id))
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await _seed_diagram(diagram_repo, "feat_01")
-    uc = _make_uc(
-        project_repo,
-        document_repo,
-        feature_repo=feature_repo,
-        diagram_repo=diagram_repo,
-    )
-
-    # Act
-    result = await uc.execute(
-        project_id=project.id,
-        impacts=[
-            {
-                "artifact_type": "ActivityDiagram",
-                "target_id": "feat_01",
-                "action": "update",
-                "field": "estructura UML",
-                "before": ":Registrar pago;",
-                "after": ":Registrar pago con tarjeta;",
-            }
         ],
     )
 
     # Assert
     assert len(result.applied) == 1
     assert len(result.failed) == 0
-    saved = await diagram_repo.by_feature_id(FeatureId("feat_01"))
-    assert saved is not None
-    assert "Registrar pago con tarjeta" in saved.diagram_syntax
-    assert saved.diagram_syntax.endswith("@enduml")
+    assert "feat_01" in requirement_repo.locked_feature_ids
 
 
 @pytest.mark.unit

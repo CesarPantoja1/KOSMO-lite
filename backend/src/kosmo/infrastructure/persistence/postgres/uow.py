@@ -11,16 +11,12 @@ from kosmo.contracts.ai.consistency import TraceabilityRepository
 from kosmo.contracts.persistence.persistence import OutboxPort
 from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
     RequirementRepository,
 )
 from kosmo.infrastructure.persistence.postgres.outbox import OutboxStore
-from kosmo.infrastructure.persistence.postgres.repositories.activity_diagram_repo import (
-    SqlAlchemyActivityDiagramRepository,
-)
 from kosmo.infrastructure.persistence.postgres.repositories.chat_repo import SqlAlchemyChatRepository
 from kosmo.infrastructure.persistence.postgres.repositories.document_repo import (
     SqlAlchemyDocumentRepository,
@@ -49,7 +45,6 @@ class _UowContext:
     documents: DocumentRepository
     features: FeatureRepository
     requirements: RequirementRepository
-    diagrams: ActivityDiagramRepository
     implementations: FeatureImplementationRepository
     chat: ChatRepository
     traceability: TraceabilityRepository
@@ -105,10 +100,6 @@ class SqlAlchemyUnitOfWork:
         return self._current.requirements
 
     @property
-    def diagrams(self) -> ActivityDiagramRepository:
-        return self._current.diagrams
-
-    @property
     def implementations(self) -> FeatureImplementationRepository:
         return self._current.implementations
 
@@ -132,7 +123,6 @@ class SqlAlchemyUnitOfWork:
             documents=SqlAlchemyDocumentRepository(session=session),
             features=SqlAlchemyFeatureRepository(session=session),
             requirements=SqlAlchemyRequirementRepository(session=session),
-            diagrams=SqlAlchemyActivityDiagramRepository(session=session),
             implementations=SqlAlchemyFeatureImplementationRepository(session=session),
             chat=SqlAlchemyChatRepository(session=session),
             traceability=SqlAlchemyTraceabilityRepository(session=session),

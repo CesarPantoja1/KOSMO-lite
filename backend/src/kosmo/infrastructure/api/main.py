@@ -35,7 +35,6 @@ from kosmo.infrastructure.api.routers.implementations import router as implement
 from kosmo.infrastructure.api.routers.integrations import router as integrations_router
 from kosmo.infrastructure.api.routers.knowledge import router as knowledge_router
 from kosmo.infrastructure.api.routers.mcp import router as mcp_router
-from kosmo.infrastructure.api.routers.modelo import router as modelo_router
 from kosmo.infrastructure.api.routers.projects import router as projects_router
 from kosmo.infrastructure.api.routers.requirement_chat import router as requirement_chat_router
 from kosmo.infrastructure.api.routers.requirements import router as requirements_router
@@ -99,13 +98,6 @@ _OPENAPI_TAGS = [
             "Generación y gestión de requisitos EARS por característica mediante IA. "
             "Permite generar requisitos a partir del documento de descubrimiento y la "
             "característica seleccionada, consultarlos y actualizar su contenido en Markdown."
-        ),
-    },
-    {
-        "name": "modelo",
-        "description": (
-            "Generación y consulta de diagramas de actividad PlantUML por característica mediante IA. "
-            "Permite generar diagramas UML a partir de los requisitos EARS y consultar los diagramas generados."
         ),
     },
     {
@@ -252,7 +244,6 @@ def _make_outbox_handler(container: AppContainer) -> OutboxHandler:
                 project_repo=container.repos.projects,
                 feature_repo=container.repos.features,
                 requirement_repo=container.repos.requirements,
-                diagram_repo=container.repos.diagrams,
                 document_repo=container.repos.documents,
                 evaluator=container.pipeline.consistency_evaluator,
                 evaluation_repo=container.repos.consistency_evaluations,
@@ -281,7 +272,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         )
     app.state.container = components
     app.state.requirement_repo = components.repos.requirements
-    app.state.diagram_repo = components.repos.diagrams
 
     outbox_task = asyncio.create_task(run_outbox_worker(components.pipeline.outbox, _make_outbox_handler(components)))
 
@@ -525,7 +515,6 @@ app.include_router(feature_chat_router)
 app.include_router(requirements_router)
 app.include_router(requirement_chat_router)
 app.include_router(chat_sessions_router)
-app.include_router(modelo_router)
 app.include_router(consistency_router)
 app.include_router(schemas_router)
 app.include_router(knowledge_router)

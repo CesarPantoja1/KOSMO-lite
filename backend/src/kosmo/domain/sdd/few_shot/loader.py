@@ -9,7 +9,6 @@ _FILES = {
     SpecPhase.DESCUBRIMIENTO: "discovery_example.md",
     SpecPhase.CARACTERISTICAS: "features_example.md",
     SpecPhase.REQUISITOS: "ears_example.md",
-    SpecPhase.MODELO: "modelo_example.md",
 }
 
 

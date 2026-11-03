@@ -21,23 +21,19 @@ from kosmo.contracts.sdd.errors import (
     ConsistencyStaleError,
     ProjectNotFoundError,
 )
-from kosmo.contracts.sdd.ids import ConsistencyEvaluationId, FeatureId, ProjectId
+from kosmo.contracts.sdd.ids import ConsistencyEvaluationId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     RequirementRepository,
 )
 from kosmo.domain.sdd.consistency_snapshot import compute_snapshot_hash
-from kosmo.domain.sdd.plan_diffs import apply_change_diff
-from kosmo.domain.sdd.validators.activity_diagram_validator import validate_activity_diagram_syntax
 
 _log = structlog.get_logger(__name__)
 
 _REVIEW_TARGET_PHASES = (
     SpecPhase.CARACTERISTICAS,
     SpecPhase.REQUISITOS,
-    SpecPhase.MODELO,
     SpecPhase.IMPLEMENTACION,
 )
 
@@ -106,14 +102,12 @@ class GetConsistencyReviewUseCase:
         document_repo: DocumentRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         implementation_repo: FeatureImplementationRepository | None = None,
     ) -> None:
         self._evaluation_repo = evaluation_repo
         self._document_repo = document_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._implementation_repo = implementation_repo
 
     async def execute(self, project_id: ProjectId, target_phase: SpecPhase) -> list[ReviewCard]:
@@ -134,7 +128,6 @@ class GetConsistencyReviewUseCase:
                     document_repo=self._document_repo,
                     feature_repo=self._feature_repo,
                     requirement_repo=self._requirement_repo,
-                    diagram_repo=self._diagram_repo,
                     implementation_repo=self._implementation_repo,
                 )
             except Exception:
@@ -152,42 +145,9 @@ class GetConsistencyReviewUseCase:
                 )
                 continue
 
-            cards.append(_card_from_row(await self._enrich_diagram_diff(row)))
+            cards.append(_card_from_row(row))
 
         return cards
-
-    async def _enrich_diagram_diff(self, row: ConsistencyEvaluation) -> ConsistencyEvaluation:
-        """Inyecta el diagrama completo (anterior y propuesto) en el diff de un card de actividad."""
-        if row.artifact_type != "ActivityDiagram":
-            return row
-        result = dict(row.result or {})
-        diff_raw = result.get("diff")
-        if not isinstance(diff_raw, dict):
-            return row
-        diff_dict: dict[str, object] = diff_raw  # type: ignore[reportUnknownVariableType]
-        before = str(diff_dict.get("before", ""))
-        after = str(diff_dict.get("after", ""))
-        if not before and not after:
-            return row
-        try:
-            diagram = await self._diagram_repo.by_feature_id(FeatureId(row.target_artifact_id))
-        except Exception:
-            _log.debug("manage_consistency.diagram_fetch_failed", artifact_id=row.target_artifact_id, exc_info=True)
-            return row
-        if diagram is None:
-            return row
-        after_full = apply_change_diff(diagram.diagram_syntax, before=before, after=after)
-        if after_full is None:
-            return row
-        if not validate_activity_diagram_syntax(diagram.diagram_syntax).is_valid:
-            return row
-        if not validate_activity_diagram_syntax(after_full).is_valid:
-            return row
-        enriched_diff = dict(diff_dict)
-        enriched_diff["before_diagram"] = diagram.diagram_syntax
-        enriched_diff["after_diagram"] = after_full
-        result["diff"] = enriched_diff
-        return dataclasses.replace(row, result=result)
 
 
 class ApplyConsistencyEvaluationUseCase:
@@ -199,7 +159,6 @@ class ApplyConsistencyEvaluationUseCase:
         document_repo: DocumentRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         implementation_repo: FeatureImplementationRepository | None = None,
     ) -> None:
         self._evaluation_repo = evaluation_repo
@@ -207,7 +166,6 @@ class ApplyConsistencyEvaluationUseCase:
         self._document_repo = document_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._implementation_repo = implementation_repo
 
     async def execute(
@@ -234,7 +192,6 @@ class ApplyConsistencyEvaluationUseCase:
             document_repo=self._document_repo,
             feature_repo=self._feature_repo,
             requirement_repo=self._requirement_repo,
-            diagram_repo=self._diagram_repo,
             implementation_repo=self._implementation_repo,
         )
         if compute_snapshot_hash(*parts) != row.snapshot_hash:

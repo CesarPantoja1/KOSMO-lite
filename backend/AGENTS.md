@@ -37,12 +37,11 @@
 
 KOSMO es una plataforma de **Spec-Driven Development (SDD)** (*Desarrollo Guiado por Especificaciones*) asistida por Inteligencia Artificial. Su objetivo fundamental es transformar una idea de negocio en una aplicación web funcional, testeada y desplegable, garantizando trazabilidad rigurosa y consistencia en cascada unidireccional (*downstream-only / right-only*) en cada etapa.
 
-El pipeline central se compone de cinco fases secuenciales e interconectadas:
+El pipeline central se compone de cuatro fases secuenciales e interconectadas:
 1. **Descubrimiento (Business Level):** Definición del problema, espacio de valor, actores, metas medibles y reglas de negocio estructurado en **exactamente 7 secciones canónicas de Markdown** (`DISCOVERY_SECTIONS`).
 2. **Características (User Level):** Desglose del producto en capacidades de interacción del usuario codificadas secuencialmente (`C01`, `C02`, ...), con títulos de acción breves (máximo 6 palabras), descripción de interacción de 1-2 oraciones y justificación trazable a las secciones del Descubrimiento.
 3. **Requisitos (Software Level):** Especificación formal del comportamiento del software bajo notación **EARS** (*Easy Approach to Requirements Syntax*), clasificados en 6 patrones formales con criterios de aceptación estructurados en formato **Given-When-Then (GWT)**.
-4. **Modelo (Behavioral Level):** Diagramas de actividad en sintaxis moderna PlantUML estructurados por swimlanes (máximo 4 carriles y 20 nodos de acción) que modelan los flujos de decisión y control del sistema.
-5. **Implementación (Code Level):** Generación autónoma de código frontend en Next.js 16 (App Router), React 19, TypeScript estricto, Drizzle ORM (SQLite) y Vitest mediante agentes headless de OpenCode, con bucle de validación y auto-reparación determinista y sincronización a GitHub/Railway.
+4. **Implementación (Code Level):** Generación autónoma de código frontend en Next.js 16 (App Router), React 19, TypeScript estricto, Drizzle ORM (SQLite) y Vitest mediante agentes headless de OpenCode, con bucle de validación y auto-reparación determinista y sincronización a GitHub/Railway.
 
 ---
 
@@ -193,7 +192,6 @@ src/kosmo/
 │   │   ├── phase_errors.py                   # PhaseTransitionError, PhaseNotSupportedError
 │   │   └── phase_outputs.py                  # ValidationResult, DTOs de salida, esquemas Pydantic
 │   └── sdd/                                  # Bounded context SDD Core
-│       ├── activity_diagram.py               # DiagramaActividad entity
 │       ├── codegen.py                        # Contratos de Codegen, OpenCode, CodeRunner, Workspace
 │       ├── document.py                       # RichTextDocument AST, SpecPhase, EARSPattern
 │       ├── ears.py                           # EARSRequirement entity
@@ -231,7 +229,6 @@ src/kosmo/
 │   │   │   ├── ears_mode.py                  # Generación de Requisitos EARS
 │   │   │   ├── requirements_chat_mode.py     # Chat sobre Requisitos
 │   │   │   ├── requirements_refine_mode.py   # Refinamiento de Requisitos EARS
-│   │   │   ├── modelo_mode.py                # Generación de Diagramas PlantUML
 │   │   │   ├── consistency_evaluation_mode.py# Evaluación y corrección de impacto downstream
 │   │   │   └── direct_modification_mode.py   # Modificación directa de documentos
 │   │   ├── phase_validators/                 # Validadores puros de fase
@@ -256,7 +253,6 @@ src/kosmo/
 │       ├── consistency_filter.py             # Pre-filtrado de artefactos downstream (52 stopwords)
 │       ├── few_shot/loader.py                # Cargador con caché LRU de ejemplos canónicos
 │       └── validators/                       # Validadores de especificación
-│           ├── activity_diagram_validator.py # Validación sintáctica y métrica PlantUML
 │           └── ears_validator.py             # Validación de sintaxis y calidad de requisitos EARS
 ├── application/                              # Capa 3: Casos de Uso y Orquestación
 │   ├── pipeline/                             # Orquestador del Agente KOSMO
@@ -278,7 +274,6 @@ src/kosmo/
 │   ├── discovery/                            # Generación y refinamiento de Descubrimiento
 │   ├── features/                             # CRUD y generación de Características
 │   ├── requirements/                         # Generación y refinamiento de Requisitos EARS
-│   ├── modelo/                               # Generación de diagramas de actividad PlantUML
 │   ├── integrations/                         # Gestión de integraciones y sincronización
 │   ├── traceability/                         # Consulta de grafo y cálculo de impacto
 │   ├── knowledge/                            # Búsqueda semántica de sesiones y patrones
@@ -444,17 +439,7 @@ flowchart LR
   - Al menos **4 categorías EARS distintas** representadas.
   - Mínimo **2 criterios de aceptación** por requisito en formato Given-When-Then (`scenario`, `given`, `when`, `then`).
 
-#### Fase 4: Modelo (`SpecPhase.MODELO`)
-- **Nivel:** Lógica de Control y Flujo de Decisión.
-- **Formato:** Diagrama de Actividad PlantUML moderno con carriles (`@startuml` ... `@enduml`).
-- **Restricciones cuantitativas y sintácticas:**
-  - Máximo **4 swimlanes** (`|#color|Carril|`).
-  - Máximo **20 nodos de acción** (`:Acción;`).
-  - Máximo **3 niveles de anidamiento**.
-  - Sintaxis moderna: balance de `if/endif` y `fork/end merge`.
-  - Debe contener nodo inicial (`start`) y terminal (`stop`/`end`).
-
-#### Fase 5: Implementación (`SpecPhase.IMPLEMENTACION`)
+#### Fase 4: Implementación (`SpecPhase.IMPLEMENTACION`)
 - **Nivel:** Código Fuente en Ejecución.
 - **Stack Workspace:** Next.js 16 (App Router), React 19, TypeScript estricto, Drizzle ORM sobre SQLite (`better-sqlite3`), Vitest y Bootstrap 5.
 - **Restricción dura:** Prohibido el uso de clases Tailwind CSS y colores hexadecimales hardcodeados (validado por `token_linter.py`). Requiere lock exclusivo de workspace.
@@ -502,9 +487,8 @@ Ubicados en `src/kosmo/domain/pipeline/phase_modes/`. Cada clase implementa el p
 | `EARSMode` | REQUISITOS | 0.3 | `EARSSet` | `validate_ears_syntax`, `validate_ears_quality`, `validate_ears_software_level` |
 | `RequirementsChatMode` | REQUISITOS | 0.4 | `RespuestaChatLLM` | `BaseChatMode.validate_output` |
 | `RequirementsRefineMode` | REQUISITOS | 0.3 | `RequirementsDocument` | `validate_refine_input_exists` |
-| `ModeloMode` | MODELO | 0.2 | `DiagramSpec` | `validate_activity_diagram_syntax` |
 | `ConsistencyEvaluationMode`| Cross-phase | 0.2 | `ConsistencyDetectionReport` | Valida acciones (`update`/`delete`), rationale y artefactos |
-| `ConsistencyCorrectionMode`| Cross-phase | 0.2 | `ConsistencyCorrection` | Valida corrección textual y sintaxis PlantUML si aplica |
+| `ConsistencyCorrectionMode`| Cross-phase | 0.2 | `ConsistencyCorrection` | Valida corrección textual |
 | `DirectModificationMode` | Configurable | 0.1 | `DirectModificationResult` | Valida completitud de `modified_document` o mensaje de clarificación |
 
 ---
@@ -523,21 +507,15 @@ Registradas formalmente en `src/kosmo/infrastructure/api/composition/skill_regis
 | `ears_generate` | REQUISITOS | `EARSMode` | Genera requisitos EARS con criterios GWT para una característica. |
 | `requirements_refine` | REQUISITOS | `RequirementsRefineMode` | Refinamiento quirúrgico de requisitos EARS en markdown. |
 | `requirements_chat` | REQUISITOS | `RequirementsChatMode` | Asistente conversacional para requisitos a nivel de software. |
-| `modelo_generate` | MODELO | `ModeloMode` | Genera diagrama PlantUML con swimlanes desde requisitos EARS. |
-| `consistency_evaluate` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evalúa impacto downstream general tras cambios en Descubrimiento. |
 | `consistency_evaluate_upstream` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evalúa coherencia desde características hacia Descubrimiento. |
 | `consistency_evaluate_requirements` | REQUISITOS | `ConsistencyEvaluationMode` | Evalúa consistencia desde requisitos hacia la característica padre. |
 | `consistency_evaluate_requirements_upstream` | REQUISITOS | `ConsistencyEvaluationMode` | Evalúa consistencia desde requisitos hacia Descubrimiento. |
 | `consistency_evaluate_features_downstream` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evalúa impacto de características hacia requisitos EARS. |
-| `consistency_evaluate_features_model` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evalúa impacto de características hacia diagramas de actividad. |
 | `consistency_evaluate_discovery_requirements` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evalúa impacto de Descubrimiento directamente hacia requisitos. |
-| `consistency_evaluate_discovery_model` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evalúa impacto de Descubrimiento hacia diagramas de actividad. |
 | `consistency_evaluate_discovery_features` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evalúa impacto de Descubrimiento hacia características. |
 | `consistency_evaluate_discovery_implementation` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evalúa impacto de Descubrimiento en código generado. |
 | `consistency_evaluate_features_implementation` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evalúa impacto de características en código generado. |
 | `consistency_evaluate_requirements_implementation` | REQUISITOS | `ConsistencyEvaluationMode` | Evalúa impacto de requisitos EARS en código generado. |
-| `consistency_evaluate_requirements_model` | REQUISITOS | `ConsistencyEvaluationMode` | Evalúa consistencia de requisitos EARS hacia el diagrama PlantUML. |
-| `consistency_evaluate_model_implementation` | MODELO | `ConsistencyEvaluationMode` | Evalúa impacto del modelo PlantUML en código generado. |
 | `consistency_correct` | DESCUBRIMIENTO | `ConsistencyCorrectionMode` | Genera la corrección textual exacta de un artefacto afectado. |
 | `direct_modification` | DESCUBRIMIENTO | `DirectModificationMode` | Aplica modificaciones directamente desde instrucciones de chat. |
 
@@ -551,13 +529,11 @@ Inyectables al agente LLM mediante `KnowledgeToolRegistry` para consultar contex
 2. **`find_similar_sessions(query, project_id)`:** Búsqueda semántica vectorial k-NN (`pgvector`) de sesiones en otros proyectos.
 3. **`get_downstream_artifacts(feature_id)`:** Obtiene datos completos de una característica (`id`, `number`, `title`, `description`, `origin`).
 4. **`get_requirements_for_feature(feature_id)`:** Obtiene los requisitos EARS en formato Markdown asociados a la característica (truncado a 4000 caracteres).
-5. **`get_diagram_for_feature(feature_id)`:** Obtiene la sintaxis del diagrama PlantUML de la característica (truncado a 4000 caracteres).
-6. **`get_impact(artifact_id)`:** Consulta el grafo de trazabilidad retornando dependencias upstream y downstream del artefacto.
+5. **`get_impact(artifact_id)`:** Consulta el grafo de trazabilidad retornando dependencias upstream y downstream del artefacto.
 
 ### 11.2. Router MCP Local para OpenCode (`src/kosmo/infrastructure/api/routers/mcp.py`)
 Servidor Model Context Protocol expuesto vía HTTP para que los agentes headless de OpenCode consulten bajo demanda durante la construcción de código:
 - `POST /mcp/tools/get_requirements`: Retorna requisitos EARS en Markdown para la característica indicada.
-- `POST /mcp/tools/get_activity_diagram`: Retorna el diagrama PlantUML para la característica indicada.
 *Seguridad:* Exige Bearer Token y verifica que el recurso pertenezca al proyecto del usuario autenticado (`_verify_feature_access`).
 
 ---
@@ -659,7 +635,6 @@ Definidos en `src/kosmo/infrastructure/persistence/postgres/models.py` (SQLAlche
 | `projects` | `ProjectModel` | Proyectos de software, dueño, fase actual y slug único. |
 | `features` | `FeatureModel` | Características (`number`, `title`, `description`, `origin`). |
 | `requirements` | `RequirementModel` | Requisitos EARS en Markdown por feature (FK cascade). |
-| `activity_diagrams`| `ActivityDiagramModel`| Sintaxis PlantUML del diagrama de actividad por feature. |
 | `discovery` | `DiscoveryModel` | Documento Markdown de Descubrimiento del proyecto. |
 | `document_versions`| `DocumentVersionModel`| Snapshots inmutables de versiones de documentos por fase. |
 | `traceability_edges`| `TraceabilityEdgeModel`| Grafo de trazabilidad (`source_type/id`, `target_type/id`). |
@@ -699,11 +674,11 @@ Definidos en `src/kosmo/infrastructure/persistence/postgres/models.py` (SQLAlche
 9. **`chat_sessions` (`/projects/{project_id}/chat/sessions`):** Listado y borrado de sesiones de chat.
 10. **`modelo` (`/projects/{project_id}/features/{feature_id}/model`):** `/generate`, `GET`.
 11. **`consistency` (`/projects/{project_id}/consistency`):** `/evaluate`, `/apply`, listado y detalle de evaluaciones.
-12. **`schemas` (`/schemas`):** Esquemas JSON de referencia (`/ears`, `/diagram`).
+12. **`schemas` (`/schemas`):** Esquemas JSON de referencia (`/ears`).
 13. **`knowledge` (`/knowledge`):** `/patterns`, `/sessions/similar`.
 14. **`documents` (`/projects/{project_id}/documents`):** Historial y consulta de versiones de documentos.
 15. **`traceability` (`/projects/{project_id}/traceability`):** Grafo completo e `/impact/{artifact_id}`.
-16. **`mcp` (`/mcp`):** Servidor MCP para OpenCode (`/tools/get_requirements`, `/tools/get_activity_diagram`).
+16. **`mcp` (`/mcp`):** Servidor MCP para OpenCode (`/tools/get_requirements`, ).
 17. **`implementations` (`/projects/{project_id}/features/{feature_id}/implementation`):** `/start`, `/stream` (SSE), `/status`.
 18. **`integrations` (`/integrations`):** Conexiones activas del usuario y desconexión por proveedor.
 19. **`github` (`/integrations/github`):** Flujo OAuth (`/authorize`, `/callback`) y `/sync` de proyecto.
@@ -728,7 +703,7 @@ Definidos en `src/kosmo/infrastructure/persistence/postgres/models.py` (SQLAlche
 ## 19. Testing y Estrategia de Pruebas
 
 La suite de pruebas se divide en capas en `tests/`:
-- `tests/unit/`: Pruebas de dominio puro, parsers, validadores EARS/PlantUML, diffs y guardrails (rápidas, sin I/O ni base de datos).
+- `tests/unit/`: Pruebas de dominio puro, parsers, validadores EARS, diffs y guardrails (rápidas, sin I/O ni base de datos).
 - `tests/integration/`: Pruebas de adaptadores de persistencia con PostgreSQL de prueba y mocks de red.
 - `tests/e2e/`: Pruebas completas de endpoints API mediante `httpx.AsyncClient`.
 
@@ -796,8 +771,7 @@ Definida en `src/kosmo/config.py` mediante `pydantic-settings`:
    - Descubrimiento: **Exactamente las 7 secciones canónicas de `DISCOVERY_SECTIONS`**. Mínimo 25 palabras por sección. Cero tecnicismos.
    - Características: Título <= 6 palabras. Código `C01`, `C02`, ... Descripción de interacción. No usar formato de Historia de Usuario.
    - Requisitos EARS: 3 a 15 requisitos, >= 4 categorías EARS distintas, mínimo 2 criterios GWT obligatorios por requisito.
-   - Modelo PlantUML: <= 4 swimlanes, <= 20 nodos de acción, <= 3 niveles de anidamiento, sintaxis moderna.
-   - Implementación: Código Next.js 16 + Bootstrap 5. **Prohibido Tailwind CSS y colores hex hardcodeados**.
+      - Implementación: Código Next.js 16 + Bootstrap 5. **Prohibido Tailwind CSS y colores hex hardcodeados**.
 5. **Pragmatismo y YAGNI:** No crees factories de 1 implementación ni capas de abstracción especulativas. Si una función simple de 5 líneas resuelve el problema, escríbela.
 
 ### 21.3. Checklist Obligatorio Antes de Dar una Tarea por Terminada

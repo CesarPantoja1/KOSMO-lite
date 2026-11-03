@@ -54,7 +54,7 @@ async def check_project_traceability_navigation(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Característica {entity_id} no encontrada en este proyecto",
                 )
-        elif level in (SpecPhase.REQUISITOS, SpecPhase.MODELO):
+        elif level == SpecPhase.REQUISITOS:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Característica {entity_id} no encontrada",
@@ -97,7 +97,7 @@ async def check_traceability_navigation(
             feature = await container.repos.features.by_id(FeatureId(entity_id))
             if feature is not None:
                 project_id = feature.project_id
-            elif level in (SpecPhase.REQUISITOS, SpecPhase.MODELO):
+            elif level == SpecPhase.REQUISITOS:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Característica {entity_id} no encontrada",

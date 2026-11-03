@@ -6,7 +6,6 @@ from kosmo.contracts.ai.chat import ChatRepository
 from kosmo.contracts.ai.consistency import TraceabilityRepository
 from kosmo.contracts.sdd.codegen import FeatureImplementationRepository
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
@@ -37,10 +36,6 @@ class UnitOfWork(Protocol):
 
     @property
     def requirements(self) -> RequirementRepository: ...
-
-    @property
-    def diagrams(self) -> ActivityDiagramRepository: ...
-
     @property
     def implementations(self) -> FeatureImplementationRepository: ...
 
