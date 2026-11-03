@@ -7,10 +7,8 @@ import {
 	useConsistencyGateStore,
 } from '@/entities/consistency';
 import { useImplementationStore } from '@/entities/implementation';
-import { useModelingStore } from '@/entities/modeling';
 import { useProjectStore } from '@/entities/project';
 import { useRequirementsStore } from '@/entities/requirements';
-import { preloadPlantUmlEngine } from '@/features/plantuml-viewer';
 import { formatApiError } from '@/shared/api';
 import { ArrowLeft, ModalConfirm, toast } from '@/shared/ui';
 import Link from 'next/link';
@@ -21,14 +19,12 @@ import { GateReviewCard } from './GateReviewCard';
 const TARGET_LABELS: Record<ConsistencyTargetPhase, string> = {
 	features: 'Funcionalidades',
 	requirements: 'Criterios',
-	model: 'Diagramas',
 	implementation: 'Código',
 };
 
 const ROUTE_TO_TARGET: Record<string, ConsistencyTargetPhase> = {
 	caracteristicas: 'features',
 	requisitos: 'requirements',
-	modelo: 'model',
 	descubrimiento: 'features',
 	codigo: 'implementation',
 	implementacion: 'implementation',
@@ -37,7 +33,6 @@ const ROUTE_TO_TARGET: Record<string, ConsistencyTargetPhase> = {
 const TARGET_TO_ROUTE: Record<ConsistencyTargetPhase, string> = {
 	features: '/proyecto/caracteristicas',
 	requirements: '/proyecto/requisitos',
-	model: '/proyecto/modelo',
 	implementation: '/proyecto/codigo',
 };
 
@@ -49,8 +44,6 @@ const refreshArtifactStores = async (projectId: string, cards: ReviewCard[]) => 
 		const featureId = card.target_artifact_id.split(':')[0];
 		if (card.artifact_type === 'EARSRequirement') {
 			fetches.push(useRequirementsStore.getState().getRequirements(projectId, featureId));
-		} else if (card.artifact_type === 'ActivityDiagram') {
-			fetches.push(useModelingStore.getState().getDiagram(projectId, featureId));
 		} else if (card.artifact_type === 'FeatureImplementation') {
 			fetches.push(
 				useImplementationStore
@@ -87,10 +80,6 @@ const ConsistencyPage = () => {
 	const phaseStatus = status?.phases?.[targetPhase];
 	const evaluating = phaseStatus?.evaluating ?? 0;
 	const pending = phaseStatus?.pending ?? 0;
-
-	useEffect(() => {
-		preloadPlantUmlEngine();
-	}, []);
 
 	useEffect(() => {
 		if (!currentProject) return;

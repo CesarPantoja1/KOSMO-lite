@@ -30,7 +30,6 @@ export { default as List } from './icons/List';
 export { default as Load } from './icons/Load';
 export { default as MaxEditor } from './icons/MaxEditor';
 export { default as MinEditor } from './icons/MinEditor';
-export { default as Modeling } from './icons/Modeling';
 export { default as OpenMarkdownContent } from './icons/OpenMarkdownContent';
 export { default as Plus } from './icons/Plus';
 export { default as Requirements } from './icons/Requirements';

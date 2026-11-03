@@ -10,7 +10,7 @@ export type {
 	ChatHistory,
 } from '@/shared/model/chat-message';
 
-export type ChatPhase = 'discovery' | 'features' | 'requirements' | 'model';
+export type ChatPhase = 'discovery' | 'features' | 'requirements';
 
 export interface ChatSessionSummary {
 	id: string;

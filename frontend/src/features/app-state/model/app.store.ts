@@ -1,7 +1,6 @@
 import { useConsistencyGateStore } from '@/entities/consistency';
 import { clearDiscoveryStore } from '@/entities/discovery';
 import { clearCharacteristicStore } from '@/entities/characteristic';
-import { clearModelingStore } from '@/entities/modeling';
 import { clearRequirementsStore } from '@/entities/requirements';
 import { clearImplementationStore } from '@/entities/implementation';
 import { useChatSessionsStore } from '@/entities/chat';
@@ -31,7 +30,6 @@ export const useAppStore = create<AppState>()((set) => ({
 		clearProjectStore();
 		clearDiscoveryStore();
 		clearCharacteristicStore();
-		clearModelingStore();
 		clearRequirementsStore();
 		clearImplementationStore();
 		useChatSessionsStore.getState().reset();
@@ -47,7 +45,6 @@ export const useAppStore = create<AppState>()((set) => ({
 		clearProjectStoreExceptProjects();
 		clearDiscoveryStore();
 		clearCharacteristicStore();
-		clearModelingStore();
 		clearRequirementsStore();
 		clearImplementationStore();
 		useChatSessionsStore.getState().reset();

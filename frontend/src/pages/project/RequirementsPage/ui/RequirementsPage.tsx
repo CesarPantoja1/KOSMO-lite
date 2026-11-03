@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useRequirementsStore } from '@/entities/requirements';
-import { useModelingStore } from '@/entities/modeling';
 import { formatApiError } from '@/shared/api';
 import { useUnsavedChanges } from '@/features/app-state';
 import {
@@ -52,10 +51,6 @@ const RequirementsPage = () => {
 	const saveRequirements = useRequirementsStore((s) => s.saveRequirements);
 	const generateRequirements = useRequirementsStore((s) => s.generateRequirements);
 	const deleteRequirementsStore = useRequirementsStore((s) => s.deleteRequirements);
-
-	// Modeling estado (para eliminar diagrama asociado)
-	const hasDiagram = useModelingStore((s) => s.hasDiagram);
-	const deleteDiagramModeling = useModelingStore((s) => s.deleteDiagram);
 
 	const [markdown, setMarkdown] = useState('');
 	const [savedContent, setSavedContent] = useState('');
@@ -194,10 +189,6 @@ const RequirementsPage = () => {
 		try {
 			await deleteRequirementsStore(currentProject.id, featureId);
 
-			if (hasDiagram[featureId]) {
-				await deleteDiagramModeling(currentProject.id, featureId);
-			}
-
 			setMarkdown('');
 			setSavedContent('');
 			toast.success('Requisitos eliminados');
@@ -308,8 +299,8 @@ const RequirementsPage = () => {
 									</button>
 								)}
 								<Link
-									href='modelo'
-									onClick={handleNextLink('modelo')}
+									href='codigo'
+									onClick={handleNextLink('codigo')}
 									className='btn btn-primary'
 								>
 									Continuar

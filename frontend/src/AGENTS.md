@@ -54,7 +54,6 @@ src/
 │   ├── discovery/        # Documento de Descubrimiento
 │   ├── implementation/   # Codegen: estado, file-tree, eventos SSE
 │   ├── integration/      # OAuth (GitHub, Railway)
-│   ├── modeling/         # Diagramas PlantUML
 │   ├── project/          # Proyectos (store persist) + GitHub sync
 │   ├── requirements/     # Requisitos EARS + chat history
 │   └── user/             # Re-export de auth (shared) + getUser
@@ -65,8 +64,7 @@ src/
 │   ├── chatbot/          # Chat SSE + sesiones (Chatbot, ChatStreamPanel, ...)
 │   ├── github-sync/      # useProjectGithubRepo, GitHubSyncBanner
 │   ├── initialize/       # initializeProject (hidratación de stores)
-│   ├── markdown-editor/  # Editor + TOC + autosave
-│   └── plantuml-viewer/  # PlantUmlViewer (engine, cola de render, pan/zoom)
+│   └── markdown-editor/  # Editor + TOC + autosave
 │
 ├── widgets/        # ui/ + model/ + lib/ + types/
 │   ├── AsideCharacteristic/       # Sidebar de características
@@ -87,11 +85,10 @@ src/
         ├── CreateProjectPage/    # Alta de proyecto
         ├── DiscoveryPage/        # Documento de descubrimiento
         ├── ImplementationPage/   # Codegen + resumen + deploy
-        ├── ModelingPage/         # Diagramas PlantUML
         └── RequirementsPage/     # Requisitos EARS
 ```
 
-> Cada capa tiene su propio `AGENTS.md` con el detalle de slices. Los slices complejos (`pages/project`, `features/chatbot`, `features/plantuml-viewer`, `widgets/main-navbar`) tienen `AGENTS.md` propio.
+> Cada capa tiene su propio `AGENTS.md` con el detalle de slices. Los slices complejos (`pages/project`, `features/chatbot`, `widgets/main-navbar`) tienen `AGENTS.md` propio.
 
 ---
 

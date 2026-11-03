@@ -1,7 +1,7 @@
 # `pages/project/` — Wizard SDD (fases del proyecto)
 
 > **Destinatario:** Agentes de IA que trabajen en `frontend/src/pages/project/`.
-> **Ámbito:** las 7 páginas del pipeline Spec-Driven Development y la revisión de consistencia.
+> **Ámbito:** las 6 páginas del pipeline Spec-Driven Development y la revisión de consistencia.
 > **Nivel superior:** [`../AGENTS.md`](../AGENTS.md) (capa `pages`).
 > **Referencia de dominio:** [`../../../../backend/AGENTS.md`](../../../../backend/AGENTS.md) (pipeline y validaciones por fase).
 
@@ -10,8 +10,8 @@
 ## 1. Pipeline de fases
 
 ```
-Descubrimiento → Características → Requisitos → Modelo → Implementación
-   (negocio)       (usuario)        (software)   (comportamiento) (código)
+Descubrimiento → Características → Requisitos → Implementación
+   (negocio)       (usuario)        (software)   (código)
                           ↕ consistencia (cascada hacia la derecha)
 ```
 
@@ -25,10 +25,9 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 |---|---|---|---|---|
 | `DiscoveryPage` | `/proyecto/descubrimiento` | `ui/DiscoveryPage.tsx` | `useDiscoveryStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `ChatStreamPanel`, `useUnsavedChanges` |
 | `CharacteristicsPage` | `/proyecto/caracteristicas` + `/nueva` | `ui/CharacteristicsPage.tsx`, `CreateCharacteristicPage.tsx`, `CardCharacterist.tsx`, `CharacteristicModal.tsx`, `Search.tsx` | `useCharacteristicStore`, `useDiscoveryStore`, `useProjectStore` | `ChatStreamPanel`, `subscribeImplementationEvents` |
-| `RequirementsPage` | `/proyecto/requisitos` | `ui/RequirementsPage.tsx` | `useRequirementsStore`, `useModelingStore`, `useCharacteristicStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `PanelAsistenteRequisito`, `AsideCharacteristic`, `useUnsavedChanges` |
-| `ModelingPage` | `/proyecto/modelo` | `ui/ModelingPage.tsx` | `useModelingStore`, `useRequirementsStore`, `useCharacteristicStore`, `useProjectStore`, `useAppStore` | `PlantUmlViewer`, `AsideCharacteristic`, `useUnsavedChanges` |
-| `ImplementationPage` | `/proyecto/codigo` + `/codigo/resumen` | `ui/ImplementationPage.tsx`, `ImplementationSummaryPage.tsx`, `DeployPreconditionPanel.tsx`, `DeployResultPanel.tsx` | `useImplementationStore`, `useCharacteristicStore`, `useModelingStore`, `useProjectStore`, `useDeployStatus` | `useProjectGithubRepo`, `GestionRepositorioGitHub`, `AsideCharacteristic` |
-| `ConsistencyPage` | `/proyecto/[fase]/consistencia` | `ui/ConsistencyPage.tsx`, `GateReviewCard.tsx` | `useConsistencyGateStore` (+ refresca stores de artefacto) | `MarkdownText`, `PlantUmlViewer`, `preloadPlantUmlEngine` |
+| `RequirementsPage` | `/proyecto/requisitos` | `ui/RequirementsPage.tsx` | `useRequirementsStore`, `useCharacteristicStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `PanelAsistenteRequisito`, `AsideCharacteristic`, `useUnsavedChanges` |
+| `ImplementationPage` | `/proyecto/codigo` + `/codigo/resumen` | `ui/ImplementationPage.tsx`, `ImplementationSummaryPage.tsx`, `DeployPreconditionPanel.tsx`, `DeployResultPanel.tsx` | `useImplementationStore`, `useCharacteristicStore`, `useProjectStore`, `useDeployStatus` | `useProjectGithubRepo`, `GestionRepositorioGitHub`, `AsideCharacteristic` |
+| `ConsistencyPage` | `/proyecto/[fase]/consistencia` | `ui/ConsistencyPage.tsx`, `GateReviewCard.tsx` | `useConsistencyGateStore` (+ refresca stores de artefacto) | `MarkdownText` |
 | `CreateProjectPage` | `/crear-proyecto` | `ui/CreateProjectPage.tsx`, `CreateProjectForm.tsx`; `model/useIntegrationGate.ts` | `useProjectStore` | `useIntegrationGate` |
 
 `Index.ts` de cada slice reexporta sus componentes (`CharacteristicsPage` exporta además `CreateCharacteristic`).
@@ -54,12 +53,6 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 ### Requisitos (`RequirementsPage`)
 - Criterios EARS por funcionalidad (Markdown editable, autosave).
 - `PanelAsistenteRequisito` (`useChatStream`) sobre `/api/v1/features/{id}/requirements/chat/stream`; refetch si `modification.applied`.
-- `handleDeleteRequirements` también elimina el diagrama asociado.
-
-### Modelo (`ModelingPage`)
-- Diagramas PlantUML por funcionalidad; `AsideCharacteristic` para seleccionar.
-- Casos: sin criterios → link a `/proyecto/requisitos`; con criterios sin diagrama → generar; con diagrama → `PlantUmlViewer`.
-- Estado local: `isGenerating`, `confirmDeleteId`, `uml`, `savedContent`, `pendingCharSwitch`, `plantumlSource`, flags de maximizado de editor/viewer.
 
 ### Implementación (`ImplementationPage`)
 - Genera/regenera la implementación por funcionalidad; `useProjectGithubRepo` decide el CTA según GitHub (`syncing | failed | not-linked`).
@@ -68,10 +61,10 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 - `DeployResultPanel`: estado Railway (`ready/building/pending/failed`), copiar URL, reintentar, `deleteDeployment` con `ModalConfirm`.
 
 ### Consistencia (`ConsistencyPage`)
-- `useParams<{fase}>` mapea `ROUTE_TO_TARGET` a fases `features|requirements|model|implementation`.
+- `useParams<{fase}>` mapea `ROUTE_TO_TARGET` a fases `features|requirements|implementation`.
 - `useConsistencyGateStore`: `status, loadStatus, loadReview, applyEvaluation, discardEvaluation, bulkResolve, loadActivity`.
-- `refreshArtifactStores` recarga stores de characteristic/requirements/modeling/implementation según `artifact_type`.
-- `preloadPlantUmlEngine()` al montar. `GateReviewCard` muestra diff textual o de diagrama (pestañas Anterior/Propuesto) con Aplicar/Descartar.
+- `refreshArtifactStores` recarga stores de characteristic/requirements/implementation según `artifact_type`.
+- `GateReviewCard` muestra diff textual (pestañas Anterior/Propuesto) con Aplicar/Descartar.
 - Rutas de revisión canónicas: `entities/consistency/model/selectors.ts` → `CONSISTENCY_REVIEW_ROUTES`.
 
 ### Crear proyecto (`CreateProjectPage`)
@@ -86,7 +79,6 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 - **Autosave:** `useUnsavedChanges` + `saveStatus` (MarkdownEditor) en Discovery/Requirements; `ModalConfirm` al navegar con cambios.
 - **Selección de característica:** `useCharacteristicStore.selectedId` + `AsideCharacteristic`; `pendingCharSwitch` gestiona cambios sin guardar.
 - **Streaming IA:** `ChatStreamPanel` (Discovery/Characteristics) y `PanelAsistenteRequisito` (Requirements) sobre `features/chatbot`.
-- **Diagramas:** `PlantUmlViewer` (Modeling/Consistency) + `wrapPlantUmlSource`.
 
 ---
 

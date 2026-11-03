@@ -36,7 +36,6 @@ Segmentos permitidos (solo si se necesitan): **`ui/`**, **`model/`**, **`hooks/`
 | `project/CharacteristicsPage` | `app/(app)/proyecto/caracteristicas/page.tsx` | `/proyecto/caracteristicas` | `CharacteristicsPage` |
 | `project/CharacteristicsPage` | `app/(app)/proyecto/caracteristicas/nueva/page.tsx` | `/proyecto/caracteristicas/nueva` | `CreateCharacteristic` |
 | `project/RequirementsPage` | `app/(app)/proyecto/requisitos/page.tsx` | `/proyecto/requisitos` | `RequirementsPage` |
-| `project/ModelingPage` | `app/(app)/proyecto/modelo/page.tsx` | `/proyecto/modelo` | `ModelingPage` |
 | `project/ImplementationPage` | `app/(app)/proyecto/codigo/page.tsx` | `/proyecto/codigo` | `ImplementationPage` |
 | `project/ImplementationPage` | `app/(app)/proyecto/codigo/resumen/page.tsx` | `/proyecto/codigo/resumen` | `ImplementationSummaryPage` (import directo desde `ui/`) |
 | `project/ConsistencyPage` | `app/(app)/proyecto/[fase]/consistencia/page.tsx` | `/proyecto/{fase}/consistencia` | `ConsistencyPage` |
@@ -66,7 +65,7 @@ Segmentos permitidos (solo si se necesitan): **`ui/`**, **`model/`**, **`hooks/`
 
 ### Páginas del proyecto (`project/*`)
 Ver [`project/AGENTS.md`](./project/AGENTS.md). Resumen de composición recurrente:
-- `ChatStreamPanel` (Discovery, Characteristics), `MarkdownEditor` (Discovery, Requirements), `MarkdownText` (Consistency), `PlantUmlViewer` (Modeling, Consistency), `PanelAsistenteRequisito` (Requirements), `AiConfigForm` (Onboarding, Profile), `useUnsavedChanges` (Discovery, Modeling, Requirements).
+- `ChatStreamPanel` (Discovery, Characteristics), `MarkdownEditor` (Discovery, Requirements), `MarkdownText` (Consistency), `PanelAsistenteRequisito` (Requirements), `AiConfigForm` (Onboarding, Profile), `useUnsavedChanges` (Discovery, Requirements).
 - Widgets `@/widgets`: `RootNavbar`, `MainNavbar`, `AsideCharacteristic`, `GestionRepositorioGitHub`.
 
 ---

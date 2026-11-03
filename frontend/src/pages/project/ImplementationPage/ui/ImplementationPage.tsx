@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 
 import { useCharacteristicStore } from '@/entities/characteristic';
 import { useImplementationStore } from '@/entities/implementation';
-import { useModelingStore } from '@/entities/modeling';
 import { useProjectStore } from '@/entities/project';
 import { useProjectGithubRepo } from '@/features/github-sync';
 import { formatApiError } from '@/shared/api';
@@ -46,8 +45,6 @@ const ImplementationPage = () => {
 	const startGeneration = useImplementationStore((s) => s.startGeneration);
 	const loadImplementation = useImplementationStore((s) => s.loadImplementation);
 
-	const hasDiagram = useModelingStore((s) => s.hasDiagram);
-
 	const selectedCharacteristic = characteristics.find((c) => c.id === selectedId) ?? null;
 	const hasCharacteristics = characteristics.length > 0;
 	const hasAnyImplementation = Object.values(implementations).some(Boolean);
@@ -55,7 +52,6 @@ const ImplementationPage = () => {
 	const currentRequiresReview = selectedId
 		? !!requiresReviewByFeature[selectedId] || status === 'requires_review'
 		: false;
-	const selectedHasDiagram = selectedId ? !!hasDiagram[selectedId] : false;
 	const isGenerating = status === 'generating';
 
 	useEffect(() => {
@@ -180,7 +176,7 @@ const ImplementationPage = () => {
 			{isGenerating && (
 				<Loading
 					title='Generando implementación'
-					description='Transformando requisitos y modelo en código funcional.'
+					description='Transformando requisitos en código funcional.'
 					messages={progress}
 				/>
 			)}
@@ -281,42 +277,21 @@ const ImplementationPage = () => {
 											</p>
 										</div>
 
-										{!selectedHasDiagram ? (
-											<div className='flex flex-col my-auto items-center gap-5 px-12'>
-												<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-warning-50'>
-													<Ai color='text-warning-500' size={48} />
-												</div>
-												<div className='flex flex-col items-center gap-2 text-center max-w-md'>
-													<h3 className='text-neutral-800 text-lg font-semibold'>
-														Falta diagrama de actividad
-													</h3>
-													<p className='text-neutral-500 text-sm'>
-														Esta funcionalidad no tiene diagrama de actividad generado.
-														Genera el diagrama antes de continuar con la implementación.
-													</p>
-												</div>
-												<Link href='/proyecto/modelo' className='btn btn-secondary'>
-													<ArrowLeft color='' size={18} />
-													Ir a diagramas
-												</Link>
+										<div className='flex flex-col my-auto items-center gap-5 px-12'>
+											<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-ai-50'>
+												<Ai color='text-ai-500' size={48} />
 											</div>
-										) : (
-											<div className='flex flex-col my-auto items-center gap-5 px-12'>
-												<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-ai-50'>
-													<Ai color='text-ai-500' size={48} />
-												</div>
-												<div className='flex flex-col items-center gap-2 text-center max-w-md'>
-													<h3 className='text-neutral-800 text-lg font-semibold'>
-														Aún no hay implementación generada
-													</h3>
-													<p className='text-neutral-500 text-sm'>
-														Esta funcionalidad aún no tiene código generado. El asistente
-														creará la estructura de implementación automáticamente.
-													</p>
-												</div>
-												{renderGenerateAction('Generar implementación')}
+											<div className='flex flex-col items-center gap-2 text-center max-w-md'>
+												<h3 className='text-neutral-800 text-lg font-semibold'>
+													Aún no hay implementación generada
+												</h3>
+												<p className='text-neutral-500 text-sm'>
+													Esta funcionalidad aún no tiene código generado. El asistente
+													creará la estructura de implementación automáticamente.
+												</p>
 											</div>
-										)}
+											{renderGenerateAction('Generar implementación')}
+										</div>
 									</div>
 								)}
 
@@ -351,7 +326,7 @@ const ImplementationPage = () => {
 														Implementación desactualizada
 													</h3>
 													<p className='text-neutral-600 text-sm'>
-														Las especificaciones de esta funcionalidad (Descubrimiento, Requisitos o Modelo) cambiaron recientemente. El código generado previamente ya no coincide con los nuevos requisitos.
+														Las especificaciones de esta funcionalidad (Descubrimiento o Requisitos) cambiaron recientemente. El código generado previamente ya no coincide con los nuevos requisitos.
 													</p>
 													<p className='text-neutral-500 text-xs mt-1'>
 														Haz clic en «Regenerar implementación» para actualizar el código automáticamente con las nuevas reglas.

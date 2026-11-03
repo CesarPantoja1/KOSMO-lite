@@ -16,7 +16,6 @@
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@mdxeditor/editor": "^4.0.1",
-    "@plantuml/core": "^1.2026.6",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",
     "msw": "^2.13.4",

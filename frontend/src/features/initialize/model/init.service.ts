@@ -1,6 +1,5 @@
 import { useDiscoveryStore, getDiscovery } from '@/entities/discovery';
 import { useCharacteristicStore, getCharacteristics } from '@/entities/characteristic';
-import { useModelingStore, getDiagram } from '@/entities/modeling';
 import { useRequirementsStore, getRequirements } from '@/entities/requirements';
 import { ApiError } from '@/shared/api';
 
@@ -24,20 +23,11 @@ export const initializeProject = async (projectId: string): Promise<void> => {
 
 		await Promise.allSettled(
 			characteristics.map(async (c) => {
-				const [reqResult, diagramResult] = await Promise.allSettled([
-					getRequirements(projectId, c.id),
-					getDiagram(projectId, c.id),
-				]);
-
-				if (reqResult.status === 'fulfilled') {
-					const content = reqResult.value?.document_markdown ?? '';
-					useRequirementsStore.getState().setHasRequirements(c.id, !!content);
-					if (content) {
-						useRequirementsStore.getState().setCurrentRequirements(c.id, content);
-					}
-				}
-				if (diagramResult.status === 'fulfilled') {
-					useModelingStore.getState().setHasDiagram(c.id, !!diagramResult.value);
+				const reqResult = await getRequirements(projectId, c.id);
+				const content = reqResult.document_markdown ?? '';
+				useRequirementsStore.getState().setHasRequirements(c.id, !!content);
+				if (content) {
+					useRequirementsStore.getState().setCurrentRequirements(c.id, content);
 				}
 			}),
 		);

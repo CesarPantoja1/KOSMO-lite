@@ -1,10 +1,4 @@
-import {
-	Characteristics,
-	Discovery,
-	Implementation,
-	Modeling,
-	Requirements,
-} from '@/shared/ui';
+import { Characteristics, Discovery, Implementation, Requirements } from '@/shared/ui';
 import { Lightbulb, ArrowRight } from '@/shared/ui';
 
 const steps = [
@@ -34,18 +28,12 @@ const steps = [
 	},
 	{
 		number: '05',
-		icon: <Modeling size={18} color='text-neutral-500' />,
-		title: 'Diagramas',
-		text: 'Se modelan las actividades del usuario.',
-	},
-	{
-		number: '06',
 		icon: <Implementation size={18} color='text-neutral-500' />,
 		title: 'Implementación',
 		text: 'Se genera código por funcionalidad.',
 	},
 	{
-		number: '07',
+		number: '06',
 		icon: <ArrowRight size={18} color='text-neutral-500' />,
 		title: 'Aplicación',
 		text: 'Se construye una app ejecutable.',
@@ -75,7 +63,7 @@ export function FlowSteps() {
 					</p>
 				</div>
 
-				<div className='mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-7'>
+				<div className='mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-6'>
 					{steps.map((step) => (
 						<div
 							key={step.number}

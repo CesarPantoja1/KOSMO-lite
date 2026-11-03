@@ -94,14 +94,14 @@ describe('consistency/api — modo real (USE_MOCKS=false)', () => {
 		mockFetchOk({ resolved: 3, skipped: 1 });
 
 		// Act
-		await bulkResolveConsistency('prj_01', 'apply', 'model');
+		await bulkResolveConsistency('prj_01', 'apply', 'requirements');
 
 		// Assert
 		const [url, options] = fetchMock.mock.calls[0];
 		expect(url).toContain('/consistency/review/bulk');
 		expect(JSON.parse((options as RequestInit).body as string)).toEqual({
 			action: 'apply',
-			target_phase: 'model',
+			target_phase: 'requirements',
 		});
 	});
 
@@ -160,7 +160,7 @@ describe('consistency/api — modo mock (USE_MOCKS=true)', () => {
 		const { getConsistencyReview } = await import('./api');
 
 		// Act
-		const promise = getConsistencyReview('prj_01', 'model');
+		const promise = getConsistencyReview('prj_01', 'requirements');
 		await vi.advanceTimersByTimeAsync(300);
 		const result = await promise;
 

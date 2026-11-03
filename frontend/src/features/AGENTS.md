@@ -27,13 +27,12 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**. **No** existe `api/`.
 |---|---|---|---|
 | `markdown-editor` | `ui/markdown-editor.tsx`, `editor-content.tsx`, `save-indicator.tsx`, `toc-sidebar.tsx`, `markdown-editor-skeleton.tsx`; `model/use-headings.ts`, `heading.ts`; `lib/extract-headings.ts` | `MarkdownEditor`, `MarkdownEditorHandle`, `MarkdownEditorSkeleton`, `SaveStatus` | Editor Markdown con TOC, autosave e indicador de guardado. |
 | `chatbot` | `ui/*`, `model/useChatStream.ts` | `Chatbot`, `ChatStreamPanel`, `PanelAsistenteRequisito`, `ChatbotMessage`, `useChatStream`, `SendChatStreamBody` | Chat con streaming SSE y sesiones. **Ver [`chatbot/AGENTS.md`](./chatbot/AGENTS.md).** |
-| `plantuml-viewer` | `ui/*`, `model/*`, `lib/*` | `PlantUmlViewer`, `PanZoomState`, `preloadPlantUmlEngine`, `wrapPlantUmlSource` | Render de PlantUML con carga de motor, cola y pan/zoom. **Ver [`plantuml-viewer/AGENTS.md`](./plantuml-viewer/AGENTS.md).** |
 | `app-state` | `model/app.store.ts`, `lib/clearAllStores.ts`, `lib/useUnsavedChanges.ts` | `useAppStore`, `clearAppStore`, `useUnsavedChanges`, `clearAllStores` | Estado de UI global: inicialización, cambios sin guardar, editor maximizado, limpieza de stores. |
 | `github-sync` | `model/useProjectGithubRepo.ts`, `ui/GitHubSyncBanner.tsx` | `useProjectGithubRepo`, `ProjectGithubViewState`, `GitHubSyncBanner` | Estado de vinculación/sincronización del repo GitHub del proyecto. |
 | `ai-config` | `ui/AiConfigForm.tsx`, `ui/AiProviderBadge.tsx` | `AiConfigForm`, `AiProviderBadge` | Formulario BYOK de proveedor/modelo IA y badge del proveedor. |
-| `initialize` | `model/init.service.ts` | `initializeProject` | Hidrata los stores de entidad al abrir un proyecto (discovery, características, requisitos, diagramas). |
+| `initialize` | `model/init.service.ts` | `initializeProject` | Hidrata los stores de entidad al abrir un proyecto (discovery, características, requisitos). |
 
-Barrel: `features/index.ts` reexporta `markdown-editor`, `chatbot`, `plantuml-viewer`, `app-state` y `github-sync`. `ai-config` e `initialize` se importan de su ruta directa.
+Barrel: `features/index.ts` reexporta `markdown-editor`, `chatbot`, `app-state` y `github-sync`. `ai-config` e `initialize` se importan de su ruta directa.
 
 ---
 
@@ -47,7 +46,7 @@ Barrel: `features/index.ts` reexporta `markdown-editor`, `chatbot`, `plantuml-vi
 - `resetProjectState` / `resetStateBeforeChangeProject` son el punto canónico para añadir la limpieza de nuevos stores.
 
 ### `initialize`
-- `initializeProject(projectId)`: carga descubrimiento (404 es normal), características y, en paralelo (`Promise.allSettled`), requisitos y diagramas por característica. Escribe directamente en los stores de entidad.
+- `initializeProject(projectId)`: carga descubrimiento (404 es normal), características y requisitos por característica. Escribe directamente en los stores de entidad.
 
 ### `github-sync`
 - `useProjectGithubRepo` expone `ProjectGithubViewState` con estados `loading | not-linked | no-code | create | syncing | failed | synced`, consumido por `GestionRepositorioGitHub` y la página de implementación.
@@ -80,7 +79,6 @@ const send = (url, body) => start(url, { body, onEvent });
 ```
 ├── Comportamiento del editor Markdown     → features/markdown-editor/{ui,model,lib}
 ├── Streaming de chat / sesiones           → features/chatbot/ (ver su AGENTS.md)
-├── Render PlantUML / zoom                 → features/plantuml-viewer/ (ver su AGENTS.md)
 ├── Limpieza de stores / cambios sin guardar → features/app-state/
 ├── Estado de sync GitHub                   → features/github-sync/
 ├── Formulario de IA (BYOK)                 → features/ai-config/

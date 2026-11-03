@@ -11,11 +11,6 @@ vi.mock('@/entities/characteristic', () => ({
 	getCharacteristics: vi.fn(),
 }));
 
-vi.mock('@/entities/modeling', () => ({
-	useModelingStore: { getState: vi.fn() },
-	getDiagram: vi.fn(),
-}));
-
 vi.mock('@/entities/requirements', () => ({
 	useRequirementsStore: { getState: vi.fn() },
 	getRequirements: vi.fn(),
@@ -23,19 +18,16 @@ vi.mock('@/entities/requirements', () => ({
 
 import { useDiscoveryStore, getDiscovery } from '@/entities/discovery';
 import { useCharacteristicStore, getCharacteristics } from '@/entities/characteristic';
-import { useModelingStore, getDiagram } from '@/entities/modeling';
 import { useRequirementsStore, getRequirements } from '@/entities/requirements';
 import { initializeProject } from './init.service';
 
 const discoveryState = { setCurrentDiscovery: vi.fn() };
 const characteristicState = { setCurrentCharacteristics: vi.fn() };
-const modelingState = { setHasDiagram: vi.fn() };
 const requirementsState = { setHasRequirements: vi.fn(), setCurrentRequirements: vi.fn() };
 
 const api = {
 	getDiscovery: vi.mocked(getDiscovery),
 	getCharacteristics: vi.mocked(getCharacteristics),
-	getDiagram: vi.mocked(getDiagram),
 	getRequirements: vi.mocked(getRequirements),
 };
 
@@ -44,7 +36,6 @@ describe('initializeProject', () => {
 		vi.clearAllMocks();
 		vi.mocked(useDiscoveryStore.getState).mockReturnValue(discoveryState as never);
 		vi.mocked(useCharacteristicStore.getState).mockReturnValue(characteristicState as never);
-		vi.mocked(useModelingStore.getState).mockReturnValue(modelingState as never);
 		vi.mocked(useRequirementsStore.getState).mockReturnValue(requirementsState as never);
 	});
 
@@ -94,7 +85,7 @@ describe('initializeProject', () => {
 		expect(api.getRequirements).not.toHaveBeenCalled();
 	});
 
-	it('carga requisitos y diagramas para cada característica', async () => {
+	it('carga requisitos para cada característica', async () => {
 		// Arrange
 		api.getDiscovery.mockResolvedValue(null as never);
 		api.getCharacteristics.mockResolvedValue([
@@ -106,7 +97,6 @@ describe('initializeProject', () => {
 				? ({ feature_id: 'f1', document_markdown: '## Doc', total: 1 } as never)
 				: ({ feature_id: 'f2', document_markdown: '', total: 0 } as never),
 		);
-		api.getDiagram.mockResolvedValue({ diagram_syntax: '@startuml' } as never);
 
 		// Act
 		await initializeProject('prj_01');
@@ -120,21 +110,17 @@ describe('initializeProject', () => {
 		expect(requirementsState.setCurrentRequirements).toHaveBeenCalledWith('f1', '## Doc');
 		expect(requirementsState.setHasRequirements).toHaveBeenCalledWith('f2', false);
 		expect(requirementsState.setCurrentRequirements).not.toHaveBeenCalledWith('f2', expect.anything());
-		expect(modelingState.setHasDiagram).toHaveBeenCalledWith('f1', true);
-		expect(modelingState.setHasDiagram).toHaveBeenCalledWith('f2', true);
 	});
 
-	it('ignora silenciosamente los features cuya consulta de requisitos/diagrama falla', async () => {
+	it('ignora silenciosamente los features cuya consulta de requisitos falla', async () => {
 		// Arrange
 		api.getDiscovery.mockResolvedValue(null as never);
 		api.getCharacteristics.mockResolvedValue([{ id: 'f1' } as never]);
 		api.getRequirements.mockRejectedValue(new Error('boom'));
-		api.getDiagram.mockRejectedValue(new Error('boom'));
 
 		// Act & Assert (no debe lanzar)
 		await expect(initializeProject('prj_01')).resolves.toBeUndefined();
 		expect(requirementsState.setHasRequirements).not.toHaveBeenCalled();
-		expect(modelingState.setHasDiagram).not.toHaveBeenCalled();
 	});
 
 	it('captura cualquier error inesperado sin propagarlo', async () => {

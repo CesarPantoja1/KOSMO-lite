@@ -35,7 +35,6 @@ Para optimizar tokens, la documentación está **fragmentada por nivel**:
 | Estado de formularios | react-hook-form + zod           | `^7.79.0` / `^4.3.6` | Formularios validados con esquemas Zod.                 |
 | A11y / primitivas     | react-aria-components           | `^1.19.0`            | Componentes accesibles (tooltips, toasts).              |
 | Editor Markdown       | @mdxeditor/editor               | `^4.0.1`             | Editor de documentos SDD.                               |
-| Diagramas             | @plantuml/core + remark         | `^1.2026.6`          | Render de PlantUML y parseo Markdown.                   |
 | Cliente HTTP          | fetch nativo                    | —                    | Envuelto en `shared/api/client.ts`.                     |
 | Mocks                 | MSW                             | `^2.13.4`            | `NEXT_PUBLIC_USE_MOCKS` y tests.                        |
 | Testing               | Vitest + Testing Library        | `^4.1.4`             | `jsdom`, cobertura v8.                                  |
@@ -123,7 +122,6 @@ bun run test:coverage
 | `/proyecto/caracteristicas`       | `app/(app)/proyecto/caracteristicas/page.tsx`       | `CharacteristicsPage`             |
 | `/proyecto/caracteristicas/nueva` | `app/(app)/proyecto/caracteristicas/nueva/page.tsx` | `CreateCharacteristic`            |
 | `/proyecto/requisitos`            | `app/(app)/proyecto/requisitos/page.tsx`            | `RequirementsPage`                |
-| `/proyecto/modelo`                | `app/(app)/proyecto/modelo/page.tsx`                | `ModelingPage`                    |
 | `/proyecto/codigo`                | `app/(app)/proyecto/codigo/page.tsx`                | `ImplementationPage`              |
 | `/proyecto/codigo/resumen`        | `app/(app)/proyecto/codigo/resumen/page.tsx`        | `ImplementationSummaryPage`       |
 | `/proyecto/{fase}/consistencia`   | `app/(app)/proyecto/[fase]/consistencia/page.tsx`   | `ConsistencyPage`                 |

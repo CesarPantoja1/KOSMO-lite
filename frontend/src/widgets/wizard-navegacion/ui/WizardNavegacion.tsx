@@ -27,7 +27,6 @@ import {
 	Characteristics,
 	Discovery,
 	Requirements,
-	Modeling,
 	Implementation,
 } from '@/shared/ui';
 
@@ -58,13 +57,6 @@ const phaseItems: {
 		label: 'CRITERIOS',
 		subtitle: 'Reglas de aceptación',
 		consistencyPhase: 'requirements',
-	},
-	{
-		href: '/proyecto/modelo',
-		Icon: Modeling,
-		label: 'DIAGRAMAS',
-		subtitle: 'Flujo de interacción',
-		consistencyPhase: 'model',
 	},
 	{
 		href: '/proyecto/codigo',
