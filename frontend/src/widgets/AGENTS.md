@@ -1,0 +1,95 @@
+# Capa `widgets/` — Bloques UI complejos
+
+> **Destinatario:** Agentes de IA que trabajen en `frontend/src/widgets/`.
+> **Ámbito:** `src/widgets/` — bloques UI que componen múltiples entidades y features en una unidad cohesiva (navbars, paneles, wizards).
+> **Regla:** los widgets importan de `features`, `entities` y `shared`.
+> **Nivel superior:** [../AGENTS.md](../AGENTS.md).
+
+---
+
+## 1. Estructura y segmentos
+
+```
+widgets/<widget>/
+├── ui/       # Composición visual
+├── model/    # Coordinación de estado entre slices
+├── lib/      # Utilidades internas
+├── types/    # Tipos propios (o model/types.ts)
+└── index.ts  # API pública
+```
+
+Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**, **`types/`**.
+
+---
+
+## 2. Catálogo de widgets
+
+| Widget | Archivos clave | Exports | Propósito |
+|---|---|---|---|
+| `main-navbar` | `ui/MainNavbar.tsx`, `ProjectNavigation.tsx`, `SidebarBrand.tsx`, `UserSection.tsx`; `model/types.ts`; `index.tsx` | `MainNavbar`, `IconWizardProps` | Layout autenticado: sidebar (marca + proyectos + usuario) y área principal con `WizardNavegacion` y `GitHubSyncBanner`. **Ver [`main-navbar/AGENTS.md`](./main-navbar/AGENTS.md).** |
+| `wizard-navegacion` | `ui/WizardNavegacion.tsx`, `WizardItem.tsx`, `PhaseStatusBadge.tsx`, `ConsistencyGateButton.tsx`, `AiProviderToast.tsx`; `model/wizard.ts`, `status.ts`, `get-status-color.ts`, `useConsistencyPolling.ts` | `WizardNavegacion` | Barra de pasos del pipeline SDD (Descubrimiento→Funcionalidades→Criterios→Diagramas→Implementación) con badges de consistencia y gate. |
+| `root-navbar` | `ui/RootNavbar.tsx` | `RootNavbar` | Navbar público de la landing (anclas + "Comenzar"/"Mi Cuenta" según sesión). Montado en `app/(root)/layout.tsx`. |
+| `AsideCharacteristic` | `ui/AsideCharacteristic.tsx` | `AsideCharacteristic` | Sidebar colapsable de características (288px/52px) con selección y advertencias. |
+| `gestion-repositorio-github` | `ui/GestionRepositorioGitHub.tsx` | `GestionRepositorioGitHub` | Tarjeta que gestiona el repo GitHub según `ProjectGithubViewState` (crear/sincronizar/estado). |
+| `gestion-deploy` | `ui/` (vacío) | — | Placeholder sin implementación. |
+
+---
+
+## 3. Detalle de widgets no triviales
+
+### `wizard-navegacion`
+- `WizardNavegacion` define `phaseItems` (hitos del proyecto), calcula `activeIndex` y el estado por paso.
+- Integra `useConsistencyPolling` (refresco periódico de `getConsistencyStatus` solo con pestaña visible y anti-solapamiento), `PhaseStatusBadge` (pendientes/evaluando/fallos) y `ConsistencyGateButton` (navega a la ruta de revisión respetando cambios sin guardar).
+- `AiProviderToast` avisa cuando falta la API Key de IA y enlaza a `/onboarding`.
+- `model/get-status-color.ts` centraliza los estilos Tailwind por `ProjectStatus` (`active | completed | disable`).
+- Se oculta en rutas de consistencia y cuando `isProyectosOpen` es falso.
+
+### `main-navbar`
+- `MainNavbar` es el contenedor del layout autenticado: sidebar (`SidebarBrand` + `ProjectNavigation` + `UserSection`) y `main` (con `WizardNavegacion` + `GitHubSyncBanner` + `children`).
+- Oculta sidebar/header cuando `isEditorMaximized`.
+- Gestiona navegación con protección de cambios sin guardar (`pendingNavigationPath`).
+
+### `AsideCharacteristic`
+- Lista características (`display_id`/título) con selección, icono o `WarningIcon` según `warningByFeature`, y borrado en hover. Soporta modo de expansión controlado/no controlado.
+
+### `gestion-repositorio-github`
+- Controlado por `ProjectGithubViewState`; en estado `create` usa `FormularioCreacionRepositorio` (shared/ui). Muestra visibilidad, URL, última sincronización y hash corto.
+
+---
+
+## 4. Patrones
+
+- Un widget **compone** (`ui/`) y, si cruza varias entidades/features, añade `model/` para coordinarlas.
+- Preferir props/estado de entidad antes de crear estado propio en el widget.
+- Los iconos provienen de `@/shared/ui`; los componentes compartidos (modales, toast, formularios de repo) de `@/shared/ui`.
+
+---
+
+## 5. Dónde cambiar qué
+
+```
+├── Layout autenticado / sidebar          → widgets/main-navbar/
+├── Barra de pasos SDD / consistencia     → widgets/wizard-navegacion/
+├── Navbar de landing                     → widgets/root-navbar/
+├── Sidebar de características            → widgets/AsideCharacteristic/
+└── Tarjeta de repositorio GitHub         → widgets/gestion-repositorio-github/
+```
+
+---
+
+## 6. Invariantes
+
+1. **Sin importar** `pages`.
+2. **No duplicar** lógica de entidad: consumir stores/APIs de `@/entities/*`.
+3. **Reutilizar** `shared/ui` (modales, toast, formularios) en lugar de reimplementar.
+4. **`index.ts` como API pública.**
+5. Un widget complejo con lógica de coordinación debe documentarse con su propio `AGENTS.md`.
+
+---
+
+## 7. Verificación
+
+```bash
+bun run typecheck
+# los widgets no se miden en cobertura
+```
