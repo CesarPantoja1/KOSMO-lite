@@ -2,33 +2,31 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-import { useAppStore } from '@/features/app-state';
-import { useProjectStore } from '@/entities/project';
+
+import { toast } from '@/shared/ui';
+
+import type {
+	ConsistencyStatusResponse,
+	ConsistencyTargetPhase,
+} from '@/entities/consistency';
 import {
 	CONSISTENCY_REVIEW_ROUTES,
 	firstPhaseToReview,
 	sumPhaseStatus,
 } from '@/entities/consistency';
-import type {
-	ConsistencyStatusResponse,
-	ConsistencyTargetPhase,
-} from '@/entities/consistency';
-import { useConsistencyPolling } from '../model/useConsistencyPolling';
-import { toast } from '@/shared/ui';
+import { useProjectStore } from '@/entities/project';
+
+import { useAppStore } from '@/features/app-state';
 
 import { getStyleIconStatus } from '../model/get-status-color';
-import { ProjectStatus } from '../model/status';
-import WizardItem from './WizardItem';
-import { PhaseStatusBadge } from './PhaseStatusBadge';
-import { ConsistencyGateButton } from './ConsistencyGateButton';
+import { useConsistencyPolling } from '../model/useConsistencyPolling';
 import { AiProviderToast } from './AiProviderToast';
+import { ConsistencyGateButton } from './ConsistencyGateButton';
+import { PhaseStatusBadge } from './PhaseStatusBadge';
+import WizardItem from './WizardItem';
 
-import {
-	Characteristics,
-	Discovery,
-	Requirements,
-	Implementation,
-} from '@/shared/ui';
+import { Characteristics, Discovery, Implementation, Requirements } from '@/shared/ui';
+import { ProjectStatus } from '../model/types';
 
 const phaseItems: {
 	href: string;

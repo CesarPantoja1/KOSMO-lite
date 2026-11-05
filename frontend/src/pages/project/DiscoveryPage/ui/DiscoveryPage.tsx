@@ -1,20 +1,22 @@
 'use client';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useDiscoveryStore } from '@/entities/discovery';
-import { createAssistantError } from '@/entities/chat';
+import { formatApiError } from '@/shared/api';
+import { Ai, ArrowRight, Loading, ModalConfirm, toast } from '@/shared/ui';
+
 import type { ChatMessage } from '@/entities/chat';
+import { createAssistantError } from '@/entities/chat';
+import { useDiscoveryStore } from '@/entities/discovery';
+import { useProjectStore } from '@/entities/project';
+
+import { useAppStore, useUnsavedChanges } from '@/features/app-state';
+import { ChatStreamPanel } from '@/features/chatbot';
 import {
-	ChatStreamPanel,
 	MarkdownEditor,
 	type MarkdownEditorHandle,
 	type SaveStatus,
-} from '@/features';
-import { Ai, ArrowRight, Loading, ModalConfirm, toast } from '@/shared/ui';
-import { formatApiError } from '@/shared/api';
-import { useAppStore, useUnsavedChanges } from '@/features/app-state';
-import { useProjectStore } from '@/entities/project';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+} from '@/features/markdown-editor';
 
 const generatingDiscoveryMessages = [
 	'Analizando información del proyecto...',

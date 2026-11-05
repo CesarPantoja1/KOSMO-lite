@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+
 import { useAuthStore } from '@/entities/user';
+import { RootNavbar } from '@/widgets/root-navbar';
+
 import { AiConfigTab } from './AiConfigTab';
 import { CuentaTab } from './CuentaTab';
-import { RootNavbar } from '@/widgets';
 
 type TabType = 'cuenta' | 'ia';
 
@@ -18,7 +20,9 @@ function ProfilePage() {
 		Boolean(window.opener && window.opener !== window) &&
 		(() => {
 			const params = new URLSearchParams(window.location.search);
-			return Boolean(params.get('code') || params.get('error') || params.get('error_description'));
+			return Boolean(
+				params.get('code') || params.get('error') || params.get('error_description'),
+			);
 		})();
 
 	useEffect(() => {

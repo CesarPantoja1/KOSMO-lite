@@ -1,20 +1,30 @@
 'use client';
 
-import { useCharacteristicStore, deleteFeature } from '@/entities/characteristic';
-import { useDiscoveryStore } from '@/entities/discovery';
-import { ChatStreamPanel } from '@/features';
-import { createAssistantError } from '@/entities/chat';
-import { subscribeImplementationEvents } from '@/entities/implementation';
-import { Ai, ArrowLeft, Loading, ModalConfirm, Plus, toast } from '@/shared/ui';
-import { formatApiError } from '@/shared/api';
-import ArrowRight from '@/shared/ui/icons/ArrowRight';
-import { useProjectStore } from '@/entities/project';
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
 import { useCharacteristicsPage } from '../hooks/use-characteristics-page';
+
+import {
+	Ai,
+	ArrowLeft,
+	ArrowRight,
+	Loading,
+	ModalConfirm,
+	Plus,
+	toast,
+} from '@/shared/ui';
+import { formatApiError } from '@/shared/api';
+
+import { deleteFeature, useCharacteristicStore } from '@/entities/characteristic';
+import { ChatMessage, createAssistantError } from '@/entities/chat';
+import { useDiscoveryStore } from '@/entities/discovery';
+import { subscribeImplementationEvents } from '@/entities/implementation';
+import { useProjectStore } from '@/entities/project';
+
+import { ChatStreamPanel } from '@/features/chatbot';
+
 import CardCharacterist from './CardCharacterist';
 import Search from './Search';
-import { ChatMessage } from '@/entities/chat';
 
 const generatingCharacteristicMessages = [
 	'Analizando descubrimiento del proyecto...',

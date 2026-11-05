@@ -1,16 +1,18 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { RootNavbar } from '@/widgets';
-import { Hero } from './Hero';
-import { FlowSteps } from './FlowSteps';
-import { Features } from './Features';
-import { SddSection } from './SddSection';
-import { ApiKeySection } from './ApiKeySection';
-import { CtaSection } from './CtaSection';
-import { AuthModal } from './AuthModal';
-import { SessionExpiredWatcher } from './SessionExpiredWatcher';
+
 import { VideoIntro } from '@/shared/ui/VideoIntro';
+import { RootNavbar } from '@/widgets/root-navbar';
+
+import { ApiKeySection } from './ApiKeySection';
+import { AuthModal } from './AuthModal';
+import { CtaSection } from './CtaSection';
+import { Features } from './Features';
+import { FlowSteps } from './FlowSteps';
+import { Hero } from './Hero';
+import { SddSection } from './SddSection';
+import { SessionExpiredWatcher } from './SessionExpiredWatcher';
 
 export function RootPage() {
 	const [showAuthModal, setShowAuthModal] = useState(false);

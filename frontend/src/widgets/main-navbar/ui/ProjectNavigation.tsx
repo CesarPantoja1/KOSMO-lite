@@ -1,5 +1,6 @@
-import { Project } from '@/entities/project';
 import { ComputerDesktop, Home } from '@/shared/ui';
+
+import { Project } from '@/entities/project';
 
 interface ProjectNavigationProps {
 	projects: Project[];
