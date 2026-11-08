@@ -19,6 +19,7 @@ from kosmo.application.codegen.recover_zombie_implementations import recover_zom
 from kosmo.application.integrations.recover_pending_deployments import recover_pending_deployments
 from kosmo.config import settings
 from kosmo.contracts.sdd.errors import SpecError
+from kosmo.infrastructure.api.catalog_sync_worker import run_catalog_sync_worker
 from kosmo.infrastructure.api.composition import AppContainer, build_app_components
 from kosmo.infrastructure.api.middlewares import RequestLoggingMiddleware
 from kosmo.infrastructure.api.routers.ai_config import router as ai_config_router
@@ -306,6 +307,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
                 delay = min(delay * 2, 600.0)
 
     recovery_task = asyncio.create_task(_recover_after_lease_expiry(), name="codegen_recovery_task")
+    sync_task: asyncio.Task[None] | None = None
+    if settings.ai_catalog_sync_enabled:
+        sync_task = asyncio.create_task(
+            run_catalog_sync_worker(components, settings),
+            name="ai_catalog_sync_worker",
+        )
 
     # El estado de despliegue persiste en PostgreSQL, pero las tareas de sondeo no.
     # Reanudarlas evita que un reinicio durante una publicación deje la UI en BUILDING.
@@ -320,6 +327,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     try:
         yield
     finally:
+        if sync_task is not None:
+            sync_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await sync_task
         recovery_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await recovery_task
