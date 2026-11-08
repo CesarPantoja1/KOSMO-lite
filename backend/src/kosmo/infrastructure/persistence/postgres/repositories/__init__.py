@@ -2,6 +2,9 @@ from kosmo.infrastructure.persistence.postgres.repositories.agent_memory_repo im
     SqlAlchemyAgentSessionStore,
     SqlAlchemyKnowledgePatternStore,
 )
+from kosmo.infrastructure.persistence.postgres.repositories.ai_catalog_repo import (
+    SqlAlchemyAiCatalogRepository,
+)
 from kosmo.infrastructure.persistence.postgres.repositories.audit import SqlAlchemyAuditEventSink
 from kosmo.infrastructure.persistence.postgres.repositories.chat_repo import SqlAlchemyChatRepository
 from kosmo.infrastructure.persistence.postgres.repositories.consistency_repo import (
@@ -45,6 +48,7 @@ from kosmo.infrastructure.persistence.postgres.repositories.workspace_repo impor
 
 __all__ = [
     "SqlAlchemyAgentSessionStore",
+    "SqlAlchemyAiCatalogRepository",
     "SqlAlchemyAuditEventSink",
     "SqlAlchemyChatRepository",
     "SqlAlchemyCodeSyncLogRepository",

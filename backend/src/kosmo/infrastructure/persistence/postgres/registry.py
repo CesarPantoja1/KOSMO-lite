@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from kosmo.infrastructure.persistence.postgres.repositories import (
+    SqlAlchemyAiCatalogRepository,
     SqlAlchemyAuditEventSink,
     SqlAlchemyChatRepository,
     SqlAlchemyCodeSyncLogRepository,
@@ -42,6 +43,7 @@ class RepositoryRegistry:
     workspaces: SqlAlchemyWorkspaceRepository
     implementations: SqlAlchemyFeatureImplementationRepository
     user_ai_configs: SqlAlchemyUserAiConfigRepository
+    ai_catalog: SqlAlchemyAiCatalogRepository
     project_integrations: SqlAlchemyProjectGitHubIntegrationRepository
     project_deployments: SqlAlchemyProjectDeploymentRepository
     sync_logs: SqlAlchemyCodeSyncLogRepository
@@ -64,6 +66,7 @@ class RepositoryRegistry:
             workspaces=SqlAlchemyWorkspaceRepository(session_factory),
             implementations=SqlAlchemyFeatureImplementationRepository(session_factory),
             user_ai_configs=SqlAlchemyUserAiConfigRepository(session_factory),
+            ai_catalog=SqlAlchemyAiCatalogRepository(session_factory),
             project_integrations=SqlAlchemyProjectGitHubIntegrationRepository(session_factory),
             project_deployments=SqlAlchemyProjectDeploymentRepository(session_factory),
             sync_logs=SqlAlchemyCodeSyncLogRepository(session_factory),

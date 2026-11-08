@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector  # pyright: ignore[reportMissingTypeStubs]
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -367,6 +367,37 @@ class UserAiConfigModel(Base):
     model: Mapped[str] = mapped_column(String(100), nullable=False)
     encrypted_api_key: Mapped[str | None] = mapped_column(Text(), nullable=True)
     is_custom: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AiCatalogModel(Base):
+    __tablename__ = "ai_catalog_models"
+    __table_args__ = (
+        UniqueConstraint("provider", "model_id", name="uq_ai_catalog_provider_model"),
+        Index("ix_ai_catalog_active_models", "provider", "is_active", "opencode_compatible"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    opencode_model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    tier: Mapped[str] = mapped_column(String(32), nullable=False)
+    context_window: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("128000"))
+    max_output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("8192"))
+    supports_tools: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    supports_vision: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    opencode_compatible: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    is_deprecated: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    shutdown_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        pg.JSONB(), nullable=False, server_default=text("'{}'::jsonb")
+    )
+    last_discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

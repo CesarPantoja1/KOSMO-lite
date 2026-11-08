@@ -33,6 +33,8 @@ class AIModelInfo:
     id: str
     display_name: str
     tier: str
+    description: str = ""
+    recommended: bool = False
 
 
 @dataclass(frozen=True, slots=True)

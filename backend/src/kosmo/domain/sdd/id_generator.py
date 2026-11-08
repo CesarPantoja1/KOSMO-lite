@@ -34,6 +34,8 @@ _PREFIX_MAP: dict[str, str] = {
     "integration": "uint_",
     "project_integration": "pint_",
     "code_sync_log": "csync_",
+    "catalog": "cat_",
+    "catalog_model": "cat_",
 }
 
 
