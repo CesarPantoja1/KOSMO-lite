@@ -14,6 +14,7 @@ from kosmo.contracts.ai.ai_config import AIProvider, UserAiConfigRepository
 from kosmo.contracts.auth.context import current_user_id
 from kosmo.contracts.auth.secrets import EncryptedSecret, SecretCipher
 from kosmo.contracts.sdd.codegen import OpenCodeEvent, OpenCodeEventType, OpenCodeSession
+from kosmo.domain.codegen.model_alias_resolver import OpenCodeModelAliasResolver
 from kosmo.infrastructure.codegen.opencode_client import OpenCodeHttpClient
 
 
@@ -55,14 +56,17 @@ class IsolatedOpenCodeClient:
             raise UserCodegenConfigError(
                 "El proveedor seleccionado no es compatible con OpenCode. Elige OpenAI, Anthropic, Google o DeepSeek."
             )
-        if not config.model or "/" in config.model:
+        if not config.model:
+            raise UserCodegenConfigError("El modelo configurado no es válido para OpenCode.")
+        resolved_model = OpenCodeModelAliasResolver().resolve(config.provider.value, config.model)
+        if not resolved_model or "/" in resolved_model:
             raise UserCodegenConfigError("El modelo configurado no es válido para OpenCode.")
         encrypted = config.encrypted_api_key
         secret = encrypted if isinstance(encrypted, EncryptedSecret) else EncryptedSecret(ciphertext=encrypted)
         api_key = self._cipher.decrypt(secret).decode("utf-8").strip()
         if not api_key:
             raise UserCodegenConfigError("La API key configurada está vacía. Actualízala en Preferencias de IA.")
-        return config.provider, config.model, api_key
+        return config.provider, resolved_model, api_key
 
     async def validate_user_config(self) -> None:
         """Reject missing/unsupported BYOK configuration before mutating the workspace."""

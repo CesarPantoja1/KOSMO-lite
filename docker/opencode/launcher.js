@@ -74,6 +74,34 @@ function writeSecret(containerId, filename, value) {
 }
 
 const labels = { "kosmo.opencode-job": "1", "kosmo.stack": stack };
+const defaultOpenCodeCatalog = {
+  openai: [
+    "gpt-6.1-terra", "gpt-6.1-terra-pro", "gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna",
+    "gpt-5.6", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "o3-pro", "o3",
+    "gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o1-preview", "o3-mini", "gpt-4-turbo", "gpt-4"
+  ],
+  anthropic: [
+    "claude-opus-5-5", "claude-opus-5-5-fast", "claude-sonnet-5-5", "claude-haiku-5-5",
+    "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5", "claude-opus-4-8", "claude-sonnet-4-6",
+    "claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5",
+    "claude-3-7-sonnet", "claude-3-7-sonnet-20250219",
+    "claude-3-5-sonnet", "claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620",
+    "claude-3-5-haiku", "claude-3-5-haiku-20241022",
+    "claude-3-opus", "claude-3-opus-20240229",
+    "claude-3-sonnet", "claude-3-haiku",
+  ],
+  google: [
+    "gemini-4-argon", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+    "gemini-3.5-flash-lite", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite",
+    "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+    "gemini-2.0-flash", "gemini-2.0-flash-exp",
+    "gemini-1.5-pro", "gemini-1.5-flash",
+    "gemini-3.1-pro",
+  ],
+  deepseek: [
+    "deepseek-v4-pro", "deepseek-flash", "deepseek-chat", "deepseek-reasoner",
+  ],
+};
 function containerFilters() {
   return encodeURIComponent(JSON.stringify({ label: Object.entries(labels).map(([k, v]) => `${k}=${v}`) }));
 }
@@ -241,6 +269,9 @@ const server = http.createServer(async (request, response) => {
     return;
   }
   try {
+    if (request.method === "GET" && request.url === "/catalog") {
+      return reply(response, 200, defaultOpenCodeCatalog);
+    }
     if (request.method === "POST" && request.url === "/jobs") {
       if (creating) return reply(response, 429, { error: "El lanzador está ocupado" });
       creating = true;
@@ -289,5 +320,5 @@ if (require.main === module) {
   server.listen(port, "0.0.0.0");
 }
 
-module.exports = { buildJobConfig, secretExecArgs, validId, validModel, validContainerId,
+module.exports = { defaultOpenCodeCatalog, buildJobConfig, secretExecArgs, validId, validModel, validContainerId,
   ownedJobId, workspaceReadError };

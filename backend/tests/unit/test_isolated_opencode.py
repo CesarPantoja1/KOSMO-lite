@@ -207,3 +207,66 @@ async def test_startup_oom_is_reported_immediately(cipher: FernetSecretCipher, m
     finally:
         current_user_id.reset(user_token)
         await client.aclose()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_job_normalizes_model_aliases_for_opencode(
+    cipher: FernetSecretCipher, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = UserAiConfig(
+        user_id="owner-2",
+        provider=AIProvider.ANTHROPIC,
+        model="claude-3-7-sonnet-20250219",
+        encrypted_api_key=cipher.encrypt(b"sk-ant-test"),
+    )
+    client = make_client(config, cipher)
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.method == "POST" and request.url.path == "/jobs":
+            return httpx.Response(
+                201,
+                json={
+                    "job_id": "b" * 64,
+                    "base_url": "http://kosmo-oc-xyz:4096",
+                    "password": "ephemeral-password",
+                },
+            )
+        return httpx.Response(200, json={"ok": True})
+
+    await client._launcher.aclose()
+    client._launcher = httpx.AsyncClient(
+        base_url="http://launcher:8082",
+        transport=httpx.MockTransport(handler),
+        headers={"Authorization": "Bearer internal-token"},
+    )
+    validated: list[tuple[str, str]] = []
+
+    class FakeOpenCode:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        async def health_check(self) -> bool:
+            return True
+
+        async def validate_model(self, provider: str, model: str) -> None:
+            validated.append((provider, model))
+
+        async def aclose(self) -> None:
+            return None
+
+    monkeypatch.setattr(isolated_opencode, "OpenCodeHttpClient", FakeOpenCode)
+    user_token = current_user_id.set("owner-2")
+    try:
+        await client.start_job("/workspaces/prj_456")
+        await client.stop_job()
+        assert validated == [("anthropic", "claude-3-7-sonnet")]
+        import json
+
+        payload = json.loads(calls[0].read().decode())
+        assert payload["model"] == "claude-3-7-sonnet"
+    finally:
+        current_user_id.reset(user_token)
+        await client.aclose()
