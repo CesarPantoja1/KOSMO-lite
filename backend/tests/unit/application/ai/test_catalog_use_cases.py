@@ -128,11 +128,11 @@ async def test_get_catalog_curates_strictly_one_model_per_tier() -> None:
             CatalogModel(
                 id="cat_4",
                 provider="openai",
-                model_id="o3-pro",
-                opencode_model_id="o3-pro",
-                display_name="o3-pro",
-                tier=ModelTier.REASONING,
-                metadata_json={"release_date": "2026-09-01"},
+                model_id="gpt-5-mini",
+                opencode_model_id="gpt-5-mini",
+                display_name="GPT-5 mini",
+                tier=ModelTier.FAST,
+                metadata_json={"release_date": "2025-09-01"},
             ),
             CatalogModel(
                 id="cat_5",
@@ -171,3 +171,31 @@ async def test_get_catalog_curates_strictly_one_model_per_tier() -> None:
     assert openai_prov.models[0].description == ""
     assert openai_prov.models[1].id == "gpt-6.1-terra"
     assert openai_prov.models[2].id == "gpt-6-luna"
+
+
+@pytest.mark.asyncio
+async def test_get_catalog_offline_fallback_seeds_complete_curated_models() -> None:
+    # Arrange: Simular sistema 100% offline (OpenCode y red inaccesibles)
+    from kosmo.domain.ai.seed_catalog import SEED_CATALOG_MODELS
+
+    repo = MagicMock(spec=AiCatalogRepository)
+    # Primera llamada vacía, segunda llamada retorna las semillas
+    repo.list_active.side_effect = [[], list(SEED_CATALOG_MODELS)]
+    repo.upsert_batch = AsyncMock()
+
+    offline_inspector = MagicMock(spec=OpenCodeCatalogInspector)
+    offline_inspector.get_raw_models = AsyncMock(side_effect=RuntimeError("No internet / OpenCode offline"))
+
+    use_case = GetAiCatalogUseCase(catalog_repo=repo, opencode_inspector=offline_inspector)
+
+    # Act
+    providers = await use_case.execute()
+
+    # Assert: El fallback offline sembró SEED_CATALOG_MODELS exitosamente
+    repo.upsert_batch.assert_called_once_with(list(SEED_CATALOG_MODELS))
+    assert len(providers) == 4
+    provider_map = {p.value: [m.id for m in p.models] for p in providers}
+    assert provider_map["openai"] == ["gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"]
+    assert provider_map["anthropic"] == ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
+    assert provider_map["google"] == ["gemini-4-argon", "gemini-3.8-flash", "gemini-3.5-flash-lite"]
+    assert provider_map["deepseek"] == ["deepseek-v4-pro", "deepseek-flash"]

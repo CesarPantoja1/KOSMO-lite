@@ -25,8 +25,6 @@ def test_resolve_openai_snapshot_aliases() -> None:
     # Act & Assert
     assert resolver.resolve("openai", "gpt-4o-2024-08-06") == "gpt-4o"
     assert resolver.resolve("openai", "gpt-4o-mini-2024-07-18") == "gpt-4o-mini"
-    assert resolver.resolve("openai", "o1-2024-12-17") == "o1"
-    assert resolver.resolve("openai", "o3-mini-2025-01-31") == "o3-mini"
 
 
 def test_resolve_google_prefixed_aliases() -> None:

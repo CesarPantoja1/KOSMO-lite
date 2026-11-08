@@ -4,9 +4,11 @@ import re
 
 
 def is_excluded_model(model_id: str) -> bool:
-    """Filtra modelos que no son de tipo chat / conversational reasoning o snapshots fechados redundantes."""
+    """Filtra modelos no aptos (embeddings, audio, etc.), snapshots fechados o series obsoletas."""
     mid = model_id.lower()
     if bool(re.search(r"-\d{8}$", mid)):
+        return True
+    if any(mid.startswith(prefix) for prefix in ("o1", "o3", "o4")):
         return True
     excluded_keywords = (
         "embed",

@@ -44,15 +44,10 @@ OPENCODE_SEED_MODELS: dict[str, frozenset[str]] = {
             "gpt-5",
             "gpt-5-pro",
             "gpt-5-mini",
-            "o3",
-            "o3-pro",
-            "o3-fast",
-            "o4-mini",
             "gpt-4.1",
             "gpt-4.1-mini",
             "gpt-4o",
             "gpt-4o-mini",
-            "o1",
         }
     ),
     "anthropic": frozenset(

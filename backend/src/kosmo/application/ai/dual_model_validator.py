@@ -15,7 +15,7 @@ class DualModelValidator:
 
     def classify_tier(self, model_id: str) -> ModelTier:
         mid = model_id.lower()
-        if any(kw in mid for kw in ("o1", "o3", "o4", "reasoner")):
+        if any(kw in mid for kw in ("reasoner", "-thinking", "-deliberate")):
             return ModelTier.REASONING
         if any(kw in mid for kw in ("sol", "opus", "gemini-4", "v4-pro")):
             return ModelTier.FLAGSHIP
@@ -48,6 +48,10 @@ class DualModelValidator:
 
         # Invariante: Solo activo si OpenCode lo acepta, tiene contexto suficiente y no está retirado
         is_active = opencode_compatible and has_min_context and (not is_deprecated)
+
+        # Invariante de seguridad: Modelos obsoletos 'o' de OpenAI no se activan
+        if raw.provider == "openai" and any(raw.model_id.lower().startswith(p) for p in ("o1", "o3", "o4")):
+            is_active = False
 
         tier = self.classify_tier(raw.model_id)
         model_pk = existing_id or IdGenerator.generate("catalog")

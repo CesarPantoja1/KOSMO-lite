@@ -77,8 +77,8 @@ const labels = { "kosmo.opencode-job": "1", "kosmo.stack": stack };
 const defaultOpenCodeCatalog = {
   openai: [
     "gpt-6.1-terra", "gpt-6.1-terra-pro", "gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna",
-    "gpt-5.6", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "o3-pro", "o3",
-    "gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o1-preview", "o3-mini", "gpt-4-turbo", "gpt-4"
+    "gpt-5.6", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini",
+    "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"
   ],
   anthropic: [
     "claude-opus-5-5", "claude-opus-5-5-fast", "claude-sonnet-5-5", "claude-haiku-5-5",

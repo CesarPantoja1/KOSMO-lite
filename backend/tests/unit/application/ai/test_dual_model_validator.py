@@ -19,7 +19,7 @@ def test_validator_approves_fully_compatible_model() -> None:
         display_name="GPT-4o",
         context_window=128000,
     )
-    opencode_models = {"gpt-4o", "o3-mini"}
+    opencode_models = {"gpt-4o", "gpt-4o-mini"}
 
     # Act
     model = validator.validate_and_classify(raw, opencode_models)
@@ -70,6 +70,21 @@ def test_validator_resolves_aliased_model_to_match_opencode() -> None:
     assert model.is_active is True
 
 
+def test_validator_rejects_obsolete_openai_o_models() -> None:
+    # Arrange: Modelos de la serie 'o' de OpenAI deben quedar inactivos
+    validator = DualModelValidator()
+    for o_model in ("o1", "o1-mini", "o3", "o3-pro", "o3-mini", "o4-mini"):
+        raw = RawDiscoveredModel(
+            provider="openai",
+            model_id=o_model,
+            display_name=o_model,
+            context_window=200000,
+        )
+        opencode_models = {o_model}
+        model = validator.validate_and_classify(raw, opencode_models)
+        assert model.is_active is False, f"Model {o_model} should be inactive"
+
+
 def test_validator_marks_expired_shutdown_date_as_inactive() -> None:
     # Arrange
     validator = DualModelValidator()
@@ -96,7 +111,6 @@ def test_validator_classifies_tiers_correctly() -> None:
     validator = DualModelValidator()
 
     # Act & Assert
-    assert validator.classify_tier("o3-mini") == ModelTier.REASONING
     assert validator.classify_tier("claude-3-opus") == ModelTier.FLAGSHIP
     assert validator.classify_tier("deepseek-reasoner") == ModelTier.REASONING
     assert validator.classify_tier("gpt-4o-mini") == ModelTier.FAST
