@@ -1,4 +1,10 @@
-from .ai_config import get_manage_ai_preferences_use_case, get_validate_ai_connection_use_case
+from .ai_config import (
+    build_sync_ai_catalog_use_case,
+    get_ai_catalog_use_case,
+    get_manage_ai_preferences_use_case,
+    get_sync_ai_catalog_use_case,
+    get_validate_ai_connection_use_case,
+)
 from .auth import get_principal, require_project_owner, verify_project_owner
 from .container import get_container
 from .integrations import (
@@ -14,6 +20,8 @@ from .integrations import (
 )
 
 __all__ = [
+    "build_sync_ai_catalog_use_case",
+    "get_ai_catalog_use_case",
     "get_container",
     "get_delete_deployment_use_case",
     "get_deployment_worker",
@@ -25,6 +33,7 @@ __all__ = [
     "get_monitor_deployment_status_use_case",
     "get_orchestrate_cloud_deployment_use_case",
     "get_principal",
+    "get_sync_ai_catalog_use_case",
     "get_sync_github_repository_use_case",
     "get_validate_ai_connection_use_case",
     "require_project_owner",

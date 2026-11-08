@@ -7,6 +7,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from kosmo.contracts.ai.catalog import RawDiscoveredModel
 from kosmo.contracts.sdd.ids import FeatureId, ImplementationId, ProjectId, WorkspaceId
 
 
@@ -261,6 +262,19 @@ class OpenCodeClientPort(Protocol):
     ) -> AsyncIterator[OpenCodeEvent]: ...
 
     async def close_session(self, session_id: str) -> None: ...
+
+
+class OpenCodeCatalogInspector(Protocol):
+    """Puerto para inspeccionar el catálogo de modelos aceptados por OpenCode."""
+
+    async def get_supported_models(self) -> dict[str, set[str]]:
+        """Devuelve un mapa {provider_id: {model_id_1, model_id_2, ...}}
+        exactamente como los valida OpenCode en su endpoint /provider."""
+        ...
+
+    async def get_raw_models(self) -> list[RawDiscoveredModel]:
+        """Consulta OpenCode y retorna los modelos con sus metadatos reales."""
+        ...
 
 
 class WorkspaceRepository(Protocol):
