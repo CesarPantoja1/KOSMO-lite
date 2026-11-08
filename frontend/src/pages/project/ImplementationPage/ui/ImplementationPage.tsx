@@ -3,10 +3,6 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 
-import { useCharacteristicStore } from '@/entities/characteristic';
-import { useImplementationStore } from '@/entities/implementation';
-import { useProjectStore } from '@/entities/project';
-import { useProjectGithubRepo } from '@/features/github-sync';
 import { formatApiError } from '@/shared/api';
 import {
 	Ai,
@@ -19,7 +15,13 @@ import {
 	toast,
 	WarningIcon,
 } from '@/shared/ui';
-import { AsideCharacteristic } from '@/widgets';
+
+import { useCharacteristicStore } from '@/entities/characteristic';
+import { useImplementationStore } from '@/entities/implementation';
+import { useProjectStore } from '@/entities/project';
+
+import { AsideCharacteristic } from '@/features/aside-characteristic';
+import { useProjectGithubRepo } from '@/features/github-sync';
 
 const ImplementationPage = () => {
 	const characteristics = useCharacteristicStore((s) => s.currentCharacteristics);
@@ -41,7 +43,9 @@ const ImplementationPage = () => {
 	const progress = useImplementationStore((s) => s.progress);
 	const errorMessage = useImplementationStore((s) => s.errorMessage);
 	const implementations = useImplementationStore((s) => s.implementations);
-	const requiresReviewByFeature = useImplementationStore((s) => s.requiresReviewByFeature);
+	const requiresReviewByFeature = useImplementationStore(
+		(s) => s.requiresReviewByFeature,
+	);
 	const startGeneration = useImplementationStore((s) => s.startGeneration);
 	const loadImplementation = useImplementationStore((s) => s.loadImplementation);
 
@@ -111,7 +115,8 @@ const ImplementationPage = () => {
 						Preparando repositorio en GitHub...
 					</button>
 					<p className='text-xs text-neutral-400'>
-						El repositorio se está inicializando en segundo plano. Estará listo en un momento.
+						El repositorio se está inicializando en segundo plano. Estará listo en un
+						momento.
 					</p>
 				</div>
 			);
@@ -133,7 +138,8 @@ const ImplementationPage = () => {
 						type='button'
 						onClick={async () => {
 							const repoName =
-								githubStatus?.suggested_repo_name || `kosmo-${currentProject?.slug || 'app'}`;
+								githubStatus?.suggested_repo_name ||
+								`kosmo-${currentProject?.slug || 'app'}`;
 							try {
 								await retryCreateRepo({ repo_name: repoName, is_public: true });
 								toast.success('Repositorio creado exitosamente en GitHub');
@@ -326,15 +332,21 @@ const ImplementationPage = () => {
 														Implementación desactualizada
 													</h3>
 													<p className='text-neutral-600 text-sm'>
-														Las especificaciones de esta funcionalidad (Descubrimiento o Requisitos) cambiaron recientemente. El código generado previamente ya no coincide con los nuevos requisitos.
+														Las especificaciones de esta funcionalidad (Descubrimiento o
+														Requisitos) cambiaron recientemente. El código generado
+														previamente ya no coincide con los nuevos requisitos.
 													</p>
 													<p className='text-neutral-500 text-xs mt-1'>
-														Haz clic en «Regenerar implementación» para actualizar el código automáticamente con las nuevas reglas.
+														Haz clic en «Regenerar implementación» para actualizar el
+														código automáticamente con las nuevas reglas.
 													</p>
 												</div>
 												<div className='flex items-center gap-3 mt-2 flex-wrap justify-center'>
 													{renderGenerateAction('Regenerar implementación')}
-													<Link href='/proyecto/codigo/resumen' className='btn btn-secondary'>
+													<Link
+														href='/proyecto/codigo/resumen'
+														className='btn btn-secondary'
+													>
 														Ver código actual
 													</Link>
 												</div>

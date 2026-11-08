@@ -61,13 +61,13 @@ src/
 ├── features/       # ui/ + model/ + lib/. SIN api/ (no hacen HTTP directo)
 │   ├── ai-config/        # AiConfigForm, AiProviderBadge
 │   ├── app-state/        # app.store, useUnsavedChanges, clearAllStores
+│   ├── aside-characteristic/ # Sidebar de características
 │   ├── chatbot/          # Chat SSE + sesiones (Chatbot, ChatStreamPanel, ...)
 │   ├── github-sync/      # useProjectGithubRepo, GitHubSyncBanner
 │   ├── initialize/       # initializeProject (hidratación de stores)
 │   └── markdown-editor/  # Editor + TOC + autosave
 │
 ├── widgets/        # ui/ + model/ + lib/ + types/
-│   ├── AsideCharacteristic/       # Sidebar de características
 │   ├── gestion-deploy/            # (vacío / placeholder)
 │   ├── gestion-repositorio-github/# Tarjeta de repo GitHub
 │   ├── main-navbar/               # Layout autenticado (sidebar + nav + usuario)
@@ -106,9 +106,11 @@ src/
 ### `features/` — acciones del usuario
 - Segmentos: **`ui/`** (formularios/botones/paneles), **`model/`** (hooks/estado local), **`lib/`** (utilidades internas).
 - **Prohibido `api/`**: no hacen HTTP; reciben datos por props o store y usan entidades.
+- **Importación:** `@/features/<feature>` (el `index.ts` del slice). No existe barril de capa `@/features`.
 
 ### `widgets/` — bloques UI complejos
 - Segmentos: `ui/`, `model/`, `lib/`, `types/`. Componen varias entidades y features en una unidad cohesiva (navbars, wizards, paneles).
+- **Importación:** `@/widgets/<widget>` (el `index.ts` del slice). No existe barril de capa `@/widgets`.
 
 ### `pages/` — composición por ruta
 - Segmentos solo si se necesitan: `ui/` (layout propio), `model/`/`hooks/` (lógica de la página). No crear carpetas vacías.
@@ -214,7 +216,7 @@ export const getProjects = (): Promise<Project[]> =>
 
 1. **Dirección FSD:** `shared` nunca importa capas superiores; `entities`/`features` no se importan entre sí fuera de las reglas.
 2. **`entities` sin `ui/` y `features` sin `api/`:** respetar los segmentos permitidos por capa.
-3. **API pública vía `index.ts`:** los consumidores importan del barril de la capa, no de archivos internos (salvo dentro del mismo slice).
+3. **API pública vía `index.ts` del slice:** los consumidores importan de `@/entities/<x>`, `@/features/<x>` o `@/widgets/<x>`, nunca de archivos internos (salvo dentro del mismo slice). `features` y `widgets` **no** tienen barril de capa.
 4. **Sesión expirada:** `shared` emite (`emitSessionExpired`) y el consumidor limpia (`app/session-expired-listener.tsx` → `clearAllStores`). No invertir esa dependencia.
 5. **Un único `apiClient`:** todas las llamadas HTTP pasan por `shared/api/client.ts` (maneja auth, refresh y errores).
 6. **Tokens de diseño:** nunca hardcodear colores/hex; usar `globals.css`.

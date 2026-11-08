@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+
 import { useAiConfigStore } from '@/entities/ai-config';
 
 export function AiProviderToast() {
@@ -29,7 +30,10 @@ export function AiProviderToast() {
 			</svg>
 			<p className='text-sm text-warning-700'>
 				API Key de IA no configurada. Es obligatoria para usar funciones de IA.{' '}
-				<Link href='/onboarding' className='font-medium underline hover:text-warning-800 transition-colors'>
+				<Link
+					href='/onboarding'
+					className='font-medium underline hover:text-warning-800 transition-colors'
+				>
 					Configurar ahora
 				</Link>
 			</p>

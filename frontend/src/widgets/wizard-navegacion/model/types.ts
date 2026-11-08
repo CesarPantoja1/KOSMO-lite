@@ -1,3 +1,5 @@
+export type ProjectStatus = 'active' | 'completed' | 'disable';
+
 export type ItemWizardProps = {
 	href: string;
 	icon: React.ReactNode;
@@ -6,4 +8,10 @@ export type ItemWizardProps = {
 	subtitle: string;
 	labelStyles: string;
 	onClick?: (e: React.MouseEvent) => void;
+};
+
+export type stylesIconStatus = {
+	iconContainer: string;
+	iconStyles: string;
+	labelStyles: string;
 };

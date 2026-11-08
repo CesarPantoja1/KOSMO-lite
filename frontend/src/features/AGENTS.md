@@ -30,9 +30,10 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**. **No** existe `api/`.
 | `app-state` | `model/app.store.ts`, `lib/clearAllStores.ts`, `lib/useUnsavedChanges.ts` | `useAppStore`, `clearAppStore`, `useUnsavedChanges`, `clearAllStores` | Estado de UI global: inicialización, cambios sin guardar, editor maximizado, limpieza de stores. |
 | `github-sync` | `model/useProjectGithubRepo.ts`, `ui/GitHubSyncBanner.tsx` | `useProjectGithubRepo`, `ProjectGithubViewState`, `GitHubSyncBanner` | Estado de vinculación/sincronización del repo GitHub del proyecto. |
 | `ai-config` | `ui/AiConfigForm.tsx`, `ui/AiProviderBadge.tsx` | `AiConfigForm`, `AiProviderBadge` | Formulario BYOK de proveedor/modelo IA y badge del proveedor. |
+| `aside-characteristic` | `ui/AsideCharacteristic.tsx` | `AsideCharacteristic` | Sidebar colapsable de características (selección, iconos/advertencias, borrado). |
 | `initialize` | `model/init.service.ts` | `initializeProject` | Hidrata los stores de entidad al abrir un proyecto (discovery, características, requisitos). |
 
-Barrel: `features/index.ts` reexporta `markdown-editor`, `chatbot`, `app-state` y `github-sync`. `ai-config` e `initialize` se importan de su ruta directa.
+**Importación:** no existe `features/index.ts` (barril de capa). Cada consumidor importa del slice: `@/features/<feature>` (p. ej. `@/features/chatbot`, `@/features/aside-characteristic`).
 
 ---
 
@@ -53,6 +54,10 @@ Barrel: `features/index.ts` reexporta `markdown-editor`, `chatbot`, `app-state` 
 
 ### `ai-config`
 - `AiConfigForm` se embebe en Onboarding y Profile; `AiProviderBadge` muestra el proveedor activo.
+
+### `aside-characteristic`
+- Lista características (`display_id`/título) con selección, icono o `WarningIcon` según `warningByFeature`, y borrado en hover.
+- Soporta expansión controlada (`isExpanded`/`onToggleExpand`) o no controlada (`defaultExpanded`).
 
 ---
 
@@ -82,6 +87,7 @@ const send = (url, body) => start(url, { body, onEvent });
 ├── Limpieza de stores / cambios sin guardar → features/app-state/
 ├── Estado de sync GitHub                   → features/github-sync/
 ├── Formulario de IA (BYOK)                 → features/ai-config/
+├── Sidebar de características              → features/aside-characteristic/
 └── Hidratación al abrir proyecto           → features/initialize/
 ```
 
@@ -92,7 +98,7 @@ const send = (url, body) => start(url, { body, onEvent });
 1. **Sin `api/`**: nada de `fetch`/`apiClient` dentro de una feature.
 2. **Sin importar** `widgets` ni `pages`.
 3. **Reutilizar entidades:** leer datos y estado desde `@/entities/*`; no duplicar tipos.
-4. **`index.ts` como API pública**; añadir exports cuando se agregan componentes/hooks públicos.
+4. **`index.ts` del slice como API pública**; importar de `@/features/<feature>` y añadir exports cuando se agregan componentes/hooks públicos. No hay barril de capa.
 5. **Toda feature con `ui/` de red debe separar** presentación de controlador.
 
 ---

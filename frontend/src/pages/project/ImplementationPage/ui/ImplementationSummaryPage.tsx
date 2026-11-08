@@ -1,11 +1,9 @@
 'use client';
 
-import { useCharacteristicStore } from '@/entities/characteristic';
-import type { ImplementationMetric } from '@/entities/implementation';
-import { useImplementationStore } from '@/entities/implementation';
-import { useRailwayOAuth } from '@/entities/integration';
-import { useProjectStore } from '@/entities/project';
-import { useProjectGithubRepo, type ProjectGithubViewState } from '@/features/github-sync';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
 import {
 	AiOrbCenterIcon,
 	ArrowLeft,
@@ -21,13 +19,21 @@ import {
 	StarIcon,
 	WarningIcon,
 } from '@/shared/ui';
-import { GestionRepositorioGitHub } from '@/widgets';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 
+import { useCharacteristicStore } from '@/entities/characteristic';
 import type { PreconditionState } from '@/entities/deploy';
 import { useDeployStatus } from '@/entities/deploy';
+import type { ImplementationMetric } from '@/entities/implementation';
+import { useImplementationStore } from '@/entities/implementation';
+import { useRailwayOAuth } from '@/entities/integration';
+import { useProjectStore } from '@/entities/project';
+
+import {
+	useProjectGithubRepo,
+	type ProjectGithubViewState,
+} from '@/features/github-sync';
+import { GestionRepositorioGitHub } from '@/widgets/gestion-repositorio-github';
+
 import { DeployPreconditionPanel } from './DeployPreconditionPanel';
 import { DeployResultPanel } from './DeployResultPanel';
 
@@ -98,7 +104,9 @@ const heroMeta: Record<
 const ImplementationSummaryPage = () => {
 	const router = useRouter();
 	const summary = useImplementationStore((s) => s.summary);
-	const requiresReviewByFeature = useImplementationStore((s) => s.requiresReviewByFeature);
+	const requiresReviewByFeature = useImplementationStore(
+		(s) => s.requiresReviewByFeature,
+	);
 
 	const currentProjectId = useProjectStore((s) => s.currentProject?.id ?? null);
 	const github = useProjectGithubRepo(currentProjectId);
@@ -115,11 +123,7 @@ const ImplementationSummaryPage = () => {
 		if (summary) return;
 		const target = selectedCharacteristic ?? currentCharacteristics[0] ?? null;
 		if (!target) return;
-		loadImplementation(
-			target.id,
-			target.title,
-			target.display_id,
-		);
+		loadImplementation(target.id, target.title, target.display_id);
 	}, [summary, selectedCharacteristic, currentCharacteristics, loadImplementation]);
 
 	const refreshRailway = railway.refresh;
@@ -197,7 +201,9 @@ const ImplementationSummaryPage = () => {
 									Implementación desactualizada
 								</h3>
 								<p className='text-xs text-warning-700'>
-									Las especificaciones de esta funcionalidad cambiaron en fases anteriores. El código actual no está sincronizado con la última versión de los requisitos.
+									Las especificaciones de esta funcionalidad cambiaron en fases
+									anteriores. El código actual no está sincronizado con la última versión
+									de los requisitos.
 								</p>
 							</div>
 						</div>
@@ -286,7 +292,6 @@ const ImplementationSummaryPage = () => {
 								<p className='mt-2 max-w-sm text-sm text-neutral-500 leading-relaxed'>
 									{meta.subtitle}
 								</p>
-
 							</div>
 						</div>
 

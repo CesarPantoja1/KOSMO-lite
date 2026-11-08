@@ -1,14 +1,10 @@
 'use client';
 
-import { MarkdownEditor, PanelAsistenteRequisito, type SaveStatus } from '@/features';
-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { useRequirementsStore } from '@/entities/requirements';
 import { formatApiError } from '@/shared/api';
-import { useUnsavedChanges } from '@/features/app-state';
 import {
 	Ai,
 	ArrowLeft,
@@ -16,15 +12,18 @@ import {
 	CursorClickFill,
 	Loading,
 	ModalConfirm,
+	Requirements,
 	toast,
 } from '@/shared/ui';
-import { useAppStore } from '@/features/app-state';
-import { useProjectStore } from '@/entities/project';
 
 import { useCharacteristicStore } from '@/entities/characteristic';
+import { useProjectStore } from '@/entities/project';
+import { useRequirementsStore } from '@/entities/requirements';
 
-import { AsideCharacteristic } from '@/widgets';
-import { Requirements } from '@/shared/ui';
+import { useAppStore, useUnsavedChanges } from '@/features/app-state';
+import { AsideCharacteristic } from '@/features/aside-characteristic';
+import { PanelAsistenteRequisito } from '@/features/chatbot';
+import { MarkdownEditor, type SaveStatus } from '@/features/markdown-editor';
 
 const generatingRequirementsMessages = [
 	'Analizando característica...',

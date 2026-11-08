@@ -66,7 +66,8 @@ Segmentos permitidos (solo si se necesitan): **`ui/`**, **`model/`**, **`hooks/`
 ### Páginas del proyecto (`project/*`)
 Ver [`project/AGENTS.md`](./project/AGENTS.md). Resumen de composición recurrente:
 - `ChatStreamPanel` (Discovery, Characteristics), `MarkdownEditor` (Discovery, Requirements), `MarkdownText` (Consistency), `PanelAsistenteRequisito` (Requirements), `AiConfigForm` (Onboarding, Profile), `useUnsavedChanges` (Discovery, Requirements).
-- Widgets `@/widgets`: `RootNavbar`, `MainNavbar`, `AsideCharacteristic`, `GestionRepositorioGitHub`.
+- Widgets por slice: `@/widgets/root-navbar`, `@/widgets/main-navbar`, `@/widgets/gestion-repositorio-github`.
+- Features por slice: `@/features/aside-characteristic`. No existen barrels `@/widgets` ni `@/features`.
 
 ---
 

@@ -1,12 +1,6 @@
-import { ProjectStatus } from './status';
+import { ProjectStatus, stylesIconStatus } from './types';
 
-type styles = {
-	iconContainer: string;
-	iconStyles: string;
-	labelStyles: string;
-};
-
-export const getStyleIconStatus = (status: ProjectStatus): styles => {
+export const getStyleIconStatus = (status: ProjectStatus): stylesIconStatus => {
 	if (status === 'active')
 		return {
 			iconContainer:
