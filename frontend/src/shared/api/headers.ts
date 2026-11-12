@@ -1,4 +1,4 @@
-import { useAuthStore } from '@/shared/model/auth.store';
+import { useAuthStore } from '../model';
 
 export function authHeaders(extra: HeadersInit = {}): Headers {
 	const headers = new Headers(extra);

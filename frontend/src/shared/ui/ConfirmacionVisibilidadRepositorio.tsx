@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
-import { WarningIcon } from '@/shared/ui';
+import WarningIcon from './icons/WarningIcon';
 
 type Props = {
 	repoName: string;

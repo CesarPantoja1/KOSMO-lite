@@ -129,6 +129,17 @@ const mockSendChatMessage = async (
 	return mockChatResponses[Math.floor(Math.random() * mockChatResponses.length)];
 };
 
+const mockGetChatHistory = async (projectId: string): Promise<ChatHistory> => {
+	await delay(300);
+	return {
+		phase: 'discovery',
+		context: projectId,
+		messages: [],
+		has_more: false,
+		next_cursor: null,
+	};
+};
+
 // --- Real implementations ---
 
 const realGetDiscovery = (projectId: string) => {
@@ -162,6 +173,20 @@ const realSendChatMessage = (projectId: string, content: string) => {
 	});
 };
 
+const realGetChatHistory = (
+	projectId: string,
+	sessionId: string | null,
+	before?: string | null,
+) => {
+	const query = new URLSearchParams();
+	if (sessionId) query.set('session_id', sessionId);
+	if (before) query.set('before', before);
+	const suffix = query.toString() ? `?${query.toString()}` : '';
+	return apiClient<ChatHistory>(`/api/v1/projects/${projectId}/discovery/chat${suffix}`, {
+		method: 'GET',
+	});
+};
+
 // --- Exports (switch based on USE_MOCKS) ---
 
 export const getDiscovery = (projectId: string): Promise<DiscoveryResponse> =>
@@ -185,28 +210,6 @@ export const sendChatMessage = (
 	USE_MOCKS
 		? mockSendChatMessage(projectId, content)
 		: realSendChatMessage(projectId, content);
-
-const mockGetChatHistory = async (projectId: string): Promise<ChatHistory> => {
-	await delay(300);
-	return {
-		phase: 'discovery',
-		context: projectId,
-		messages: [],
-		has_more: false,
-		next_cursor: null,
-	};
-};
-
-const realGetChatHistory = (projectId: string, sessionId: string | null, before?: string | null) => {
-	const query = new URLSearchParams();
-	if (sessionId) query.set('session_id', sessionId);
-	if (before) query.set('before', before);
-	const suffix = query.toString() ? `?${query.toString()}` : '';
-	return apiClient<ChatHistory>(
-		`/api/v1/projects/${projectId}/discovery/chat${suffix}`,
-		{ method: 'GET' },
-	);
-};
 
 export const getChatHistory = (
 	projectId: string,

@@ -16,9 +16,8 @@ shared/
 │   ├── config.ts        # API_BASE_URL, USE_MOCKS, PUBLIC_APP_DOMAIN
 │   ├── errors.ts        # ApiError, parseApiError, formatApiError, ApiViolation
 │   ├── auth.ts          # authApi (register, authorize, exchangeToken, getMe, login, logout)
-│   ├── auth.types.ts    # DTOs de auth (UserPublic, TokenPairResponse, PrincipalView, ...)
 │   ├── headers.ts       # authHeaders(extra): Bearer o X-Mock-User
-│   └── index.ts         # Barrel
+│   └── index.ts         # Barrel (reexporta tipos de ../model/auth-types)
 ├── lib/
 │   ├── sse.ts               # consumeSse(response, onEvent)
 │   ├── useSseStream.ts      # useSseStream() → { phase, error, start, stop }
@@ -28,7 +27,8 @@ shared/
 │   ├── session-events.ts    # emitSessionExpired / onSessionExpired
 │   └── index.ts
 ├── model/
-│   ├── auth.store.ts    # useAuthStore (persist 'kosmo-auth-store'), clearAuthStore
+│   ├── auth-store.ts    # useAuthStore (persist 'kosmo-auth-store'), clearAuthStore
+│   ├── auth-types.ts    # DTOs de auth (RegisterRequest, UserPublic, TokenPairResponse, PrincipalView, ...)
 │   ├── chat-message.ts  # tipos de mensaje + createUserMessage/appendMessage
 │   └── index.ts
 └── ui/
@@ -42,7 +42,7 @@ shared/
     ├── FormularioCreacionRepositorio.tsx
     ├── VideoIntro.tsx
     ├── toast/       # toast(), ToasterProvider, types, icons
-    ├── icons/       # 54 iconos SVG (default export mayormente)
+    ├── icons/       # 53 iconos SVG (default export mayormente)
     └── index.ts
 ```
 
@@ -69,6 +69,7 @@ shared/
 
 ### `auth.ts` / `headers.ts`
 - `authApi`: `register`, `authorize` (PKCE S256), `exchangeToken`, `getMe`, `login` (authorize→exchange→setTokens→getMe), `logout`.
+- Los DTOs viven en `model/auth-types.ts` (no en `api/`); `shared/api/index.ts` los reexporta para conveniencia.
 - `authHeaders(extra)`: `Authorization: Bearer <accessToken>`; si `NEXT_PUBLIC_AUTH_DISABLED==='true'` y hay `mockUserId`, usa `X-Mock-User`. No sobrescribe headers existentes.
 
 ---
@@ -88,7 +89,7 @@ shared/
 
 ## 4. `model/` — Estado compartido
 
-### `auth.store.ts` — `useAuthStore`
+### `auth-store.ts` — `useAuthStore`
 Zustand + `persist` (clave `kosmo-auth-store`).
 - Estado: `accessToken`, `refreshToken`, `user`, `mockUserId`.
 - Acciones: `setTokens`, `setUser`, `clearAuth`, `initMockUser`.
@@ -121,7 +122,7 @@ Zustand + `persist` (clave `kosmo-auth-store`).
 - Tipos: `ToastVariant`, `ToastPosition`, `ToastContent`, `ToastOptions`.
 
 ### `ui/icons/`
-- 54 iconos SVG `.tsx` con props típicas `{ size?, color?, className? }`.
+- 53 iconos SVG `.tsx` con props típicas `{ size?, color?, className? }`.
 - Mayoría `export default`; excepciones nombradas: `Logo`, `Lightbulb`, `AiOrb`, `KeyIcon`.
 - Todos reexportados en `ui/index.ts`. **Importar desde `@/shared/ui`**, no del archivo suelto, salvo necesidad puntual.
 

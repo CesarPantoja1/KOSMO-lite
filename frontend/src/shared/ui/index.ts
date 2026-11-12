@@ -64,7 +64,6 @@ export { default as InfoCircleIcon } from './icons/InfoCircleIcon';
 export { default as PlusSmallIcon } from './icons/PlusSmallIcon';
 
 // toast
-
 export { toast } from './toast/toast';
 export { ToasterProvider } from './toast/ToasterProvider';
 export type {

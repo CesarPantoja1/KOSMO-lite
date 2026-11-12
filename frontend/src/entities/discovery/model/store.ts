@@ -28,10 +28,7 @@ interface DiscoveryStore {
 	) => Promise<ChatMessage[]>;
 	historyHasMore: boolean;
 	historyCursor: string | null;
-	loadOlderChatHistory: (
-		projectId: string,
-		sessionId?: string | null,
-	) => Promise<void>;
+	loadOlderChatHistory: (projectId: string, sessionId?: string | null) => Promise<void>;
 	appendUserMessage: (content: string) => void;
 	appendAssistantMessage: (message: ChatMessage) => void;
 }

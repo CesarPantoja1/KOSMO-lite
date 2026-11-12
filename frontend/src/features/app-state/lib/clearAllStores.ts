@@ -1,4 +1,4 @@
-import { clearAuthStore } from '@/shared/model/auth.store';
+import { clearAuthStore } from '@/shared/model/auth-store';
 import { clearProjectStore } from '@/entities/project';
 import { clearDiscoveryStore } from '@/entities/discovery';
 import { clearCharacteristicStore } from '@/entities/characteristic';

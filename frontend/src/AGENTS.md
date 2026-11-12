@@ -42,7 +42,7 @@ src/
 ├── shared/
 │   ├── api/        # apiClient, authApi, errores (ApiError), headers, config
 │   ├── lib/        # sse, useSseStream, pkce, zod, session-events, normalize-repo-name
-│   ├── model/      # auth.store (Zustand+persist), chat-message (tipos/helpers)
+│   ├── model/      # auth-store (Zustand+persist), auth-types (DTOs), chat-message
 │   └── ui/         # Loading, ModalConfirm, AuthGuard, MarkdownText, toast/, icons/
 │
 ├── entities/       # model/ (tipos + store Zustand) + api/ (Llamadas HTTP). SIN ui/
@@ -68,7 +68,6 @@ src/
 │   └── markdown-editor/  # Editor + TOC + autosave
 │
 ├── widgets/        # ui/ + model/ + lib/ + types/
-│   ├── gestion-deploy/            # (vacío / placeholder)
 │   ├── gestion-repositorio-github/# Tarjeta de repo GitHub
 │   ├── main-navbar/               # Layout autenticado (sidebar + nav + usuario)
 │   ├── root-navbar/               # Navbar público (landing)

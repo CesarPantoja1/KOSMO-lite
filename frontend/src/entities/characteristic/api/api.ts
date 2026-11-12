@@ -169,6 +169,17 @@ const mockSendChatMessage = async (
 	return mockChatResponses[Math.floor(Math.random() * mockChatResponses.length)];
 };
 
+const mockGetChatHistory = async (featureId: string): Promise<ChatHistory> => {
+	await delay(300);
+	return {
+		phase: 'features',
+		context: featureId,
+		messages: [],
+		has_more: false,
+		next_cursor: null,
+	};
+};
+
 // --- Real implementations ---
 
 const realGetCharacteristics = async (
@@ -225,6 +236,27 @@ const realSendChatMessage = async (
 	});
 };
 
+const realGetChatHistory = (
+	featureId: string,
+	sessionId: string | null,
+	before?: string | null,
+) => {
+	const query = new URLSearchParams();
+	if (sessionId) query.set('session_id', sessionId);
+	if (before) query.set('before', before);
+	const suffix = query.toString() ? `?${query.toString()}` : '';
+	return apiClient<ChatHistory>(`/api/v1/features/${featureId}/chat/history${suffix}`, {
+		method: 'GET',
+	});
+};
+
+const realDeleteFeature = async (projectId: string, featureId: string): Promise<void> => {
+	await apiClient<void>(
+		`/api/v1/projects/${encodeURIComponent(projectId)}/features/${encodeURIComponent(featureId)}`,
+		{ method: 'DELETE' },
+	);
+};
+
 // --- Exports (switch based on USE_MOCKS) ---
 
 export const getCharacteristics = (
@@ -262,27 +294,6 @@ export const sendChatMessage = (
 		? mockSendChatMessage(featureId, content)
 		: realSendChatMessage(featureId, content);
 
-const mockGetChatHistory = async (featureId: string): Promise<ChatHistory> => {
-	await delay(300);
-	return {
-		phase: 'features',
-		context: featureId,
-		messages: [],
-		has_more: false,
-		next_cursor: null,
-	};
-};
-
-const realGetChatHistory = (featureId: string, sessionId: string | null, before?: string | null) => {
-	const query = new URLSearchParams();
-	if (sessionId) query.set('session_id', sessionId);
-	if (before) query.set('before', before);
-	const suffix = query.toString() ? `?${query.toString()}` : '';
-	return apiClient<ChatHistory>(`/api/v1/features/${featureId}/chat/history${suffix}`, {
-		method: 'GET',
-	});
-};
-
 export const getChatHistory = (
 	featureId: string,
 	sessionId: string | null = null,
@@ -291,13 +302,6 @@ export const getChatHistory = (
 	USE_MOCKS
 		? mockGetChatHistory(featureId)
 		: realGetChatHistory(featureId, sessionId, before);
-
-const realDeleteFeature = async (projectId: string, featureId: string): Promise<void> => {
-	await apiClient<void>(
-		`/api/v1/projects/${encodeURIComponent(projectId)}/features/${encodeURIComponent(featureId)}`,
-		{ method: 'DELETE' },
-	);
-};
 
 export const deleteFeature = (projectId: string, featureId: string): Promise<void> =>
 	USE_MOCKS ? Promise.resolve() : realDeleteFeature(projectId, featureId);

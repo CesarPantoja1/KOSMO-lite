@@ -1,15 +1,19 @@
-import { apiClient } from './client';
-import { generateCodeVerifier, generateCodeChallenge } from '@/shared/lib/pkce';
-import { useAuthStore } from '@/shared/model/auth.store';
+import { generateCodeChallenge, generateCodeVerifier } from '@/shared/lib/pkce';
+import { useAuthStore } from '@/shared/model/auth-store';
 import type {
-	RegisterResponse,
 	AuthorizationCodeResponse,
-	TokenPairResponse,
 	PrincipalView,
-} from './auth.types';
+	RegisterResponse,
+	TokenPairResponse,
+} from '../model/auth-types';
+import { apiClient } from './client';
 
 export const authApi = {
-	async register(name: string, email: string, password: string): Promise<RegisterResponse> {
+	async register(
+		name: string,
+		email: string,
+		password: string,
+	): Promise<RegisterResponse> {
 		return apiClient<RegisterResponse>('/api/v1/auth/register', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -17,21 +21,27 @@ export const authApi = {
 		});
 	},
 
-	async authorize(email: string, password: string): Promise<{ code: string; verifier: string }> {
+	async authorize(
+		email: string,
+		password: string,
+	): Promise<{ code: string; verifier: string }> {
 		const verifier = generateCodeVerifier();
 		const challenge = await generateCodeChallenge(verifier);
 
-		const response = await apiClient<AuthorizationCodeResponse>('/api/v1/auth/authorize', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				email,
-				password,
-				code_challenge: challenge,
-				code_challenge_method: 'S256',
-				scopes: ['profile:read', 'agent:run'],
-			}),
-		});
+		const response = await apiClient<AuthorizationCodeResponse>(
+			'/api/v1/auth/authorize',
+			{
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					email,
+					password,
+					code_challenge: challenge,
+					code_challenge_method: 'S256',
+					scopes: ['profile:read', 'agent:run'],
+				}),
+			},
+		);
 
 		return { code: response.authorization_code, verifier };
 	},
@@ -57,17 +67,17 @@ export const authApi = {
 	async login(email: string, password: string): Promise<void> {
 		const { code, verifier } = await this.authorize(email, password);
 		const tokens = await this.exchangeToken(code, verifier);
-		
+
 		const { setTokens, setUser } = useAuthStore.getState();
 		setTokens(tokens.access.token, tokens.refresh.token);
-		
+
 		const user = await this.getMe();
 		setUser(user);
 	},
 
 	async logout(): Promise<void> {
 		const { refreshToken, clearAuth } = useAuthStore.getState();
-		
+
 		if (refreshToken) {
 			try {
 				await apiClient('/api/v1/auth/logout', {
@@ -79,7 +89,7 @@ export const authApi = {
 				console.error('Error on logout', e);
 			}
 		}
-		
+
 		clearAuth();
 	},
 };

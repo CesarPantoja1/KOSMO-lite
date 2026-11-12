@@ -1,9 +1,9 @@
+import { emitSessionExpired } from '../lib';
+import { useAuthStore } from '../model';
+import type { TokenPairResponse } from '../model/auth-types';
 import { API_BASE_URL } from './config';
-import { useAuthStore } from '@/shared/model/auth.store';
-import { authHeaders } from './headers';
-import type { TokenPairResponse } from './auth.types';
 import { parseApiError } from './errors';
-import { emitSessionExpired } from '@/shared/lib/session-events';
+import { authHeaders } from './headers';
 
 let isRefreshing = false;
 let failedQueue: {
@@ -121,4 +121,3 @@ export const apiClient = async <T>(
 
 	return res.json();
 };
-

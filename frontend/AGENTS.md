@@ -103,9 +103,9 @@ bun run test:coverage
 
 | Archivo                            | Responsabilidad                                                                                                                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/layout.tsx`                   | Root layout: fuente Geist, `globals.css`, `<ToasterProvider />` y `<SessionExpiredListener />`. Metadata base.                                                                  |
+| `app/layout.tsx`                   | Root layout: fuentes Geist locales (`--font-geist`), `globals.css`, `<ToasterProvider />`, `<SessionExpiredListener />` y `<Script src='/runtime-config.js' />` (config inyectada por el entrypoint de Docker). Metadata base. |
 | `app/(app)/layout.tsx`             | Layout autenticado: envuelve en `<AuthGuard>` y `<MainNavbar>`.                                                                                                                 |
-| `app/(root)/layout.tsx`            | Layout público: antepone `<RootNavbar>`.                                                                                                                                        |
+| `app/(root)/layout.tsx`            | Layout público: antepone `<RootNavbar>`. **Actualmente sin rutas hijas**: `/` vive en `app/page.tsx` y `RootPage` renderiza su propio `RootNavbar`.                              |
 | `app/not-found.tsx`                | Página 404.                                                                                                                                                                     |
 | `app/session-expired-listener.tsx` | **Composition root**: une el evento `onSessionExpired` (de `shared`) con `clearAllStores` (de `features/app-state`). Vive aquí porque `shared` no puede depender de `features`. |
 

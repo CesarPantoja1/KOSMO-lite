@@ -21,34 +21,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function toSuggestions(raw: unknown): ChangeSuggestion[] {
 	if (!Array.isArray(raw)) return [];
-	return raw
-		.filter(isRecord)
-		.map((item) => ({
-			id: String(item.id ?? crypto.randomUUID()),
-			section: String(item.section ?? ''),
-			description: String(item.description ?? ''),
-			diff_before: String(item.diff_before ?? ''),
-			diff_after: String(item.diff_after ?? ''),
-			rationale: typeof item.rationale === 'string' ? item.rationale : null,
-			applied: item.applied === true,
-			not_applied_reason:
-				typeof item.not_applied_reason === 'string' ? item.not_applied_reason : null,
-		}));
+	return raw.filter(isRecord).map((item) => ({
+		id: String(item.id ?? crypto.randomUUID()),
+		section: String(item.section ?? ''),
+		description: String(item.description ?? ''),
+		diff_before: String(item.diff_before ?? ''),
+		diff_after: String(item.diff_after ?? ''),
+		rationale: typeof item.rationale === 'string' ? item.rationale : null,
+		applied: item.applied === true,
+		not_applied_reason:
+			typeof item.not_applied_reason === 'string' ? item.not_applied_reason : null,
+	}));
 }
 
 function toModification(raw: unknown): ModificationResult | null {
 	if (!isRecord(raw)) return null;
 	return {
 		applied: raw.applied === true,
-		modified_section: typeof raw.modified_section === 'string' ? raw.modified_section : null,
+		modified_section:
+			typeof raw.modified_section === 'string' ? raw.modified_section : null,
 		change_description:
 			typeof raw.change_description === 'string' ? raw.change_description : null,
 		modified_document:
 			typeof raw.modified_document === 'string' ? raw.modified_document : null,
 		before: typeof raw.before === 'string' ? raw.before : null,
 		after: typeof raw.after === 'string' ? raw.after : null,
-		undo_version_id:
-			typeof raw.undo_version_id === 'string' ? raw.undo_version_id : null,
+		undo_version_id: typeof raw.undo_version_id === 'string' ? raw.undo_version_id : null,
 		clarification_message:
 			typeof raw.clarification_message === 'string' ? raw.clarification_message : null,
 	};

@@ -30,9 +30,8 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**, **`types/`**.
 |---|---|---|---|
 | `main-navbar` | `ui/MainNavbar.tsx`, `ProjectNavigation.tsx`, `SidebarBrand.tsx`, `UserSection.tsx`; `model/types.ts`; `index.tsx` | `MainNavbar`, `IconWizardProps` | Layout autenticado: sidebar (marca + proyectos + usuario) y área principal con `WizardNavegacion` y `GitHubSyncBanner`. **Ver [`main-navbar/AGENTS.md`](./main-navbar/AGENTS.md).** |
 | `wizard-navegacion` | `ui/WizardNavegacion.tsx`, `WizardItem.tsx`, `PhaseStatusBadge.tsx`, `ConsistencyGateButton.tsx`, `AiProviderToast.tsx`; `model/types.ts`, `get-status-color.ts`, `useConsistencyPolling.ts` | `WizardNavegacion` | Barra de pasos del pipeline SDD (Descubrimiento→Funcionalidades→Criterios→Implementación) con badges de consistencia y gate. |
-| `root-navbar` | `ui/RootNavbar.tsx` | `RootNavbar` | Navbar público de la landing (anclas + "Comenzar"/"Mi Cuenta" según sesión). Montado en `app/(root)/layout.tsx`. |
+| `root-navbar` | `ui/RootNavbar.tsx` | `RootNavbar` | Navbar público de la landing (anclas + "Comenzar"/"Mi Cuenta" según sesión). Renderizado por `RootPage`; también antepuesto por `app/(root)/layout.tsx`. |
 | `gestion-repositorio-github` | `ui/GestionRepositorioGitHub.tsx` | `GestionRepositorioGitHub` | Tarjeta que gestiona el repo GitHub según `ProjectGithubViewState` (crear/sincronizar/estado). |
-| `gestion-deploy` | `ui/` (vacío) | — | Placeholder sin implementación. |
 
 ---
 
