@@ -30,7 +30,12 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 	it('getRequirements consulta el endpoint con project_id como query', async () => {
 		// Arrange
 		const { getRequirements } = await import('./api');
-		mockFetchOk({ feature_id: 'f1', feature_number: 1, document_markdown: 'md', total: 1 });
+		mockFetchOk({
+			feature_id: 'f1',
+			feature_number: 1,
+			document_markdown: 'md',
+			total: 1,
+		});
 
 		// Act
 		const result = await getRequirements('prj_01', 'f1');
@@ -64,7 +69,12 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 	it('generateRequirements hace POST con project_id', async () => {
 		// Arrange
 		const { generateRequirements } = await import('./api');
-		mockFetchOk({ feature_id: 'f1', feature_number: 1, document_markdown: 'generado', total: 4 });
+		mockFetchOk({
+			feature_id: 'f1',
+			feature_number: 1,
+			document_markdown: 'generado',
+			total: 4,
+		});
 
 		// Act
 		const result = await generateRequirements('prj_01', 'f1');
@@ -95,7 +105,13 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 	it('getRequirementChatHistory agrega session_id y before como query params', async () => {
 		// Arrange
 		const { getRequirementChatHistory } = await import('./api');
-		mockFetchOk({ phase: 'requirements', context: 'f1', messages: [], has_more: false, next_cursor: null });
+		mockFetchOk({
+			phase: 'requirements',
+			context: 'f1',
+			messages: [],
+			has_more: false,
+			next_cursor: null,
+		});
 
 		// Act
 		await getRequirementChatHistory('f1', 'sess_1', 'cursor_1');

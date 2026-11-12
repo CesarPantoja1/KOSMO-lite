@@ -8,12 +8,17 @@ function mockFetchOk(body: unknown) {
 }
 
 function mockFetchError(status: number, body: unknown) {
-	fetchMock.mockResolvedValue({ ok: false, status, headers: new Headers(), json: async () => body });
+	fetchMock.mockResolvedValue({
+		ok: false,
+		status,
+		headers: new Headers(),
+		json: async () => body,
+	});
 }
 
 afterEach(() => {
 	fetchMock.mockReset();
-	vi.stubGlobal('fetch', undefined);
+	vi.unstubAllGlobals();
 });
 
 describe('buildSummary', () => {
@@ -44,19 +49,25 @@ describe('buildSummary', () => {
 		expect(summary.featureDisplayId).toBe('F-01');
 		expect(summary.status).toBe('completed');
 		expect(summary.metrics).toHaveLength(4);
-		expect(summary.metrics[0]).toMatchObject({ value: '1', label: 'Funcionalidades implementadas' });
-		expect(summary.metrics[1]).toMatchObject({ value: '2', label: 'Requisitos de negocio' });
+		expect(summary.metrics[0]).toMatchObject({
+			value: '1',
+			label: 'Funcionalidades implementadas',
+		});
+		expect(summary.metrics[1]).toMatchObject({
+			value: '2',
+			label: 'Requisitos de negocio',
+		});
 		expect(summary.metrics[2]).toMatchObject({
 			value: '4',
 			label: 'Enlaces de trazabilidad',
 		});
-		expect(summary.metrics[3]).toMatchObject({ value: '100%', label: 'Calidad verificada' });
+		expect(summary.metrics[3]).toMatchObject({
+			value: '100%',
+			label: 'Calidad verificada',
+		});
 		expect(summary.generatedAt).toBe('2026-08-19T10:00:00Z');
 		expect(summary.technologies).toContain('Next.js');
-		expect(summary.generatedFiles).toEqual([
-			'src/app/page.tsx',
-			'tests/app.test.tsx',
-		]);
+		expect(summary.generatedFiles).toEqual(['src/app/page.tsx', 'tests/app.test.tsx']);
 	});
 
 	it('usa valores por defecto coherentes cuando el evento no trae métricas', () => {
@@ -64,7 +75,13 @@ describe('buildSummary', () => {
 		const data: Record<string, unknown> = { status: 'implemented' };
 
 		// Act
-		const summary = buildSummary('feat_02', 'Título', 'F-02', data, '2026-08-19T10:00:00Z');
+		const summary = buildSummary(
+			'feat_02',
+			'Título',
+			'F-02',
+			data,
+			'2026-08-19T10:00:00Z',
+		);
 
 		// Assert
 		expect(summary.metrics).toHaveLength(4);
@@ -87,7 +104,9 @@ describe('fetchImplementationFile', () => {
 		// Assert
 		expect(content).toBe('export const a = 1;');
 		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/api/v1/implementations/impl_feat_01/files/content?path=src%2Fa.ts'),
+			expect.stringContaining(
+				'/api/v1/implementations/impl_feat_01/files/content?path=src%2Fa.ts',
+			),
 			expect.objectContaining({ cache: 'no-store' }),
 		);
 	});
@@ -146,7 +165,6 @@ describe('fetchImplementation', () => {
 		expect(record).toBeNull();
 	});
 });
-
 
 describe('generateImplementation', () => {
 	function sseResponse(payload: string): Response {
@@ -261,7 +279,10 @@ describe('generateImplementation', () => {
 		const events = [
 			{
 				event_type: 'error',
-				data: { error: 'El servidor OpenCode no está disponible. Verifica que esté en ejecución.' },
+				data: {
+					error:
+						'El servidor OpenCode no está disponible. Verifica que esté en ejecución.',
+				},
 			},
 		];
 		const ssePayload = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
@@ -285,7 +306,9 @@ describe('generateImplementation', () => {
 		const { generateImplementation } = await import('./api');
 		await expect(
 			generateImplementation('feat_03', 'Error Feature', 'F-03'),
-		).rejects.toThrow('El servidor OpenCode no está disponible. Verifica que esté en ejecución.');
+		).rejects.toThrow(
+			'El servidor OpenCode no está disponible. Verifica que esté en ejecución.',
+		);
 	});
 
 	it('transmite pensamientos de OpenCode y deltas en tiempo real hacia onProgress', async () => {
@@ -296,9 +319,18 @@ describe('generateImplementation', () => {
 		};
 
 		const events = [
-			{ event_type: 'plan_progress', data: { thought: 'Pensando cómo estructurar la feature...' } },
-			{ event_type: 'build_progress', data: { delta: 'Generando schema de datos...', stage: 'writing' } },
-			{ event_type: 'build_progress', data: { delta: 'Validando tipados...', stage: 'validating' } },
+			{
+				event_type: 'plan_progress',
+				data: { thought: 'Pensando cómo estructurar la feature...' },
+			},
+			{
+				event_type: 'build_progress',
+				data: { delta: 'Generando schema de datos...', stage: 'writing' },
+			},
+			{
+				event_type: 'build_progress',
+				data: { delta: 'Validando tipados...', stage: 'validating' },
+			},
 			{
 				event_type: 'done',
 				data: { status: 'implemented', generated_files: ['src/db/schema.ts'] },
@@ -326,9 +358,17 @@ describe('generateImplementation', () => {
 		await generateImplementation('feat_th', 'Thought Feature', 'F-TH', onProgress);
 
 		// Assert
-		expect(logs.some((l) => l.type === 'thought' && l.message.includes('Pensando'))).toBe(true);
-		expect(logs.some((l) => l.type === 'code' && l.message.includes('Generando schema'))).toBe(true);
-		expect(logs.some((l) => l.type === 'validation' && l.message.includes('Validando tipados'))).toBe(true);
+		expect(logs.some((l) => l.type === 'thought' && l.message.includes('Pensando'))).toBe(
+			true,
+		);
+		expect(
+			logs.some((l) => l.type === 'code' && l.message.includes('Generando schema')),
+		).toBe(true);
+		expect(
+			logs.some(
+				(l) => l.type === 'validation' && l.message.includes('Validando tipados'),
+			),
+		).toBe(true);
 	});
 });
 
@@ -352,14 +392,21 @@ describe('subscribeImplementationEvents', () => {
 		const deltas: string[] = [];
 		let doneDelta = '';
 		const events = [
-			{ event_type: 'plan_progress', data: { delta: 'Eliminando la funcionalidad del código...' } },
+			{
+				event_type: 'plan_progress',
+				data: { delta: 'Eliminando la funcionalidad del código...' },
+			},
 			{
 				event_type: 'build_progress',
 				data: { delta: 'Validando la aplicación después de la eliminación...' },
 			},
 			{
 				event_type: 'done',
-				data: { status: 'deleted', delta: 'La funcionalidad se eliminó y la aplicación sigue funcionando correctamente.' },
+				data: {
+					status: 'deleted',
+					delta:
+						'La funcionalidad se eliminó y la aplicación sigue funcionando correctamente.',
+				},
 			},
 		];
 		const ssePayload = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
@@ -388,7 +435,10 @@ describe('subscribeImplementationEvents', () => {
 		const events = [
 			{
 				event_type: 'error',
-				data: { error: 'No se pudo eliminar la funcionalidad. La aplicación volvió a su estado anterior.' },
+				data: {
+					error:
+						'No se pudo eliminar la funcionalidad. La aplicación volvió a su estado anterior.',
+				},
 			},
 		];
 		const ssePayload = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
@@ -410,4 +460,3 @@ describe('subscribeImplementationEvents', () => {
 		expect(errorMsg).toContain('volvió a su estado anterior');
 	});
 });
-

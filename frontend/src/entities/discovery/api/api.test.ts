@@ -55,7 +55,9 @@ describe('discovery/api — modo real (USE_MOCKS=false)', () => {
 		const [url, options] = fetchMock.mock.calls[0];
 		expect(url).toContain('/api/v1/projects/prj_01/discovery');
 		expect((options as RequestInit).method).toBe('PUT');
-		expect(JSON.parse((options as RequestInit).body as string)).toEqual({ content: 'nuevo' });
+		expect(JSON.parse((options as RequestInit).body as string)).toEqual({
+			content: 'nuevo',
+		});
 	});
 
 	it('generateDiscovery hace POST al endpoint', async () => {
@@ -96,7 +98,13 @@ describe('discovery/api — modo real (USE_MOCKS=false)', () => {
 	it('getChatHistory agrega session_id y before como query params', async () => {
 		// Arrange
 		const { getChatHistory } = await import('./api');
-		mockFetchOk({ phase: 'discovery', context: 'prj_01', messages: [], has_more: false, next_cursor: null });
+		mockFetchOk({
+			phase: 'discovery',
+			context: 'prj_01',
+			messages: [],
+			has_more: false,
+			next_cursor: null,
+		});
 
 		// Act
 		await getChatHistory('prj_01', 'sess_1', 'cursor_1');

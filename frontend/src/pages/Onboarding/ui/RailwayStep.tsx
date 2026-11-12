@@ -25,7 +25,7 @@ export function RailwayStep({ onStatusChange }: RailwayStepProps) {
 					Conecta tu cuenta de Railway
 				</h3>
 				<p className='text-neutral-500 text-sm mt-1'>
-					Opcional. Conecta Railway para desplegar tus proyectos en la nube.
+					Obligatorio. Necesitas conectar Railway para desplegar tus proyectos en la nube.
 				</p>
 			</div>
 			<OAuthIntegration

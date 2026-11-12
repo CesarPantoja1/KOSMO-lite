@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAuthStore } from '@/shared/model/auth.store';
+import { useAuthStore } from '@/shared/model/auth-store';
 import { apiClient } from './client';
 
 describe('apiClient', () => {

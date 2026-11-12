@@ -52,7 +52,11 @@ describe('useDiscoveryStore', () => {
 
 	it('saveDiscovery actualiza el descubrimiento actual', async () => {
 		// Arrange
-		api.saveDiscovery.mockResolvedValue({ id: 'd1', project_id: 'prj_01', content: 'guardado' });
+		api.saveDiscovery.mockResolvedValue({
+			id: 'd1',
+			project_id: 'prj_01',
+			content: 'guardado',
+		});
 
 		// Act
 		await useDiscoveryStore.getState().saveDiscovery('prj_01', 'guardado');
@@ -63,7 +67,11 @@ describe('useDiscoveryStore', () => {
 
 	it('generateDiscovery actualiza el descubrimiento actual', async () => {
 		// Arrange
-		api.generateDiscovery.mockResolvedValue({ id: 'd1', project_id: 'prj_01', content: 'generado' });
+		api.generateDiscovery.mockResolvedValue({
+			id: 'd1',
+			project_id: 'prj_01',
+			content: 'generado',
+		});
 
 		// Act
 		await useDiscoveryStore.getState().generateDiscovery('prj_01');
@@ -179,7 +187,9 @@ describe('useDiscoveryStore', () => {
 
 	it('clearDiscovery limpia solo el descubrimiento actual', () => {
 		// Arrange
-		useDiscoveryStore.setState({ currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' } });
+		useDiscoveryStore.setState({
+			currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' },
+		});
 
 		// Act
 		useDiscoveryStore.getState().clearDiscovery();
@@ -210,7 +220,9 @@ describe('useDiscoveryStore', () => {
 
 	it('clearDiscoveryStore limpia el storage persistido y el estado', () => {
 		// Arrange
-		useDiscoveryStore.setState({ currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' } });
+		useDiscoveryStore.setState({
+			currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' },
+		});
 
 		// Act
 		clearDiscoveryStore();

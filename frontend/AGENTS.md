@@ -64,7 +64,9 @@ bun run typecheck
 bun run test:coverage
 ```
 
-> La cobertura (`vitest.config.ts`) solo mide `src/entities/**` y `src/features/**` (excluye `ui/`, `index.ts` y tests), con umbrales: líneas 65%, statements 65%, funciones 60%, branches 55%.
+> La cobertura (`vitest.config.ts`) mide todo `src/**` (excluye tests, `index.ts`, `src/test/**` e íconos). Los umbrales reflejan la línea base actual (líneas 80%, statements 77%, funciones 77%, branches 72%) y se suben al cerrar cada fase del plan de pruebas.
+>
+> Utilidades de testing en `src/test/` (importar desde `@/test`): `renderWithProviders` (con `userEvent`), servidor MSW (`server`, `http`, `HttpResponse`, `apiUrl`), mock global de `next/navigation` (`mockRouter`, `setMockNavigation`) y fábricas (`crearProyecto`, `crearCaracteristica`, `crearSugerencia`, `crearUsuario`, `crearTokens`, `crearIntegracion`, `crearAiConfig`, `crearEstadoConsistencia`, `crearMensaje`, `crearCambioSugerido`, `crearProveedoresIA`, `crearSesionChat`) y helpers SSE (`respuestaSse`, `streamControlado`). Los stores de Zustand se reinician solos tras cada test (`__mocks__/zustand.ts`).
 
 ---
 
@@ -101,13 +103,13 @@ bun run test:coverage
 
 ### Layouts y archivos globales
 
-| Archivo                            | Responsabilidad                                                                                                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Archivo                            | Responsabilidad                                                                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `app/layout.tsx`                   | Root layout: fuentes Geist locales (`--font-geist`), `globals.css`, `<ToasterProvider />`, `<SessionExpiredListener />` y `<Script src='/runtime-config.js' />` (config inyectada por el entrypoint de Docker). Metadata base. |
-| `app/(app)/layout.tsx`             | Layout autenticado: envuelve en `<AuthGuard>` y `<MainNavbar>`.                                                                                                                 |
-| `app/(root)/layout.tsx`            | Layout público: antepone `<RootNavbar>`. **Actualmente sin rutas hijas**: `/` vive en `app/page.tsx` y `RootPage` renderiza su propio `RootNavbar`.                              |
-| `app/not-found.tsx`                | Página 404.                                                                                                                                                                     |
-| `app/session-expired-listener.tsx` | **Composition root**: une el evento `onSessionExpired` (de `shared`) con `clearAllStores` (de `features/app-state`). Vive aquí porque `shared` no puede depender de `features`. |
+| `app/(app)/layout.tsx`             | Layout autenticado: envuelve en `<AuthGuard>` y `<MainNavbar>`.                                                                                                                                                                |
+| `app/(root)/layout.tsx`            | Layout público: antepone `<RootNavbar>`. **Actualmente sin rutas hijas**: `/` vive en `app/page.tsx` y `RootPage` renderiza su propio `RootNavbar`.                                                                            |
+| `app/not-found.tsx`                | Página 404.                                                                                                                                                                                                                    |
+| `app/session-expired-listener.tsx` | **Composition root**: une el evento `onSessionExpired` (de `shared`) con `clearAllStores` (de `features/app-state`). Vive aquí porque `shared` no puede depender de `features`.                                                |
 
 ### Mapa de Rutas → Páginas
 

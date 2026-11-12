@@ -141,5 +141,5 @@ Zustand + `persist` (clave `kosmo-auth-store`).
 
 ```bash
 bun run typecheck
-bun run test:coverage   # cubre tests de api/ y lib/; ui/ y model/ no se miden
+bun run test:coverage   # mide todo src/ (incluye ui/ y model/)
 ```
