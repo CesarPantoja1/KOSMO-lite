@@ -143,3 +143,14 @@ Zustand + `persist` (clave `kosmo-auth-store`).
 bun run typecheck
 bun run test:coverage   # mide todo src/ (incluye ui/ y model/)
 ```
+
+**Pruebas de la capa (unitarias y de componente aislado):**
+
+| Segmento | Qué se prueba                                                                                   | Ejemplos                                             |
+| -------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `lib/`   | Funciones puras y hooks genéricos, con tablas `it.each` de casos válidos/inválidos.             | `pkce`, `sse`, `useSseStream`, `normalize-repo-name` |
+| `api/`   | Cliente HTTP contra MSW: token, refresh ante 401 y reintento, formato de errores.               | `client`, `auth`, `errors`, `config`                 |
+| `model/` | Store de sesión y primitivas de chat.                                                           | `auth-store`, `chat-message`                         |
+| `ui/`    | Componentes atómicos aislados: render por props, callbacks y estados (sin stores de dominio).   | `ModalConfirm`, `AuthGuard`, `OAuthIntegration`      |
+
+Un test nuevo de `shared` no debe depender de `entities`, `features` ni de datos de negocio.

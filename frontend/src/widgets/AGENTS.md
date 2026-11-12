@@ -87,5 +87,7 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**, **`types/`**.
 
 ```bash
 bun run typecheck
-# los widgets no se miden en cobertura
+bun run test:coverage   # los widgets SÍ se miden (ui/ y model/)
 ```
+
+**Pruebas de la capa (integración del bloque completo):** cada widget se renderiza con `renderWithProviders`, con sus features y stores reales y la API simulada por MSW. Se verifica la coordinación entre slices (p. ej. `wizard-navegacion`: fases, estado de consistencia y sondeo con temporizadores simulados; `main-navbar`: navegación y cierre de sesión con `mockRouter`).

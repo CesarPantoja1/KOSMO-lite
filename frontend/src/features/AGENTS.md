@@ -107,5 +107,12 @@ const send = (url, body) => start(url, { body, onEvent });
 
 ```bash
 bun run typecheck
-bun run test:coverage   # tests de features/{model,lib} SÍ se miden; ui/ se excluye
+bun run test:coverage   # se miden model/, lib/ y ui/
 ```
+
+**Pruebas de la capa (integración entre componentes):**
+
+- `model/` y `lib/`: hooks con `renderHook` contra la API simulada (MSW); temporizadores con `vi.useFakeTimers()` (debounce, autosave).
+- `ui/`: renderizar el componente real con `renderWithProviders`, sus stores reales y la API simulada; interactuar con `user` (`user-event`) y verificar lo que ve el usuario y el estado resultante.
+- Streaming SSE: `respuestaSse([...])` para una respuesta completa o `streamControlado()` para emitir evento a evento y verificar fases intermedias.
+- Mockear solo lo que jsdom no soporta (MDXEditor en `markdown-editor`).

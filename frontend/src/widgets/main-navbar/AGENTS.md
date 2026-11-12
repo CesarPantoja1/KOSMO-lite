@@ -86,4 +86,7 @@ MainNavbar (children)
 ```bash
 bun run typecheck
 bun run build
+bun run test:coverage
 ```
+
+**Pruebas:** `MainNavbar`, `ProjectNavigation`, `SidebarBrand` y `UserSection` (`ui/*.test.tsx`), con stores reales y `mockRouter` para verificar la navegación y el cierre de sesión.

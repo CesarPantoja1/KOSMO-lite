@@ -231,6 +231,18 @@ bun run typecheck
 bun run test:coverage   # umbrales en vitest.config.ts
 ```
 
+Todo cambio de comportamiento lleva su test, ubicado junto al archivo que prueba (`X.tsx` → `X.test.tsx`):
+
+| Capa       | Qué probar                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| `shared`   | Unitarias de `lib/` y `api/`; componentes de `ui/` aislados.                                |
+| `entities` | `api/`: URL, método, cuerpo y errores contra MSW. `model/`: acciones y estado del store.   |
+| `features` | Integración: componente + hook + store + API (MSW), interactuando con `user-event`.        |
+| `widgets`  | Integración del bloque completo con los stores reales.                                     |
+| `pages`    | Flujos de usuario completos de la ruta (carga, acciones, errores, navegación).            |
+
+Convenciones: estructura AAA, nombres en español que describen el comportamiento, `it.each` para tablas de casos, consultas por rol/nombre (`getByRole`) antes que por clase CSS, utilidades desde `@/test`. Mockear solo lo que jsdom no soporta (p. ej. MDXEditor → `<textarea>` con el mismo contrato de props); la red se simula con MSW, nunca con `vi.mock` del módulo `api`.
+
 Si el cambio toca navegación o rutas, validar además:
 
 ```bash

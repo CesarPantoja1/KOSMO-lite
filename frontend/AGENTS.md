@@ -66,6 +66,16 @@ bun run test:coverage
 
 > La cobertura (`vitest.config.ts`) mide todo `src/**` (excluye tests, `index.ts`, `src/test/**` e íconos). Los umbrales reflejan la línea base actual (líneas 80%, statements 77%, funciones 77%, branches 72%) y se suben al cerrar cada fase del plan de pruebas.
 >
+> Estrategia de pruebas por capa (detalle y métricas en `docs/informe-pruebas-frontend.md`; cada `AGENTS.md` de capa indica qué probar en su sección *Verificación*):
+>
+> | Nivel        | Capas                          | Tipo de prueba                                                  |
+> | ------------ | ------------------------------ | --------------------------------------------------------------- |
+> | Base         | `shared`                       | Unitarias (funciones, cliente HTTP) y de componente aislado (UI) |
+> | Dominio      | `entities`                     | Contrato HTTP de `api/` con MSW y lógica de stores en `model/`  |
+> | Integración  | `features`, `widgets`, `pages` | Componente real + hooks + stores + API simulada, como el usuario |
+>
+> Alcance: **sin** pruebas E2E, de rendimiento ni de accesibilidad. Un defecto real detectado por un test se documenta con `it.fails` (con comentario explicativo) hasta corregirlo.
+>
 > Utilidades de testing en `src/test/` (importar desde `@/test`): `renderWithProviders` (con `userEvent`), servidor MSW (`server`, `http`, `HttpResponse`, `apiUrl`), mock global de `next/navigation` (`mockRouter`, `setMockNavigation`) y fábricas (`crearProyecto`, `crearCaracteristica`, `crearSugerencia`, `crearUsuario`, `crearTokens`, `crearIntegracion`, `crearAiConfig`, `crearEstadoConsistencia`, `crearMensaje`, `crearCambioSugerido`, `crearProveedoresIA`, `crearSesionChat`) y helpers SSE (`respuestaSse`, `streamControlado`). Los stores de Zustand se reinician solos tras cada test (`__mocks__/zustand.ts`).
 
 ---

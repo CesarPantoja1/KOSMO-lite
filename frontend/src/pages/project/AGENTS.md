@@ -112,3 +112,16 @@ bun run typecheck
 bun run build
 bun run test:coverage
 ```
+
+**Pruebas por fase:**
+
+| Fase              | Tests                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| Crear proyecto    | `CreateProjectPage`, `CreateProjectForm`, `model/useIntegrationGate`, `model/types` (Zod)          |
+| Descubrimiento    | `DiscoveryPage` (generar, editar, confirmar salida, chat con IA)                                    |
+| Características   | `CharacteristicsPage`, `CreateCharacteristicPage`, hooks (`use-*`) y `model/types` (Zod)           |
+| Requisitos        | `RequirementsPage` (generar EARS, cambio de característica, eliminar, autoguardado, asistente)      |
+| Implementación    | Paneles: `DeployPreconditionPanel`, `DeployResultPanel`, `ImplementationSummaryPage`              |
+| Consistencia      | `GateReviewCard`                                                                                   |
+
+Pendiente: pruebas de página completa de `ImplementationPage` y `ConsistencyPage`. Defecto conocido documentado con `it.fails` en `RequirementsPage.test.tsx` (la carga sin caché local no apaga el indicador *Cargando criterios...*).

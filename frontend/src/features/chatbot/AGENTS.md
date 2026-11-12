@@ -11,7 +11,7 @@
 ```
 chatbot/
 ├── ui/
-│   ├── Chatbot.tsx                  # UI presentacional del chat
+│   ├── Chatbot.tsx                  # UI presentacional del chat (+ *.test.tsx por componente)
 │   ├── chatbot-message.tsx          # Burbuja de mensaje (MarkdownText + sugerencias)
 │   ├── TarjetaRecepcionPlan.tsx     # Tarjeta de ChangeSuggestion (diff/rationale)
 │   ├── ChatStreamPanel.tsx          # Contenedor: hook + sesiones + Chatbot
@@ -100,5 +100,17 @@ useChatStream.send(url, { content, session_id? })
 
 ```bash
 bun run typecheck
-bun run test:coverage   # cubre model/useChatStream.test.ts
+bun run test:coverage   # cubre model/ y ui/
 ```
+
+**Pruebas:**
+
+| Archivo                         | Qué verifica                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------- |
+| `model/useChatStream.test.ts`   | Mapeo de eventos SSE a mensajes, modificaciones aplicadas, redirecciones y errores.           |
+| `ui/ChatStreamPanel.test.tsx`   | Integración hook + sesiones + `Chatbot` contra SSE simulado (`streamControlado`).             |
+| `ui/Chatbot.test.tsx`           | Envío con Enter, detener generación, cierre y estado deshabilitado.                           |
+| `ui/SessionSelector.test.tsx`   | Crear, cambiar y eliminar sesiones (menú con `fireEvent.click`: el hover de user-event lo cierra). |
+| `ui/chatbot-message.test.tsx`, `ui/TarjetaRecepcionPlan.test.tsx` | Render de burbujas y tarjetas de sugerencia.              |
+
+`PanelAsistenteRequisito` se prueba de forma integrada desde `RequirementsPage.test.tsx`.

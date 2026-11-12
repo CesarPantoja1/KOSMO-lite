@@ -130,3 +130,15 @@ export const getProjects = (): Promise<Project[]> =>
 bun run typecheck
 bun run test:coverage   # los tests de <entidad>/{api,model} SÍ se miden
 ```
+
+**Pruebas de la capa (lógica del frontend y comunicación con el backend):**
+
+```
+entities/<entidad>/
+├── api/api.test.ts      # Contrato HTTP contra MSW
+└── model/store.test.ts  # Acciones y estado del store
+```
+
+- **`api/`**: verificar URL, método, query params y cuerpo JSON enviados; la transformación de la respuesta y la propagación de errores (404, 409, 422, 5xx). La red se simula con MSW (`server.use(http.<método>(apiUrl(...)))`), no con `vi.mock` del módulo.
+- **`model/`**: probar cada acción del store (estado antes/después, caché, flags como `hasRequirements`), sin renderizar componentes. Los stores se reinician solos tras cada test.
+- Si se agrega un endpoint, añadir su handler por defecto en `src/test/msw/handlers.ts` cuando lo consuman varias pruebas, y su fábrica en `src/test/factories.ts` si introduce un tipo nuevo.

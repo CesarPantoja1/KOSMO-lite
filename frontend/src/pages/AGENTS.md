@@ -121,3 +121,9 @@ bun run typecheck
 bun run build     # validar navegación/rutas
 bun run test:coverage
 ```
+
+**Pruebas de la capa (flujos de usuario completos):**
+
+- Cada página tiene `ui/<Pagina>.test.tsx` que la renderiza con stores, features, widgets y API (MSW) reales, y recorre los flujos de la ruta: carga inicial, estado vacío, acción principal (con su error), confirmaciones y navegación (`mockRouter`).
+- Los hooks locales (`hooks/`, `model/`) y los esquemas Zod (`model/types.ts`) se prueban por separado: hooks con `renderHook`, esquemas con tablas `it.each` de entradas válidas e inválidas.
+- Las páginas con editor (Descubrimiento, Requisitos) mockean `@/features/markdown-editor` con un `<textarea>` que respeta las props (`markdown`, `onChange`, `saveStatus`, maximizar/minimizar).
