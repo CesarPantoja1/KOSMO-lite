@@ -33,11 +33,6 @@ export interface ModificationResult {
 	clarification_message: string | null;
 }
 
-export interface RedirectInfo {
-	target_phase: string;
-	redirect_message: string;
-}
-
 export interface ChatMessage {
 	id: string;
 	role: ChatRole;
@@ -45,13 +40,6 @@ export interface ChatMessage {
 	created_at: string;
 	change_suggestions: ChangeSuggestion[] | null;
 	modification: ModificationResult | null;
-}
-
-export interface ChatResponse {
-	message: ChatMessage;
-	modification: ModificationResult | null;
-	redirect: RedirectInfo | null;
-	consistency: Record<string, unknown>[] | null;
 }
 
 export interface ChatHistory {

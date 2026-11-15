@@ -22,7 +22,7 @@ import { useRequirementsStore } from '@/entities/requirements';
 
 import { useAppStore, useUnsavedChanges } from '@/features/app-state';
 import { AsideCharacteristic } from '@/features/aside-characteristic';
-import { PanelAsistenteRequisito } from '@/features/chatbot';
+import { RequirementsChatPanel } from '@/features/chatbot';
 import { MarkdownEditor, type SaveStatus } from '@/features/markdown-editor';
 
 const generatingRequirementsMessages = [
@@ -447,7 +447,7 @@ const RequirementsPage = () => {
 				</div>
 
 				{isChatbotOpen && (
-					<PanelAsistenteRequisito
+					<RequirementsChatPanel
 						featureId={selectedId}
 						projectId={currentProject?.id ?? null}
 						onClose={() => {

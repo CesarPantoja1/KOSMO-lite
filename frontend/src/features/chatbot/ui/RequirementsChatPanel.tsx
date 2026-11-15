@@ -6,9 +6,9 @@ import type { ChatMessage } from '@/entities/chat';
 import { toast } from '@/shared/ui';
 import { formatApiError } from '@/shared/api';
 import { useCallback, useState } from 'react';
-import { ChatStreamPanel } from './ChatStreamPanel';
+import { ChatPanel } from './ChatPanel';
 
-interface PanelAsistenteRequisitoProps {
+interface RequirementsChatPanelProps {
 	featureId: string | null;
 	projectId?: string | null;
 	onClose?: () => void;
@@ -16,13 +16,13 @@ interface PanelAsistenteRequisitoProps {
 	placeholder?: string;
 }
 
-export const PanelAsistenteRequisito = ({
+export const RequirementsChatPanel = ({
 	featureId,
 	projectId,
 	onClose,
 	title = 'Asistente de Requisitos EARS',
 	placeholder = 'Ej., Agregar escenarios alternativos...',
-}: PanelAsistenteRequisitoProps) => {
+}: RequirementsChatPanelProps) => {
 	const chatHistories = useRequirementsStore((s) => s.chatHistories);
 	const loadChatHistory = useRequirementsStore((s) => s.loadChatHistory);
 	const loadOlderChatHistory = useRequirementsStore((s) => s.loadOlderChatHistory);
@@ -87,7 +87,7 @@ export const PanelAsistenteRequisito = ({
 	const messages = featureId ? (chatHistories[featureId] ?? []) : [];
 
 	return (
-		<ChatStreamPanel
+		<ChatPanel
 			key={featureId || 'empty'}
 			title={title}
 			greeting='Hola 👋. Soy tu asistente de Requisitos EARS. Puedo ayudarte a refinar los requisitos y generar sus criterios de aceptación (Dado-Cuando-Entonces).'

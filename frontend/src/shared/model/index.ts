@@ -5,8 +5,6 @@ export type {
 	ChatRole,
 	ChangeSuggestion,
 	ModificationResult,
-	RedirectInfo,
 	ChatMessage,
-	ChatResponse,
 	ChatHistory,
 } from './chat-message';

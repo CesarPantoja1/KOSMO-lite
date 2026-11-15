@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from 'react';
 
-import { VideoIntro } from '@/shared/ui/VideoIntro';
 import { RootNavbar } from '@/widgets/root-navbar';
 
 import { ApiKeySection } from './ApiKeySection';
@@ -13,6 +12,8 @@ import { FlowSteps } from './FlowSteps';
 import { Hero } from './Hero';
 import { SddSection } from './SddSection';
 import { SessionExpiredWatcher } from './SessionExpiredWatcher';
+
+import { VideoIntro } from './VideoIntro';
 
 export function RootPage() {
 	const [showAuthModal, setShowAuthModal] = useState(false);

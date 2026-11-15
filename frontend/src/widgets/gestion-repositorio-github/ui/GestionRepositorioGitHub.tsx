@@ -6,7 +6,6 @@ import { formatApiError } from '@/shared/api';
 import {
 	ArrowRight,
 	Clock,
-	FormularioCreacionRepositorio,
 	GitHub,
 	Load,
 	SuccessCheckIcon,
@@ -17,6 +16,8 @@ import {
 import type { ProjectGitHubStatus } from '@/entities/project';
 
 import type { ProjectGithubViewState } from '@/features/github-sync';
+
+import { FormularioCreacionRepositorio } from './FormularioCreacionRepositorio';
 
 type Props = {
 	viewState: ProjectGithubViewState;

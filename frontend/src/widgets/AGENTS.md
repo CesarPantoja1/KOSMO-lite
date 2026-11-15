@@ -50,7 +50,7 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**, **`types/`**.
 - Gestiona navegación con protección de cambios sin guardar (`pendingNavigationPath`).
 
 ### `gestion-repositorio-github`
-- Controlado por `ProjectGithubViewState`; en estado `create` usa `FormularioCreacionRepositorio` (shared/ui). Muestra visibilidad, URL, última sincronización y hash corto.
+- Controlado por `ProjectGithubViewState`; en estado `create` usa `FormularioCreacionRepositorio` (`ui/`, junto con `ConfirmacionVisibilidadRepositorio`) y `lib/normalize-repo-name.ts`; son internos del widget porque es su único consumidor. Muestra visibilidad, URL, última sincronización y hash corto.
 
 ---
 

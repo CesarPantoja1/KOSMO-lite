@@ -47,7 +47,7 @@ Segmentos permitidos (solo si se necesitan): **`ui/`**, **`model/`**, **`hooks/`
 ## 3. Descripción por página
 
 ### `RootPage` (landing pública)
-- Compone `RootNavbar`, secciones (`Hero`, `Features`, `FlowSteps`, `SddSection`, `ApiKeySection`, `CtaSection`), `AuthModal` (`Login`/`Register`), `SessionExpiredWatcher` y `VideoIntro`.
+- Compone `RootNavbar`, secciones (`Hero`, `Features`, `FlowSteps`, `SddSection`, `ApiKeySection`, `CtaSection`), `AuthModal` (`Login`/`Register`), `SessionExpiredWatcher` y `VideoIntro` (local en `ui/VideoIntro.tsx`).
 - `Login`/`Register` usan `authApi` y navegan a `/proyecto` o `/onboarding`.
 
 ### `HomePage`
@@ -65,7 +65,7 @@ Segmentos permitidos (solo si se necesitan): **`ui/`**, **`model/`**, **`hooks/`
 
 ### Páginas del proyecto (`project/*`)
 Ver [`project/AGENTS.md`](./project/AGENTS.md). Resumen de composición recurrente:
-- `ChatStreamPanel` (Discovery, Characteristics), `MarkdownEditor` (Discovery, Requirements), `MarkdownText` (Consistency), `PanelAsistenteRequisito` (Requirements), `AiConfigForm` (Onboarding, Profile), `useUnsavedChanges` (Discovery, Requirements).
+- `ChatPanel` (Discovery, Characteristics), `MarkdownEditor` (Discovery, Requirements), `MarkdownText` (Consistency), `RequirementsChatPanel` (Requirements), `AiConfigForm` (Onboarding, Profile), `useUnsavedChanges` (Discovery, Requirements).
 - Widgets por slice: `@/widgets/root-navbar`, `@/widgets/main-navbar`, `@/widgets/gestion-repositorio-github`.
 - Features por slice: `@/features/aside-characteristic`. No existen barrels `@/widgets` ni `@/features`.
 

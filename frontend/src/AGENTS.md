@@ -41,7 +41,7 @@ pages → widgets → features → entities → shared
 src/
 ├── shared/
 │   ├── api/        # apiClient, authApi, errores (ApiError), headers, config
-│   ├── lib/        # sse, useSseStream, pkce, zod, session-events, normalize-repo-name
+│   ├── lib/        # sse, pkce, zod, session-events
 │   ├── model/      # auth-store (Zustand+persist), auth-types (DTOs), chat-message
 │   └── ui/         # Loading, ModalConfirm, AuthGuard, MarkdownText, toast/, icons/
 │
@@ -62,7 +62,7 @@ src/
 │   ├── ai-config/        # AiConfigForm, AiProviderBadge
 │   ├── app-state/        # app.store, useUnsavedChanges, clearAllStores
 │   ├── aside-characteristic/ # Sidebar de características
-│   ├── chatbot/          # Chat SSE + sesiones (Chatbot, ChatStreamPanel, ...)
+│   ├── chatbot/          # Chat SSE + sesiones (ChatView, ChatPanel, ...)
 │   ├── github-sync/      # useProjectGithubRepo, GitHubSyncBanner
 │   ├── initialize/       # initializeProject (hidratación de stores)
 │   └── markdown-editor/  # Editor + TOC + autosave
@@ -141,7 +141,7 @@ export const getProjects = (): Promise<Project[]> =>
 - Formularios con `react-hook-form` + esquemas Zod en `model/types.ts`.
 
 ### Streaming SSE
-- `shared/lib/useSseStream.ts` (transporte) + `features/chatbot/model/useChatStream.ts` (mapeo de eventos de chat).
+- `shared/lib/sse.ts` (parser `consumeSse`) + `entities/chat/api/stream.ts` (`streamChatMessage`: red y mapeo de eventos) + `features/chatbot/model/useChatStream.ts` (fase y cancelación).
 - Eventos típicos: `chunk`, `message`, `error`.
 
 ---

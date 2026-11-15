@@ -1,12 +1,13 @@
 'use client';
 
+import { Send } from '@/shared/ui';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useState } from 'react';
 import { useController, useForm } from 'react-hook-form';
 import z from 'zod';
-import { normalizeRepoName } from '../lib';
+import { normalizeRepoName } from '../lib/normalize-repo-name';
 import { ConfirmacionVisibilidadRepositorio } from './ConfirmacionVisibilidadRepositorio';
-import Send from './icons/Send';
 
 type FormValues = {
 	repo_name: string;

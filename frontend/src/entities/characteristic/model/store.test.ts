@@ -5,7 +5,6 @@ vi.mock('../api/api', () => ({
 	generateCharacteristics: vi.fn(),
 	getSuggestCharacteristics: vi.fn(),
 	addCharacteristic: vi.fn(),
-	sendChatMessage: vi.fn(),
 	getChatHistory: vi.fn(),
 }));
 
@@ -14,7 +13,6 @@ import {
 	generateCharacteristics,
 	getSuggestCharacteristics,
 	addCharacteristic,
-	sendChatMessage,
 	getChatHistory,
 } from '../api/api';
 import { useCharacteristicStore, clearCharacteristicStore } from './store';
@@ -24,7 +22,6 @@ const api = {
 	generateCharacteristics: vi.mocked(generateCharacteristics),
 	getSuggestCharacteristics: vi.mocked(getSuggestCharacteristics),
 	addCharacteristic: vi.mocked(addCharacteristic),
-	sendChatMessage: vi.mocked(sendChatMessage),
 	getChatHistory: vi.mocked(getChatHistory),
 };
 
@@ -122,26 +119,6 @@ describe('useCharacteristicStore', () => {
 
 		// Assert
 		expect(useCharacteristicStore.getState().currentCharacteristics).toEqual([]);
-	});
-
-	it('sendChatMessage agrega el mensaje del usuario y luego la respuesta', async () => {
-		// Arrange
-		api.sendChatMessage.mockResolvedValue({
-			message: { id: 'm1', role: 'assistant', content: 'Respuesta' } as never,
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await useCharacteristicStore.getState().sendChatMessage('feat_01', 'Hola');
-
-		// Assert
-		const history = useCharacteristicStore.getState().chatHistories['feat_01'];
-		expect(history).toHaveLength(2);
-		expect(history[0].role).toBe('user');
-		expect(history[0].content).toBe('Hola');
-		expect(history[1].content).toBe('Respuesta');
 	});
 
 	it('appendUserMessage y appendAssistantMessage agregan mensajes locales', () => {

@@ -96,26 +96,6 @@ describe('characteristic/api — modo real (USE_MOCKS=false)', () => {
 		});
 	});
 
-	it('sendChatMessage hace POST con el contenido del mensaje', async () => {
-		// Arrange
-		const { sendChatMessage } = await import('./api');
-		mockFetchOk({
-			message: { id: 'm1', role: 'assistant', content: 'ok' },
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await sendChatMessage('feat_01', 'Hola');
-
-		// Assert
-		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/api/v1/features/feat_01/chat'),
-			expect.objectContaining({ method: 'POST' }),
-		);
-	});
-
 	it('getChatHistory agrega session_id y before como query params', async () => {
 		// Arrange
 		const { getChatHistory } = await import('./api');

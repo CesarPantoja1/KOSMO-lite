@@ -11,39 +11,44 @@
 ```
 chatbot/
 ├── ui/
-│   ├── Chatbot.tsx                  # UI presentacional del chat (+ *.test.tsx por componente)
-│   ├── chatbot-message.tsx          # Burbuja de mensaje (MarkdownText + sugerencias)
-│   ├── TarjetaRecepcionPlan.tsx     # Tarjeta de ChangeSuggestion (diff/rationale)
-│   ├── ChatStreamPanel.tsx          # Contenedor: hook + sesiones + Chatbot
-│   ├── SessionSelector.tsx          # Dropdown de sesiones
-│   └── PanelAsistenteRequisito.tsx  # Adaptador específico de requisitos EARS
+│   ├── ChatPanel.tsx              # Contenedor: useChatStream + sesiones + historial → ChatView
+│   ├── RequirementsChatPanel.tsx  # ChatPanel configurado para requisitos EARS
+│   ├── ChatView.tsx               # UI presentacional del chat (sin red)
+│   ├── ChatMessageBubble.tsx      # Burbuja de mensaje (MarkdownText + sugerencias)
+│   ├── TarjetaRecepcionPlan.tsx   # Tarjeta de ChangeSuggestion (diff/rationale)
+│   └── SessionSelector.tsx        # Dropdown de sesiones
 ├── model/
-│   ├── useChatStream.ts             # Mapeo de eventos SSE de chat
+│   ├── useChatStream.ts           # Hook: envía y sigue la respuesta { phase, send, stop }
 │   └── useChatStream.test.ts
 └── index.ts
 ```
 
-**Exports:** `Chatbot`, `ChatStreamPanel`, `PanelAsistenteRequisito`, `ChatbotMessage`, `useChatStream`, tipo `SendChatStreamBody`.
+**Convención de nombres:** `*View` = solo UI, sin red ni stores (`ChatView`); `*Panel` = conectado a datos (`ChatPanel` y sus especializaciones, como `RequirementsChatPanel`). `useChatStream` es el hook que usa `ChatPanel` para enviar y seguir la respuesta.
+
+**Exports:** `ChatPanel`, `RequirementsChatPanel`. El resto (`ChatView`, `ChatMessageBubble`, `useChatStream`) es interno de la feature.
+
+> El chat es **solo SSE**. El antiguo flujo HTTP (`sendChatMessage` / `POST .../chat` en los stores de `characteristic`, `discovery` y `requirements`) se eliminó; esas entidades solo conservan el historial (`loadChatHistory`, `appendUserMessage`, `appendAssistantMessage`).
 
 ---
 
 ## 2. Flujo de streaming
 
 ```
-useChatStream.send(url, { content, session_id? })
-  └── useSseStream.start (shared/lib)          // POST + authHeaders + AbortController
-        └── consumeSse(res, onEvent)           // parsea bloques SSE
-              └── onEvent(event)               // chunk | message | error
+useChatStream.send(url, { content, session_id? })      // features/chatbot: fase + AbortController
+  └── streamChatMessage(url, body, handlers, signal)   // entities/chat/api/stream.ts: POST + authHeaders
+        └── consumeSse(res, onEvent)                   // shared/lib/sse.ts: parsea bloques SSE
+              └── handlers                             // onOpen | onChunk | onMessage | onError
 ```
 
-- `useChatStream` discrimina `event.type`:
+- `streamChatMessage` (entidad) traduce `event.type`:
   - `chunk` → `onChunk(content)` (texto en streaming)
-  - `message` → `onMessage(ChatMessage)` (normaliza `message` crudo con `toSuggestions`/`toModification`)
+  - `message` → `onMessage(ChatMessage)` (normaliza el evento crudo: sugerencias y modificación)
   - `error` → `onError(Error)`
   - `start` se ignora
-- Retorna `{ phase, send, stop }`; `stop` aborta.
-- `SendChatStreamBody = { content: string; session_id?: string | null }`.
-- El transporte (`useSseStream`, `consumeSse`) vive en `shared/lib`; **la feature no hace `fetch` directo**.
+  - Rechaza con `ApiError` si la respuesta no es `ok`, con `NETWORK_ERROR_MESSAGE` si no hay conexión y con `AbortError` al cancelar.
+- `useChatStream` (feature) solo gestiona la UI: fases `idle → connecting → streaming (onOpen) → done | error`. Retorna `{ phase, send, stop }`; `stop` aborta y la fase vuelve a `idle`.
+- `ChatStreamBody = { content: string; session_id?: string | null }` (exportado por `entities/chat`).
+- **La feature no hace `fetch`**: toda la red del chat (stream y sesiones) vive en `entities/chat/api/`.
 
 ---
 
@@ -51,18 +56,18 @@ useChatStream.send(url, { content, session_id? })
 
 | Componente | Rol | Notas |
 |---|---|---|
-| `Chatbot` | Presentacional | Header (sessionSelector/título), lista de mensajes, burbuja de streaming, error con reintento, textarea auto-ajustable (Enter envía, Shift+Enter salta línea), botón Enviar/Detener. **Sin lógica de red.** |
-| `ChatbotMessage` | Mensaje individual | Usuario a la derecha (texto plano); asistente con `MarkdownText`, `clarification_message` si no se aplicó, y una `TarjetaRecepcionPlan` por `change_suggestion`. |
+| `ChatView` | Presentacional | Header (sessionSelector/título), lista de mensajes, burbuja de streaming, error con reintento, textarea auto-ajustable (Enter envía, Shift+Enter salta línea), botón Enviar/Detener. **Sin lógica de red.** |
+| `ChatMessageBubble` | Mensaje individual | Usuario a la derecha (texto plano); asistente con `MarkdownText`, `clarification_message` si no se aplicó, y una `TarjetaRecepcionPlan` por `change_suggestion`. |
 | `TarjetaRecepcionPlan` | Sugerencia de cambio | Badge Aplicado/No aplicado, motivo, diff `- Anterior`/`+ Propuesto` (detecta eliminación si `diff_after` vacío) y rationale. |
-| `ChatStreamPanel` | Contenedor | Une `useChatStream` + `useChatSessions`; gestiona `streamingContent`, error/retry, rehidratación de historial al cambiar sesión/contexto, crear/eliminar sesión y re-listado tras el primer prompt. |
+| `ChatPanel` | Contenedor | Une `useChatStream` + `useChatSessions`; gestiona `streamingContent`, error/retry, rehidratación de historial al cambiar sesión/contexto, crear/eliminar sesión y re-listado tras el primer prompt. |
 | `SessionSelector` | Dropdown de sesiones | Lista `ChatSessionSummary` con tiempo relativo; crear/seleccionar/eliminar; cierra con Escape o click externo. |
-| `PanelAsistenteRequisito` | Adaptador EARS | Lee `entities/requirements` (`chatHistories`), construye `streamUrl = /api/v1/features/{featureId}/requirements/chat/stream`, `phase='requirements'`, `contextId=featureId`; refetch de requisitos si `modification.applied`. |
+| `RequirementsChatPanel` | Adaptador EARS | Lee `entities/requirements` (`chatHistories`), construye `streamUrl = /api/v1/features/{featureId}/requirements/chat/stream`, `phase='requirements'`, `contextId=featureId`; refetch de requisitos si `modification.applied`. |
 
 ---
 
 ## 4. Integración con entidades
 
-- **`entities/chat`** (`sessions-store.ts`): store Zustand por clave `projectId:phase:contextId` (`sessionKey`); expone `listSessions`, `createSession`, `deleteSession`, `setActiveSessionId` y `useChatSessions` (auto-lista). API: `listChatSessions`, `createChatSession`, `deleteChatSession`.
+- **`entities/chat`** (`sessions-store.ts`): store Zustand por clave `projectId:phase:contextId` (`sessionKey`); expone `listSessions`, `createSession`, `deleteSession`, `setActiveSessionId` y `useChatSessions` (auto-lista). API interna: `listChatSessions`, `createChatSession`, `deleteChatSession` (no se exportan; se usan a través del store).
 - **`shared/model/chat-message.ts`**: tipos `ChatMessage`, `ChangeSuggestion`, `ModificationResult`, `ChatHistory` + helpers `createUserMessage`, `createAssistantError`, `appendMessage` (reexportados por `entities/chat/model/types.ts`).
 - **`entities/requirements`**: guarda `chatHistories[featureId]` con paginación por cursor (`historyCursor`/`historyHasMore`).
 
@@ -70,27 +75,28 @@ useChatStream.send(url, { content, session_id? })
 
 ## 5. Consumidores
 
-- `pages/project/DiscoveryPage` y `CharacteristicsPage` → `ChatStreamPanel` (fases `discovery`, `features`).
-- `pages/project/RequirementsPage` → `PanelAsistenteRequisito` (fase `requirements`).
+- `pages/project/DiscoveryPage` y `CharacteristicsPage` → `ChatPanel` (fases `discovery`, `features`).
+- `pages/project/RequirementsPage` → `RequirementsChatPanel` (fase `requirements`).
 
 ---
 
 ## 6. Dónde cambiar qué
 
 ```
-├── Mapeo de eventos SSE            → model/useChatStream.ts
-├── UI de burbujas/sugerencias      → ui/chatbot-message.tsx, ui/TarjetaRecepcionPlan.tsx
-├── Contenedor/sesiones             → ui/ChatStreamPanel.tsx + entities/chat
-├── Nuevo dominio (fase nueva)      → nuevo PanelXxx siguiendo PanelAsistenteRequisito.tsx
-└── Transporte SSE genérico         → shared/lib/useSseStream.ts (fuera de la feature)
+├── Mapeo de eventos SSE            → entities/chat/api/stream.ts
+├── Fases / cancelación del stream  → model/useChatStream.ts
+├── UI de burbujas/sugerencias      → ui/ChatMessageBubble.tsx, ui/TarjetaRecepcionPlan.tsx
+├── Contenedor/sesiones             → ui/ChatPanel.tsx + entities/chat
+├── Nuevo dominio (fase nueva)      → nuevo PanelXxx siguiendo RequirementsChatPanel.tsx
+└── Parser SSE (consumeSse)         → shared/lib/sse.ts (compartido con entities/implementation)
 ```
 
 ---
 
 ## 7. Invariantes
 
-1. **Sin `api/`:** todo HTTP a través de `shared/lib/useSseStream` (transporte) y `entities/chat` (sesiones).
-2. **Presentación separada de red:** `Chatbot` no hace red; `ChatStreamPanel` la porta.
+1. **Sin `api/` ni `fetch`:** todo HTTP a través de `entities/chat` (`streamChatMessage` y sesiones).
+2. **Presentación separada de red:** `ChatView` no hace red; `ChatPanel` la porta.
 3. **Reutilizar tipado de mensajes** de `shared/model/chat-message.ts`.
 4. **`index.ts` como API pública.**
 
@@ -107,10 +113,10 @@ bun run test:coverage   # cubre model/ y ui/
 
 | Archivo                         | Qué verifica                                                                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `model/useChatStream.test.ts`   | Mapeo de eventos SSE a mensajes, modificaciones aplicadas, redirecciones y errores.           |
-| `ui/ChatStreamPanel.test.tsx`   | Integración hook + sesiones + `Chatbot` contra SSE simulado (`streamControlado`).             |
-| `ui/Chatbot.test.tsx`           | Envío con Enter, detener generación, cierre y estado deshabilitado.                           |
+| `model/useChatStream.test.ts`   | Fases del stream, propagación de errores y cancelación con `stop()` (red simulada con MSW). |
+| `ui/ChatPanel.test.tsx`   | Integración hook + sesiones + `ChatView` contra SSE simulado (`streamControlado`).             |
+| `ui/ChatView.test.tsx`           | Envío con Enter, detener generación, cierre y estado deshabilitado.                           |
 | `ui/SessionSelector.test.tsx`   | Crear, cambiar y eliminar sesiones (menú con `fireEvent.click`: el hover de user-event lo cierra). |
-| `ui/chatbot-message.test.tsx`, `ui/TarjetaRecepcionPlan.test.tsx` | Render de burbujas y tarjetas de sugerencia.              |
+| `ui/ChatMessageBubble.test.tsx`, `ui/TarjetaRecepcionPlan.test.tsx` | Render de burbujas y tarjetas de sugerencia.              |
 
-`PanelAsistenteRequisito` se prueba de forma integrada desde `RequirementsPage.test.tsx`.
+`RequirementsChatPanel` se prueba de forma integrada desde `RequirementsPage.test.tsx`.

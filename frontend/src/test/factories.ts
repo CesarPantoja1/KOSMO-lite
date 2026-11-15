@@ -10,7 +10,7 @@ import type {
 	CharacteristicResponse,
 	SuggestCharacteristic,
 } from '@/entities/characteristic/model/types';
-import type { ChatSessionSummary } from '@/entities/chat/model/types';
+import type { ChatSessionSummary } from '@/entities/chat';
 import type { ConsistencyStatusResponse } from '@/entities/consistency/model/types';
 import type { IntegrationStatus } from '@/entities/integration/model/types';
 import type { Project } from '@/entities/project/model/types';

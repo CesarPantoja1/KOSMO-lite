@@ -1,5 +1,5 @@
 /**
- * Integración: ChatStreamPanel + useChatStream + useSseStream + store de sesiones,
+ * Integración: ChatPanel + useChatStream + streamChatMessage (entities/chat) + store de sesiones,
  * contra un backend SSE simulado con MSW.
  */
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -18,7 +18,7 @@ import {
 	server,
 	streamControlado,
 } from '@/test';
-import { ChatStreamPanel } from './ChatStreamPanel';
+import { ChatPanel } from './ChatPanel';
 
 const URL_STREAM = '/api/v1/features/feat_1/chat/stream';
 const URL_SESIONES = '/api/v1/projects/:projectId/chat-sessions';
@@ -35,7 +35,7 @@ type Callbacks = {
 function Arnes({ cb, sinSesiones = false }: { cb: Callbacks; sinSesiones?: boolean }) {
 	const [mensajes, setMensajes] = useState<ChatMessage[]>([]);
 	return (
-		<ChatStreamPanel
+		<ChatPanel
 			messages={mensajes}
 			streamUrl={URL_STREAM}
 			projectId={sinSesiones ? null : 'prj_1'}
@@ -78,7 +78,7 @@ async function enviar(user: ReturnType<typeof renderizar>['user'], texto = 'Mejo
 	await user.keyboard('{Enter}');
 }
 
-describe('ChatStreamPanel (integración con SSE)', () => {
+describe('ChatPanel (integración con SSE)', () => {
 	it('muestra la respuesta del asistente a medida que llega y luego el mensaje final', async () => {
 		const stream = streamControlado();
 		let cuerpo: unknown;

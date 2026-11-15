@@ -11,7 +11,7 @@ import { useDiscoveryStore } from '@/entities/discovery';
 import { useProjectStore } from '@/entities/project';
 
 import { useAppStore, useUnsavedChanges } from '@/features/app-state';
-import { ChatStreamPanel } from '@/features/chatbot';
+import { ChatPanel } from '@/features/chatbot';
 import {
 	MarkdownEditor,
 	type MarkdownEditorHandle,
@@ -265,7 +265,7 @@ const DiscoveryPage = () => {
 
 				{/* Chatbot panel */}
 				{isChatbotOpen && (
-					<ChatStreamPanel
+					<ChatPanel
 						placeholder='ej., ¿Qué alcance tiene el módulo de pagos?'
 						onClose={() => setIsChatbotOpen(false)}
 						messages={chatHistory}

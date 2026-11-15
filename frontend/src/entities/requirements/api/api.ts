@@ -1,7 +1,7 @@
 import { apiClient } from '@/shared/api';
 import { USE_MOCKS } from '@/shared/api/config';
 import type { RequirementsResponse } from '../model/types';
-import type { ChatHistory, ChatMessage, ChatResponse } from '@/shared/model/chat-message';
+import type { ChatHistory } from '@/shared/model/chat-message';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -172,8 +172,6 @@ export const deleteRequirements = (
 		? mockDeleteRequirements(projectId, characteristicId)
 		: realDeleteRequirements(projectId, characteristicId);
 
-const mockChatHistories: Record<string, ChatMessage[]> = {};
-
 export const getRequirementChatHistory = async (
 	featureId: string,
 	sessionId: string | null = null,
@@ -184,7 +182,7 @@ export const getRequirementChatHistory = async (
 		return {
 			phase: 'requirements',
 			context: featureId,
-			messages: mockChatHistories[featureId] ?? [],
+			messages: [],
 			has_more: false,
 			next_cursor: null,
 		};
@@ -199,91 +197,3 @@ export const getRequirementChatHistory = async (
 	);
 };
 
-export const sendRequirementChatMessage = async (
-	featureId: string,
-	content: string,
-): Promise<ChatResponse> => {
-	if (USE_MOCKS) {
-		return mockSendRequirementChatMessage(featureId, content);
-	}
-
-	return await apiClient<ChatResponse>(`/api/v1/features/${featureId}/requirements/chat`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ content }),
-	});
-};
-
-const mockSendRequirementChatMessage = async (
-	requirementId: string,
-	content: string,
-): Promise<ChatResponse> => {
-	await delay(600);
-
-	// Check for testing invalid format simulation
-	if (content.toLowerCase().includes('error_formato')) {
-		throw new Error('Respuesta del agente en formato inválido');
-	}
-
-	const userMessage: ChatMessage = {
-		id: crypto.randomUUID(),
-		role: 'user',
-		content,
-		created_at: new Date().toISOString(),
-		change_suggestions: null,
-		modification: null,
-	};
-
-	const history = mockChatHistories[requirementId] ?? [];
-
-	const response: ChatResponse = {
-		message: {
-			id: crypto.randomUUID(),
-			role: 'assistant',
-			content:
-				'He analizado el requisito. Aquí tienes una propuesta con criterios de aceptación:\n\n' +
-				'Escenario: Validación exitosa de datos\n' +
-				'  Dado que el usuario tiene permisos de edición\n' +
-				'  Cuando envía los datos del formulario completos\n' +
-				'  Entonces el sistema guarda la información y muestra un mensaje de éxito\n',
-			created_at: new Date().toISOString(),
-			change_suggestions: [
-				{
-					id: crypto.randomUUID(),
-					section: 'Agregar escenario de validación de datos',
-					description: 'cambio leve',
-					diff_before: 'antes era asi ',
-					diff_after: 'Ahora es asi',
-					rationale: 'Cubre el flujo de validación del formulario.',
-					applied: true,
-					not_applied_reason: null,
-				},
-			],
-			modification: {
-				applied: true,
-				modified_section: 'Agregar escenario de validación de datos',
-				change_description: 'Se aplicaron los cambios sugeridos.',
-				modified_document: null,
-				before: null,
-				after: null,
-				undo_version_id: null,
-				clarification_message: null,
-			},
-		},
-		modification: {
-			applied: true,
-			modified_section: 'Agregar escenario de validación de datos',
-			change_description: 'Se aplicaron los cambios sugeridos.',
-			modified_document: null,
-			before: null,
-			after: null,
-			undo_version_id: null,
-			clarification_message: null,
-		},
-		redirect: null,
-		consistency: null,
-	};
-
-	mockChatHistories[requirementId] = [...history, userMessage, response.message];
-	return response;
-};

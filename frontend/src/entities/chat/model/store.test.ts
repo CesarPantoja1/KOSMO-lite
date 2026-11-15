@@ -8,7 +8,7 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('../api/api', () => apiMocks);
 
-import { sessionKey, useChatSessionsStore } from './sessions-store';
+import { sessionKey, useChatSessionsStore } from './store';
 
 const sessionFixture = {
 	id: 'cht_01',
@@ -54,7 +54,9 @@ describe('chat sessions store', () => {
 			last_message_at: null,
 		});
 
-		await useChatSessionsStore.getState().createSession('prj_01', 'requirements', 'feat_01');
+		await useChatSessionsStore
+			.getState()
+			.createSession('prj_01', 'requirements', 'feat_01');
 
 		const key = sessionKey('prj_01', 'requirements', 'feat_01');
 		const sessions = useChatSessionsStore.getState().sessions[key];

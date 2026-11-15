@@ -3,7 +3,7 @@
 import { Ai, Close, Logo, Send } from '@/shared/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ChatbotMessage } from './chatbot-message';
+import { ChatMessageBubble } from './ChatMessageBubble';
 import { ChatMessage } from '@/entities/chat';
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
 	placeholder?: string;
 	onClose?: () => void;
 	messages?: ChatMessage[];
-	onSendMessage?: (content: string) => Promise<void> | void;
+	onSendMessage?: (content: string) => void;
 	isLoading?: boolean;
 	streamingContent?: string | null;
 	isStreaming?: boolean;
@@ -25,7 +25,27 @@ interface Props {
 	onLoadMore?: () => void;
 }
 
-export const Chatbot = ({
+/** Avatar del asistente + burbuja: saludo, indicador de escritura y texto en streaming. */
+const AssistantBubble = ({
+	children,
+	className = '',
+}: {
+	children: ReactNode;
+	className?: string;
+}) => (
+	<div className='flex items-start gap-2'>
+		<div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai-500'>
+			<Ai size={12} color='text-neutral-0' />
+		</div>
+		<div
+			className={`max-w-[85%] rounded-2xl rounded-tl-sm border border-neutral-200 bg-neutral-0 px-2.5 py-1.5 shadow-sm md:px-3 md:py-2 ${className}`}
+		>
+			{children}
+		</div>
+	</div>
+);
+
+export const ChatView = ({
 	title = 'Agente IA',
 	greeting = 'Hola 👋. ¿En qué puedo ayudarte?',
 	placeholder = 'Escribe un mensaje...',
@@ -44,28 +64,20 @@ export const Chatbot = ({
 	onLoadMore,
 }: Props) => {
 	const [input, setInput] = useState('');
-	const [isSending, setIsSending] = useState(false);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
-	const busy = isSending || isLoading || isStreaming;
+	const busy = isLoading || isStreaming;
 	const canSend = input.trim().length > 0 && !busy;
 
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, [messages, isLoading, isStreaming, streamingContent, errorMessage]);
 
-	const handleSend = async () => {
+	const handleSend = () => {
 		const trimmed = input.trim();
-		if (!trimmed || !onSendMessage) return;
+		if (!trimmed || !onSendMessage || busy) return;
 		setInput('');
-		setIsSending(true);
-		try {
-			await onSendMessage(trimmed);
-		} catch (error) {
-			console.error(error);
-		} finally {
-			setIsSending(false);
-		}
+		onSendMessage(trimmed);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -75,7 +87,7 @@ export const Chatbot = ({
 		}
 	};
 
-	// Ajusta la altura del textarea automáticamente según el contenido
+	// Ajusta la altura del textarea al contenido (también al vaciarse tras enviar)
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	useEffect(() => {
 		const textarea = textareaRef.current;
@@ -128,45 +140,30 @@ export const Chatbot = ({
 				)}
 
 				{messages.length === 0 && !busy && (
-					<div className='flex items-start gap-2'>
-						<div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai-500'>
-							<Ai size={12} color='text-neutral-0' />
-						</div>
-						<div className='max-w-[85%] rounded-2xl rounded-tl-sm bg-neutral-0 border border-neutral-200 px-2.5 py-1.5 shadow-sm md:px-3 md:py-2'>
-							<p className='text-xs leading-5 text-neutral-700 md:text-sm'>{greeting}</p>
-						</div>
-					</div>
+					<AssistantBubble>
+						<p className='text-xs leading-5 text-neutral-700 md:text-sm'>{greeting}</p>
+					</AssistantBubble>
 				)}
 
 				{messages.map((message) => (
-					<ChatbotMessage key={message.id} message={message} />
+					<ChatMessageBubble key={message.id} message={message} />
 				))}
 
-				{(isSending || isLoading || (isStreaming && streamingContent === null)) && (
-					<div className='flex items-start gap-2'>
-						<div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai-500'>
-							<Ai size={12} color='text-neutral-0' />
-						</div>
-						<div className='max-w-[85%] rounded-2xl rounded-tl-sm bg-neutral-0 border border-neutral-200 px-2.5 py-1.5 shadow-sm md:px-3 md:py-2'>
-							<span className='flex items-center gap-1 text-xs text-neutral-400 md:text-sm'>
-								<span className='animate-bounce [animation-delay:0ms]'>·</span>
-								<span className='animate-bounce [animation-delay:150ms]'>·</span>
-								<span className='animate-bounce [animation-delay:300ms]'>·</span>
-							</span>
-						</div>
-					</div>
+				{(isLoading || (isStreaming && streamingContent === null)) && (
+					<AssistantBubble>
+						<span className='flex items-center gap-1 text-xs text-neutral-400 md:text-sm'>
+							<span className='animate-bounce [animation-delay:0ms]'>·</span>
+							<span className='animate-bounce [animation-delay:150ms]'>·</span>
+							<span className='animate-bounce [animation-delay:300ms]'>·</span>
+						</span>
+					</AssistantBubble>
 				)}
 
 				{isStreaming && streamingContent !== null && (
-					<div className='flex items-start gap-2'>
-						<div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ai-500'>
-							<Ai size={12} color='text-neutral-0' />
-						</div>
-						<div className='max-w-[85%] px-2.5 py-1.5 text-xs md:px-3 md:py-2 md:text-sm leading-5 wrap-break-word whitespace-pre-wrap rounded-2xl rounded-tl-sm bg-neutral-0 border border-neutral-200 text-neutral-700 shadow-sm'>
-							{streamingContent}
-							<span className='ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-ai-500 align-text-bottom' />
-						</div>
-					</div>
+					<AssistantBubble className='text-xs leading-5 text-neutral-700 wrap-break-word whitespace-pre-wrap md:text-sm'>
+						{streamingContent}
+						<span className='ml-0.5 inline-block h-3.5 w-1.5 animate-pulse rounded-sm bg-ai-500 align-text-bottom' />
+					</AssistantBubble>
 				)}
 
 				<div ref={messagesEndRef} />
@@ -198,11 +195,7 @@ export const Chatbot = ({
 				<div className='flex items-end gap-1.5 rounded-xl border border-neutral-300 bg-neutral-50 px-2 py-1 transition-colors focus-within:border-ai-500 focus-within:ring-2 focus-within:ring-ai-500/15 md:px-2.5 md:py-1.5'>
 					<textarea
 						value={input}
-						onChange={(e) => {
-							setInput(e.target.value);
-							e.target.style.height = '0px';
-							e.target.style.height = `${e.target.scrollHeight}px`;
-						}}
+						onChange={(e) => setInput(e.target.value)}
 						ref={textareaRef}
 						onKeyDown={handleKeyDown}
 						placeholder={placeholder}

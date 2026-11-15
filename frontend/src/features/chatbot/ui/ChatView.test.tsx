@@ -1,20 +1,20 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { crearMensaje, renderWithProviders } from '@/test';
-import { Chatbot } from './Chatbot';
+import { ChatView } from './ChatView';
 
-type Props = Parameters<typeof Chatbot>[0];
+type Props = Parameters<typeof ChatView>[0];
 
 function renderizar(props: Props = {}) {
 	const onSendMessage = vi.fn();
-	const utils = renderWithProviders(<Chatbot onSendMessage={onSendMessage} {...props} />);
+	const utils = renderWithProviders(<ChatView onSendMessage={onSendMessage} {...props} />);
 	return { ...utils, onSendMessage };
 }
 
 const campo = () => screen.getByRole('textbox', { name: 'Mensaje para el asistente' });
 const botonEnviar = () => screen.getByRole('button', { name: 'Enviar mensaje' });
 
-describe('Chatbot', () => {
+describe('ChatView', () => {
 	it('sin mensajes muestra el saludo y el título por defecto', () => {
 		renderizar();
 
@@ -73,29 +73,6 @@ describe('Chatbot', () => {
 			await user.keyboard('{Enter}');
 			expect(onSendMessage).toHaveBeenCalledWith('Línea 1\nLínea 2');
 		});
-
-		it('mientras se envía muestra el indicador de escritura y bloquea el campo', async () => {
-			let resolver!: () => void;
-			const onSendMessage = vi.fn(() => new Promise<void>((r) => (resolver = r)));
-			const { user } = renderizar({ onSendMessage });
-
-			await user.type(campo(), 'Hola{Enter}');
-
-			expect(campo()).toBeDisabled();
-			resolver();
-			await vi.waitFor(() => expect(campo()).toBeEnabled());
-		});
-
-		it('si el envío falla no rompe la interfaz', async () => {
-			const consola = vi.spyOn(console, 'error').mockImplementation(() => {});
-			const onSendMessage = vi.fn().mockRejectedValue(new Error('fallo'));
-			const { user } = renderizar({ onSendMessage });
-
-			await user.type(campo(), 'Hola{Enter}');
-
-			await vi.waitFor(() => expect(campo()).toBeEnabled());
-			expect(consola).toHaveBeenCalled();
-		});
 	});
 
 	describe('streaming', () => {
@@ -136,7 +113,7 @@ describe('Chatbot', () => {
 		await user.click(screen.getByRole('button', { name: 'Cargar mensajes anteriores' }));
 		expect(onLoadMore).toHaveBeenCalledOnce();
 
-		rerender(<Chatbot hasMore loadingMore onLoadMore={onLoadMore} />);
+		rerender(<ChatView hasMore loadingMore onLoadMore={onLoadMore} />);
 		expect(screen.getByRole('button', { name: 'Cargando…' })).toBeDisabled();
 	});
 

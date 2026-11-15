@@ -4,7 +4,6 @@ vi.mock('../api/api', () => ({
 	getDiscovery: vi.fn(),
 	saveDiscovery: vi.fn(),
 	generateDiscovery: vi.fn(),
-	sendChatMessage: vi.fn(),
 	getChatHistory: vi.fn(),
 }));
 
@@ -12,7 +11,6 @@ import {
 	getDiscovery,
 	saveDiscovery,
 	generateDiscovery,
-	sendChatMessage,
 	getChatHistory,
 } from '../api/api';
 import { useDiscoveryStore, clearDiscoveryStore } from './store';
@@ -21,7 +19,6 @@ const api = {
 	getDiscovery: vi.mocked(getDiscovery),
 	saveDiscovery: vi.mocked(saveDiscovery),
 	generateDiscovery: vi.mocked(generateDiscovery),
-	sendChatMessage: vi.mocked(sendChatMessage),
 	getChatHistory: vi.mocked(getChatHistory),
 };
 
@@ -78,25 +75,6 @@ describe('useDiscoveryStore', () => {
 
 		// Assert
 		expect(useDiscoveryStore.getState().currentDiscovery?.content).toBe('generado');
-	});
-
-	it('sendChatMessage agrega el mensaje del usuario y luego la respuesta', async () => {
-		// Arrange
-		api.sendChatMessage.mockResolvedValue({
-			message: { id: 'm1', role: 'assistant', content: 'Respuesta' } as never,
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await useDiscoveryStore.getState().sendChatMessage('prj_01', 'Hola');
-
-		// Assert
-		const history = useDiscoveryStore.getState().chatHistory;
-		expect(history).toHaveLength(2);
-		expect(history[0].role).toBe('user');
-		expect(history[1].content).toBe('Respuesta');
 	});
 
 	it('appendUserMessage y appendAssistantMessage agregan mensajes locales', () => {

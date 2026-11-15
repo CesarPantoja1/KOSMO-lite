@@ -21,7 +21,7 @@ import { useDiscoveryStore } from '@/entities/discovery';
 import { subscribeImplementationEvents } from '@/entities/implementation';
 import { useProjectStore } from '@/entities/project';
 
-import { ChatStreamPanel } from '@/features/chatbot';
+import { ChatPanel } from '@/features/chatbot';
 
 import CardCharacterist from './CardCharacterist';
 import Search from './Search';
@@ -309,7 +309,7 @@ const CharacteristicsPage = () => {
 
 				{/* Chatbot panel */}
 				{activeFeatureId && (
-					<ChatStreamPanel
+					<ChatPanel
 						placeholder='ej. mejorar característica de búsqueda'
 						onClose={() => setActiveFeatureId(null)}
 						messages={chatMessages}

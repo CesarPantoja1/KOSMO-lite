@@ -6,7 +6,6 @@ vi.mock('../api/api', () => ({
 	generateRequirements: vi.fn(),
 	deleteRequirements: vi.fn(),
 	getRequirementChatHistory: vi.fn(),
-	sendRequirementChatMessage: vi.fn(),
 }));
 
 import {
@@ -15,7 +14,6 @@ import {
 	generateRequirements,
 	deleteRequirements,
 	getRequirementChatHistory,
-	sendRequirementChatMessage,
 } from '../api/api';
 import { useRequirementsStore, clearRequirementsStore } from './store';
 
@@ -25,7 +23,6 @@ const api = {
 	generateRequirements: vi.mocked(generateRequirements),
 	deleteRequirements: vi.mocked(deleteRequirements),
 	getRequirementChatHistory: vi.mocked(getRequirementChatHistory),
-	sendRequirementChatMessage: vi.mocked(sendRequirementChatMessage),
 };
 
 describe('useRequirementsStore', () => {
@@ -187,54 +184,6 @@ describe('useRequirementsStore', () => {
 		const history = useRequirementsStore.getState().chatHistories['f1'];
 		expect(history[0].id).toBe('old');
 		expect(history[1].id).toBe('recent');
-	});
-
-	it('sendChatMessage agrega el mensaje del usuario y luego la respuesta', async () => {
-		// Arrange
-		api.sendRequirementChatMessage.mockResolvedValue({
-			message: { id: 'm1', role: 'assistant', content: 'Respuesta' } as never,
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await useRequirementsStore.getState().sendChatMessage('f1', 'Hola');
-
-		// Assert
-		const history = useRequirementsStore.getState().chatHistories['f1'];
-		expect(history).toHaveLength(2);
-		expect(history[0].role).toBe('user');
-		expect(history[1].content).toBe('Respuesta');
-	});
-
-	it('sendChatMessage agrega un mensaje de error de formato inválido y relanza el error', async () => {
-		// Arrange
-		api.sendRequirementChatMessage.mockRejectedValue(
-			new Error('Respuesta del agente en formato inválido'),
-		);
-
-		// Act & Assert
-		await expect(
-			useRequirementsStore.getState().sendChatMessage('f1', 'Hola'),
-		).rejects.toThrow('formato inválido');
-
-		const history = useRequirementsStore.getState().chatHistories['f1'];
-		expect(history).toHaveLength(2);
-		expect(history[1].content).toContain('formato inválido');
-	});
-
-	it('sendChatMessage agrega un mensaje de error genérico para otros errores', async () => {
-		// Arrange
-		api.sendRequirementChatMessage.mockRejectedValue(new Error('network down'));
-
-		// Act & Assert
-		await expect(
-			useRequirementsStore.getState().sendChatMessage('f1', 'Hola'),
-		).rejects.toThrow('network down');
-
-		const history = useRequirementsStore.getState().chatHistories['f1'];
-		expect(history[1].content).toContain('Ocurrió un error al procesar tu solicitud');
 	});
 
 	it('appendUserMessage y appendAssistantMessage agregan mensajes locales', () => {

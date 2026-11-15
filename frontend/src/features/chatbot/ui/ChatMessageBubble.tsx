@@ -5,11 +5,11 @@ import { MarkdownText } from '@/shared/ui/markdown-text';
 import { TarjetaRecepcionPlan } from './TarjetaRecepcionPlan';
 import { ChatMessage } from '@/entities/chat';
 
-interface ChatbotMessageProps {
+interface ChatMessageBubbleProps {
 	message: ChatMessage;
 }
 
-export const ChatbotMessage = ({ message }: ChatbotMessageProps) => {
+export const ChatMessageBubble = ({ message }: ChatMessageBubbleProps) => {
 	const isUser = message.role === 'user';
 
 	return (

@@ -19,11 +19,9 @@ shared/
 │   ├── headers.ts       # authHeaders(extra): Bearer o X-Mock-User
 │   └── index.ts         # Barrel (reexporta tipos de ../model/auth-types)
 ├── lib/
-│   ├── sse.ts               # consumeSse(response, onEvent)
-│   ├── useSseStream.ts      # useSseStream() → { phase, error, start, stop }
+│   ├── sse.ts               # consumeSse(response, onEvent) — usado por entities/chat y entities/implementation
 │   ├── pkce.ts              # generateCodeVerifier / generateCodeChallenge (S256)
 │   ├── zod.ts               # re-export de zod
-│   ├── normalize-repo-name.ts
 │   ├── session-events.ts    # emitSessionExpired / onSessionExpired
 │   └── index.ts
 ├── model/
@@ -38,9 +36,6 @@ shared/
     ├── markdown-text.tsx        # MarkdownText (remark)
     ├── CharacterCounter.tsx
     ├── OAuthIntegration.tsx
-    ├── ConfirmacionVisibilidadRepositorio.tsx
-    ├── FormularioCreacionRepositorio.tsx
-    ├── VideoIntro.tsx
     ├── toast/       # toast(), ToasterProvider, types, icons
     ├── icons/       # 53 iconos SVG (default export mayormente)
     └── index.ts
@@ -79,9 +74,7 @@ shared/
 | Export                                           | Archivo                  | Descripción                                                                                                                             |
 | ------------------------------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `consumeSse(response, onEvent)`                  | `sse.ts`                 | Lee `ReadableStream`, separa bloques SSE por doble salto de línea y despacha cada `data:` JSON.                                         |
-| `useSseStream()`                                 | `useSseStream.ts`        | Hook de transporte SSE: `{ phase: idle\|connecting\|streaming\|done\|error, error, start, stop }`. `stop` aborta con `AbortController`. |
 | `generateCodeVerifier` / `generateCodeChallenge` | `pkce.ts`                | PKCE S256 (SHA-256 + base64url).                                                                                                        |
-| `normalizeRepoName(input)`                       | `normalize-repo-name.ts` | Slugifica nombres de repositorio (máx. 100).                                                                                            |
 | `emitSessionExpired` / `onSessionExpired`        | `session-events.ts`      | Bus de eventos desacoplado (shared no conoce consumidores).                                                                             |
 | `export * from 'zod'`                            | `zod.ts`                 | Re-export central de Zod.                                                                                                               |
 
@@ -96,7 +89,7 @@ Zustand + `persist` (clave `kosmo-auth-store`).
 - `clearAuthStore()` limpia storage + estado.
 
 ### `chat-message.ts` — Primitivas de chat
-- Tipos: `ChatRole`, `ChangeSuggestion`, `ModificationResult`, `RedirectInfo`, `ChatMessage`, `ChatResponse`, `ChatHistory`.
+- Tipos: `ChatRole`, `ChangeSuggestion`, `ModificationResult`, `ChatMessage`, `ChatHistory`. (`ChatResponse`/`RedirectInfo` se eliminaron junto con el chat HTTP; el chat es solo SSE.)
 - Helpers: `createUserMessage`, `createAssistantError`, `appendMessage`.
 - Genéricos; la gestión de sesiones de chat vive en `entities/chat`.
 
@@ -112,9 +105,6 @@ Zustand + `persist` (clave `kosmo-auth-store`).
 | `MarkdownText`                       | `markdown-text.tsx`                      | Render de Markdown (remark) con resaltado Gherkin. Memoizado.                                          |
 | `CharacterCounter`                   | `CharacterCounter.tsx`                   | Contador con color según límite.                                                                       |
 | `OAuthIntegration`                   | `OAuthIntegration.tsx`                   | Fila conectado/desconectado para OAuth.                                                                |
-| `ConfirmacionVisibilidadRepositorio` | `ConfirmacionVisibilidadRepositorio.tsx` | Diálogo de confirmación de repo público.                                                               |
-| `FormularioCreacionRepositorio`      | `FormularioCreacionRepositorio.tsx`      | Form (react-hook-form + Zod) de creación de repo.                                                      |
-| `VideoIntro`                         | `VideoIntro.tsx`                         | Video intro (no reexportado en el barrel).                                                             |
 
 ### `ui/toast/`
 - `toast` (métodos `success/error/warning/info/add/close`), cola `queue` (`maxVisibleToasts: 5`, timeout 5000 ms).
@@ -148,7 +138,7 @@ bun run test:coverage   # mide todo src/ (incluye ui/ y model/)
 
 | Segmento | Qué se prueba                                                                                   | Ejemplos                                             |
 | -------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `lib/`   | Funciones puras y hooks genéricos, con tablas `it.each` de casos válidos/inválidos.             | `pkce`, `sse`, `useSseStream`, `normalize-repo-name` |
+| `lib/`   | Funciones puras y hooks genéricos, con tablas `it.each` de casos válidos/inválidos.             | `pkce`, `sse`, `session-events`                      |
 | `api/`   | Cliente HTTP contra MSW: token, refresh ante 401 y reintento, formato de errores.               | `client`, `auth`, `errors`, `config`                 |
 | `model/` | Store de sesión y primitivas de chat.                                                           | `auth-store`, `chat-message`                         |
 | `ui/`    | Componentes atómicos aislados: render por props, callbacks y estados (sin stores de dominio).   | `ModalConfirm`, `AuthGuard`, `OAuthIntegration`      |

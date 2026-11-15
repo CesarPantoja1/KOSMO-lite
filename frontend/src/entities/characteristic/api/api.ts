@@ -1,4 +1,4 @@
-import type { ChatHistory, ChatResponse } from '@/shared/model/chat-message';
+import type { ChatHistory } from '@/shared/model/chat-message';
 import { apiClient } from '@/shared/api';
 import { USE_MOCKS } from '@/shared/api/config';
 import type {
@@ -34,67 +34,6 @@ const mockSuggestions: SuggestCharacteristic[] = [
 		description:
 			'Visualización de indicadores clave como ventas diarias, productos más vendidos, márgenes de ganancia y tendencias de consumo.',
 		origin: '',
-	},
-];
-
-const mockChatResponses: ChatResponse[] = [
-	{
-		message: {
-			id: 'mock-chat-1',
-			role: 'assistant',
-			content: 'Hola, ¿en qué puedo ayudarte con la característica?',
-			created_at: new Date().toISOString(),
-			change_suggestions: null,
-			modification: null,
-		},
-		modification: null,
-		redirect: null,
-		consistency: null,
-	},
-	{
-		message: {
-			id: 'mock-chat-2',
-			role: 'assistant',
-			content:
-				'Aquí tienes una sugerencia de cambio para mejorar la descripción de la característica.',
-			created_at: new Date().toISOString(),
-			change_suggestions: [
-				{
-					id: 'mock-chg-1',
-					section: 'Descripción de la característica',
-					description: 'Refinar la descripción para mayor claridad.',
-					diff_before:
-						'Permite crear cuentas para empleados y asignarles roles específicos (Administrador, Cajero, Bodeguero) para restringir el acceso a pantallas y funciones sensibles del sistema.',
-					diff_after:
-						'Permite crear cuentas para empleados y asignarles roles específicos (Administrador, Cajero, Bodeguero) para controlar el acceso a pantallas y funciones críticas del sistema.',
-					rationale: 'Precisión terminológica.',
-					applied: true,
-					not_applied_reason: null,
-				},
-			],
-			modification: {
-				applied: true,
-				modified_section: 'Descripción de la característica',
-				change_description: 'Se aplicaron los cambios sugeridos.',
-				modified_document: null,
-				before: null,
-				after: null,
-				undo_version_id: null,
-				clarification_message: null,
-			},
-		},
-		modification: {
-			applied: true,
-			modified_section: 'Descripción de la característica',
-			change_description: 'Se aplicaron los cambios sugeridos.',
-			modified_document: null,
-			before: null,
-			after: null,
-			undo_version_id: null,
-			clarification_message: null,
-		},
-		redirect: null,
-		consistency: null,
 	},
 ];
 
@@ -161,14 +100,6 @@ const mockAddCharacteristic = async (
 	};
 };
 
-const mockSendChatMessage = async (
-	_featureId: string,
-	_content: string,
-): Promise<ChatResponse> => {
-	await delay(500);
-	return mockChatResponses[Math.floor(Math.random() * mockChatResponses.length)];
-};
-
 const mockGetChatHistory = async (featureId: string): Promise<ChatHistory> => {
 	await delay(300);
 	return {
@@ -225,17 +156,6 @@ const realAddCharacteristic = async (
 	);
 };
 
-const realSendChatMessage = async (
-	featureId: string,
-	content: string,
-): Promise<ChatResponse> => {
-	return apiClient<ChatResponse>(`/api/v1/features/${featureId}/chat`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ content }),
-	});
-};
-
 const realGetChatHistory = (
 	featureId: string,
 	sessionId: string | null,
@@ -285,14 +205,6 @@ export const addCharacteristic = (
 	USE_MOCKS
 		? mockAddCharacteristic(projectId, item)
 		: realAddCharacteristic(projectId, item);
-
-export const sendChatMessage = (
-	featureId: string,
-	content: string,
-): Promise<ChatResponse> =>
-	USE_MOCKS
-		? mockSendChatMessage(featureId, content)
-		: realSendChatMessage(featureId, content);
 
 export const getChatHistory = (
 	featureId: string,

@@ -5,8 +5,6 @@ export { ModalConfirm } from './ModalConfirm';
 export { CharacterCounter } from './CharacterCounter';
 export { OAuthIntegration } from './OAuthIntegration';
 export type { OAuthIntegrationProps } from './OAuthIntegration';
-export { ConfirmacionVisibilidadRepositorio } from './ConfirmacionVisibilidadRepositorio';
-export { FormularioCreacionRepositorio } from './FormularioCreacionRepositorio';
 
 // icons
 export { default as Ai } from './icons/Ai';

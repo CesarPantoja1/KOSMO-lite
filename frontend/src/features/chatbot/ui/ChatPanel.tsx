@@ -5,17 +5,16 @@ import type { ChatMessage, ChatPhase } from '@/entities/chat';
 import { useChatSessions, useChatSessionsStore } from '@/entities/chat';
 import { ApiError, formatApiError } from '@/shared/api';
 import { useChatStream } from '../model/useChatStream';
-import { Chatbot } from './Chatbot';
+import { ChatView } from './ChatView';
 import { SessionSelector } from './SessionSelector';
 
-interface ChatStreamPanelProps {
+interface ChatPanelProps {
 	title?: string;
 	greeting?: string;
 	placeholder?: string;
 	onClose?: () => void;
 	messages: ChatMessage[];
 	streamUrl: string | null;
-	isLoading?: boolean;
 	projectId?: string | null;
 	phase?: ChatPhase | null;
 	contextId?: string | null;
@@ -29,14 +28,13 @@ interface ChatStreamPanelProps {
 	onError?: (error: unknown) => void;
 }
 
-export const ChatStreamPanel = ({
+export const ChatPanel = ({
 	title,
 	greeting,
 	placeholder,
 	onClose,
 	messages,
 	streamUrl,
-	isLoading = false,
 	projectId = null,
 	phase = null,
 	contextId = null,
@@ -48,35 +46,17 @@ export const ChatStreamPanel = ({
 	onMessage,
 	onRedirect,
 	onError,
-}: ChatStreamPanelProps) => {
+}: ChatPanelProps) => {
 	const [streamingContent, setStreamingContent] = useState<string | null>(null);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const lastContentRef = useRef<string | null>(null);
 
-	const onMessageRef = useRef(onMessage);
+	// Un stream en curso o el efecto de historial deben llamar siempre a la versión
+	// más reciente de los callbacks del padre, sin reiniciarse cuando cambian.
+	const latest = useRef({ onMessage, onRedirect, onError, onLoadHistory });
 	useEffect(() => {
-		onMessageRef.current = onMessage;
-	}, [onMessage]);
-
-	const onRedirectRef = useRef(onRedirect);
-	useEffect(() => {
-		onRedirectRef.current = onRedirect;
-	}, [onRedirect]);
-
-	const onErrorRef = useRef(onError);
-	useEffect(() => {
-		onErrorRef.current = onError;
-	}, [onError]);
-
-	const onLoadHistoryRef = useRef(onLoadHistory);
-	useEffect(() => {
-		onLoadHistoryRef.current = onLoadHistory;
-	}, [onLoadHistory]);
-
-	const onLoadMoreRef = useRef(onLoadMore);
-	useEffect(() => {
-		onLoadMoreRef.current = onLoadMore;
-	}, [onLoadMore]);
+		latest.current = { onMessage, onRedirect, onError, onLoadHistory };
+	});
 
 	const {
 		phase: streamPhase,
@@ -86,7 +66,7 @@ export const ChatStreamPanel = ({
 		onChunk: (content) => setStreamingContent((prev) => (prev ?? '') + content),
 		onMessage: (message) => {
 			setStreamingContent(null);
-			onMessageRef.current(message);
+			latest.current.onMessage(message);
 			// Re-lista las sesiones para refrescar el título derivado del primer prompt
 			if (projectId && phase) {
 				void useChatSessionsStore
@@ -100,10 +80,10 @@ export const ChatStreamPanel = ({
 			const text = formatApiError(err, 'Error al enviar el mensaje.');
 			// El endpoint de stream devuelve 400 cuando el cambio pertenece a otra fase
 			if (err instanceof ApiError && err.status === 400) {
-				onRedirectRef.current?.(err.detail ?? text);
+				latest.current.onRedirect?.(err.detail ?? text);
 			} else {
 				setErrorMessage(text);
-				onErrorRef.current?.(err);
+				latest.current.onError?.(err);
 			}
 		},
 	});
@@ -114,26 +94,28 @@ export const ChatStreamPanel = ({
 	useEffect(() => {
 		if (!projectId || !phase) return;
 		const timer = window.setTimeout(() => {
-			void onLoadHistoryRef.current?.(chatSessions.activeSessionId);
+			void latest.current.onLoadHistory?.(chatSessions.activeSessionId);
 		}, 0);
 		return () => window.clearTimeout(timer);
 	}, [projectId, phase, contextId, chatSessions.activeSessionId]);
 
+	const startStream = (url: string, content: string) => {
+		setErrorMessage(null);
+		setStreamingContent('');
+		send(url, { content, session_id: chatSessions.activeSessionId });
+	};
+
 	const handleSend = (content: string) => {
 		if (!streamUrl) return;
 		lastContentRef.current = content;
-		setErrorMessage(null);
-		setStreamingContent('');
 		onUserMessage(content);
-		send(streamUrl, { content, session_id: chatSessions.activeSessionId });
+		startStream(streamUrl, content);
 	};
 
 	const handleRetry = () => {
 		const last = lastContentRef.current;
 		if (!last || !streamUrl) return;
-		setErrorMessage(null);
-		setStreamingContent('');
-		send(streamUrl, { content: last, session_id: chatSessions.activeSessionId });
+		startStream(streamUrl, last);
 	};
 
 	const isStreaming = streamPhase === 'connecting' || streamPhase === 'streaming';
@@ -151,14 +133,14 @@ export const ChatStreamPanel = ({
 	};
 
 	return (
-		<Chatbot
+		<ChatView
 			title={title}
 			greeting={greeting}
 			placeholder={placeholder}
 			onClose={onClose}
 			messages={messages}
 			onSendMessage={handleSend}
-			isLoading={isLoading || chatSessions.loading}
+			isLoading={chatSessions.loading}
 			streamingContent={streamingContent}
 			isStreaming={isStreaming}
 			onStop={stop}
@@ -166,7 +148,7 @@ export const ChatStreamPanel = ({
 			onRetry={handleRetry}
 			hasMore={hasMore}
 			loadingMore={loadingMore}
-			onLoadMore={() => onLoadMoreRef.current?.(chatSessions.activeSessionId)}
+			onLoadMore={() => onLoadMore?.(chatSessions.activeSessionId)}
 			sessionSelector={
 				projectId && phase ? (
 					<SessionSelector

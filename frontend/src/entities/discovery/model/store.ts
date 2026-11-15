@@ -5,11 +5,10 @@ import {
 	getChatHistory,
 	getDiscovery,
 	saveDiscovery,
-	sendChatMessage as sendChatMessageApi,
 } from '../api/api';
 import type { DiscoveryResponse } from './types';
 import { appendMessage, createUserMessage } from '@/shared/model/chat-message';
-import type { ChatMessage, ChatResponse } from '@/shared/model/chat-message';
+import type { ChatMessage } from '@/shared/model/chat-message';
 
 interface DiscoveryStore {
 	currentDiscovery: DiscoveryResponse | null;
@@ -21,7 +20,6 @@ interface DiscoveryStore {
 	getDiscovery: (projectId: string) => Promise<DiscoveryResponse>;
 	saveDiscovery: (projectId: string, content: string) => Promise<DiscoveryResponse>;
 	generateDiscovery: (projectId: string) => Promise<DiscoveryResponse>;
-	sendChatMessage: (projectId: string, content: string) => Promise<ChatResponse>;
 	loadChatHistory: (
 		projectId: string,
 		sessionId?: string | null,
@@ -69,17 +67,6 @@ export const useDiscoveryStore = create<DiscoveryStore>()(
 				const data = await generateDiscovery(projectId);
 				set({ currentDiscovery: data });
 				return data;
-			},
-
-			sendChatMessage: async (projectId, content) => {
-				const userMessage = createUserMessage(content);
-				set((state) => ({ chatHistory: appendMessage(state.chatHistory, userMessage) }));
-
-				const response = await sendChatMessageApi(projectId, content);
-				set((state) => ({
-					chatHistory: appendMessage(state.chatHistory, response.message),
-				}));
-				return response;
 			},
 
 			appendUserMessage: (content) =>

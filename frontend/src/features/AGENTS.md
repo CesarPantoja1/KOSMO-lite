@@ -26,7 +26,7 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**. **No** existe `api/`.
 | Feature | Archivos clave | Exports principales | Propósito |
 |---|---|---|---|
 | `markdown-editor` | `ui/markdown-editor.tsx`, `editor-content.tsx`, `save-indicator.tsx`, `toc-sidebar.tsx`, `markdown-editor-skeleton.tsx`; `model/use-headings.ts`, `heading.ts`; `lib/extract-headings.ts` | `MarkdownEditor`, `MarkdownEditorHandle`, `MarkdownEditorSkeleton`, `SaveStatus` | Editor Markdown con TOC, autosave e indicador de guardado. |
-| `chatbot` | `ui/*`, `model/useChatStream.ts` | `Chatbot`, `ChatStreamPanel`, `PanelAsistenteRequisito`, `ChatbotMessage`, `useChatStream`, `SendChatStreamBody` | Chat con streaming SSE y sesiones. **Ver [`chatbot/AGENTS.md`](./chatbot/AGENTS.md).** |
+| `chatbot` | `ui/*`, `model/useChatStream.ts` | `ChatPanel`, `RequirementsChatPanel` | Chat con streaming SSE y sesiones. **Ver [`chatbot/AGENTS.md`](./chatbot/AGENTS.md).** |
 | `app-state` | `model/app.store.ts`, `lib/clearAllStores.ts`, `lib/useUnsavedChanges.ts` | `useAppStore`, `clearAppStore`, `useUnsavedChanges`, `clearAllStores` | Estado de UI global: inicialización, cambios sin guardar, editor maximizado, limpieza de stores. |
 | `github-sync` | `model/useProjectGithubRepo.ts`, `ui/GitHubSyncBanner.tsx` | `useProjectGithubRepo`, `ProjectGithubViewState`, `GitHubSyncBanner` | Estado de vinculación/sincronización del repo GitHub del proyecto. |
 | `ai-config` | `ui/AiConfigForm.tsx`, `ui/AiProviderBadge.tsx` | `AiConfigForm`, `AiProviderBadge` | Formulario BYOK de proveedor/modelo IA y badge del proveedor. |
@@ -66,16 +66,17 @@ Segmentos permitidos: **`ui/`**, **`model/`**, **`lib/`**. **No** existe `api/`.
 ### Feature que consume entidades + streaming
 ```ts
 // features/chatbot/model/useChatStream.ts
-const { start, stop, phase, error } = useSseStream();
-const send = (url, body) => start(url, { body, onEvent });
+const [phase, setPhase] = useState<ChatStreamPhase>('idle');
+const send = (url, body) =>
+  streamChatMessage(url, body, { onOpen, onChunk, onMessage, onError }, controller.signal);
 ```
-- El transporte SSE vive en `shared/lib/useSseStream.ts`; la feature mapea eventos a su dominio.
+- La red y el mapeo de eventos viven en la entidad (`entities/chat/api/stream.ts`); la feature solo gestiona fase y cancelación.
 
 ### Formulario
 - `react-hook-form` + esquemas Zod (definidos en `entities` o en `pages/*/model`).
 
 ### Presentación vs controlador
-- Los `ui/` puros no hacen red (ej. `Chatbot.tsx`); los contenedores (`ChatStreamPanel.tsx`) unen hook de red + UI.
+- Los `ui/` puros no hacen red (ej. `ChatView.tsx`); los contenedores (`ChatPanel.tsx`) unen hook de red + UI.
 
 ---
 

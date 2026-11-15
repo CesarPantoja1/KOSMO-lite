@@ -122,26 +122,6 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 		expect(url).toContain('before=cursor_1');
 	});
 
-	it('sendRequirementChatMessage hace POST con el contenido', async () => {
-		// Arrange
-		const { sendRequirementChatMessage } = await import('./api');
-		mockFetchOk({
-			message: { id: 'm1', role: 'assistant', content: 'ok' },
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await sendRequirementChatMessage('f1', 'Hola');
-
-		// Assert
-		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/api/v1/features/f1/requirements/chat'),
-			expect.objectContaining({ method: 'POST' }),
-		);
-	});
-
 	it('propaga el error de la API cuando la petición falla', async () => {
 		// Arrange
 		const { getRequirements } = await import('./api');
@@ -227,29 +207,4 @@ describe('requirements/api — modo mock (USE_MOCKS=true)', () => {
 		expect(result.messages).toEqual([]);
 	});
 
-	it('sendRequirementChatMessage devuelve una sugerencia de cambio simulada', async () => {
-		// Arrange
-		const { sendRequirementChatMessage } = await import('./api');
-
-		// Act
-		const promise = sendRequirementChatMessage('f1', 'Agrega validación');
-		await vi.advanceTimersByTimeAsync(600);
-		const result = await promise;
-
-		// Assert
-		expect(result.message.change_suggestions).toHaveLength(1);
-	});
-
-	it('sendRequirementChatMessage lanza error cuando el contenido simula formato inválido', async () => {
-		// Arrange
-		const { sendRequirementChatMessage } = await import('./api');
-
-		// Act
-		const promise = sendRequirementChatMessage('f1', 'contenido con ERROR_FORMATO');
-		const assertion = expect(promise).rejects.toThrow('formato inválido');
-		await vi.advanceTimersByTimeAsync(600);
-
-		// Assert
-		await assertion;
-	});
 });

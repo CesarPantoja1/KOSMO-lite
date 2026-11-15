@@ -23,9 +23,9 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 
 | Slice | Ruta | UI | Stores de entidad | Features/widgets clave |
 |---|---|---|---|---|
-| `DiscoveryPage` | `/proyecto/descubrimiento` | `ui/DiscoveryPage.tsx` | `useDiscoveryStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `ChatStreamPanel`, `useUnsavedChanges` |
-| `CharacteristicsPage` | `/proyecto/caracteristicas` + `/nueva` | `ui/CharacteristicsPage.tsx`, `CreateCharacteristicPage.tsx`, `CardCharacterist.tsx`, `CharacteristicModal.tsx`, `Search.tsx` | `useCharacteristicStore`, `useDiscoveryStore`, `useProjectStore` | `ChatStreamPanel`, `subscribeImplementationEvents` |
-| `RequirementsPage` | `/proyecto/requisitos` | `ui/RequirementsPage.tsx` | `useRequirementsStore`, `useCharacteristicStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `PanelAsistenteRequisito`, `AsideCharacteristic`, `useUnsavedChanges` |
+| `DiscoveryPage` | `/proyecto/descubrimiento` | `ui/DiscoveryPage.tsx` | `useDiscoveryStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `ChatPanel`, `useUnsavedChanges` |
+| `CharacteristicsPage` | `/proyecto/caracteristicas` + `/nueva` | `ui/CharacteristicsPage.tsx`, `CreateCharacteristicPage.tsx`, `CardCharacterist.tsx`, `CharacteristicModal.tsx`, `Search.tsx` | `useCharacteristicStore`, `useDiscoveryStore`, `useProjectStore` | `ChatPanel`, `subscribeImplementationEvents` |
+| `RequirementsPage` | `/proyecto/requisitos` | `ui/RequirementsPage.tsx` | `useRequirementsStore`, `useCharacteristicStore`, `useProjectStore`, `useAppStore` | `MarkdownEditor`, `RequirementsChatPanel`, `AsideCharacteristic`, `useUnsavedChanges` |
 | `ImplementationPage` | `/proyecto/codigo` + `/codigo/resumen` | `ui/ImplementationPage.tsx`, `ImplementationSummaryPage.tsx`, `DeployPreconditionPanel.tsx`, `DeployResultPanel.tsx` | `useImplementationStore`, `useCharacteristicStore`, `useProjectStore`, `useDeployStatus` | `useProjectGithubRepo`, `GestionRepositorioGitHub`, `AsideCharacteristic` |
 | `ConsistencyPage` | `/proyecto/[fase]/consistencia` | `ui/ConsistencyPage.tsx`, `GateReviewCard.tsx` | `useConsistencyGateStore` (+ refresca stores de artefacto) | `MarkdownText` |
 | `CreateProjectPage` | `/crear-proyecto` | `ui/CreateProjectPage.tsx`, `CreateProjectForm.tsx`; `model/useIntegrationGate.ts` | `useProjectStore` | `useIntegrationGate` |
@@ -46,13 +46,13 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 - Listado/CRUD de funcionalidades; alta en subpágina `CreateCharacteristic`.
 - Hooks: `useCharacteristicsPage` (fetch + filtro por título; 404 → lista vacía), `useCharacteristicModal` (`getSuggestCharacteristics`), `useCreateCharacteristic` (react-hook-form + Zod; maneja `is_saved`, `warnings`, `inconsistency_reason`).
 - Modelo Zod en `model/types.ts` (`characteristicSchema`, `CharacteristicFormData`, `FieldError`).
-- Refinamiento por IA con `ChatStreamPanel` (`/api/v1/features/{id}/chat/stream`).
+- Refinamiento por IA con `ChatPanel` (`/api/v1/features/{id}/chat/stream`).
 - Empty states: sin descubrimiento → link a `/proyecto/descubrimiento`; con descubrimiento → botón generar.
 - `subscribeImplementationEvents` para borrado de código en background.
 
 ### Requisitos (`RequirementsPage`)
 - Criterios EARS por funcionalidad (Markdown editable, autosave).
-- `PanelAsistenteRequisito` (`useChatStream`) sobre `/api/v1/features/{id}/requirements/chat/stream`; refetch si `modification.applied`.
+- `RequirementsChatPanel` (`useChatStream`) sobre `/api/v1/features/{id}/requirements/chat/stream`; refetch si `modification.applied`.
 
 ### Implementación (`ImplementationPage`)
 - Genera/regenera la implementación por funcionalidad; `useProjectGithubRepo` decide el CTA según GitHub (`syncing | failed | not-linked`).
@@ -78,14 +78,14 @@ Cada fase lee datos de `entities/*` e hidrata sus stores mediante `initializePro
 
 - **Autosave:** `useUnsavedChanges` + `saveStatus` (MarkdownEditor) en Discovery/Requirements; `ModalConfirm` al navegar con cambios.
 - **Selección de característica:** `useCharacteristicStore.selectedId` + `AsideCharacteristic`; `pendingCharSwitch` gestiona cambios sin guardar.
-- **Streaming IA:** `ChatStreamPanel` (Discovery/Characteristics) y `PanelAsistenteRequisito` (Requirements) sobre `features/chatbot`.
+- **Streaming IA:** `ChatPanel` (Discovery/Characteristics) y `RequirementsChatPanel` (Requirements) sobre `features/chatbot`.
 
 ---
 
 ## 5. Dónde cambiar qué
 
 ```
-├── Prompt/flujo de IA de una fase    → su ChatStreamPanel/PanelAsistenteRequisito (features/chatbot) + store entidad
+├── Prompt/flujo de IA de una fase    → su ChatPanel/RequirementsChatPanel (features/chatbot) + store entidad
 ├── Validación de formulario           → pages/project/<Fase>/model/types.ts (Zod)
 ├── Carga/estado de una fase           → pages/project/<Fase>/hooks/ y store de entidad
 ├── Precondiciones de deploy           → pages/project/ImplementationPage/ui/DeployPreconditionPanel.tsx

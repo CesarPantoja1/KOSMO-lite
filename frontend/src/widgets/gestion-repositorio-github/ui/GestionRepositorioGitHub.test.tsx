@@ -48,7 +48,10 @@ const estado = (overrides: Partial<ProjectGitHubStatus> = {}): ProjectGitHubStat
 	...overrides,
 });
 
-function backend({ conectado = true, repo = estado() }: { conectado?: boolean; repo?: ProjectGitHubStatus } = {}) {
+function backend({
+	conectado = true,
+	repo = estado(),
+}: { conectado?: boolean; repo?: ProjectGitHubStatus } = {}) {
 	server.use(
 		http.get(apiUrl('/api/v1/integrations/:provider/status'), () =>
 			HttpResponse.json(crearIntegracion({ is_connected: conectado })),
@@ -72,7 +75,9 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 		renderizar();
 
 		expect(await screen.findByText('Vincula tu cuenta de GitHub')).toBeInTheDocument();
-		expect(screen.getByRole('link', { name: 'Conectar cuenta de GitHub' })).toHaveAttribute('href', '/perfil');
+		expect(
+			screen.getByRole('link', { name: 'Conectar cuenta de GitHub' }),
+		).toHaveAttribute('href', '/perfil');
 	});
 
 	describe('repositorio sincronizado', () => {
@@ -118,7 +123,9 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 
 			await user.click(await screen.findByRole('button', { name: 'Sincronizar ahora' }));
 
-			expect(await screen.findByText('Código sincronizado con GitHub.')).toBeInTheDocument();
+			expect(
+				await screen.findByText('Código sincronizado con GitHub.'),
+			).toBeInTheDocument();
 			expect(pushes).toEqual([{}]);
 			expect(screen.getByText('ffff000')).toBeInTheDocument();
 		});
@@ -127,7 +134,13 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 	describe('crear el repositorio', () => {
 		it('crea un repositorio privado con el nombre sugerido', async () => {
 			const pushes: unknown[] = [];
-			backend({ repo: estado({ has_repository: false, sync_status: 'not_created', suggested_repo_name: 'kosmo-ferreteria' }) });
+			backend({
+				repo: estado({
+					has_repository: false,
+					sync_status: 'not_created',
+					suggested_repo_name: 'kosmo-ferreteria',
+				}),
+			});
 			server.use(
 				http.post(apiUrl(URL_PUSH), async ({ request }) => {
 					pushes.push(await request.json());
@@ -136,11 +149,17 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 			);
 			const { user } = renderizar();
 
-			expect(await screen.findByText('Crea el repositorio de tu proyecto')).toBeInTheDocument();
-			expect(screen.getByLabelText('Nombre del repositorio')).toHaveValue('kosmo-ferreteria');
+			expect(
+				await screen.findByText('Crea el repositorio de tu proyecto'),
+			).toBeInTheDocument();
+			expect(screen.getByLabelText('Nombre del repositorio')).toHaveValue(
+				'kosmo-ferreteria',
+			);
 			await user.click(screen.getByRole('button', { name: /Crear repositorio/ }));
 
-			expect(await screen.findByText('Repositorio creado y sincronizado con GitHub.')).toBeInTheDocument();
+			expect(
+				await screen.findByText('Repositorio creado y sincronizado con GitHub.'),
+			).toBeInTheDocument();
 			expect(pushes).toEqual([{ repo_name: 'kosmo-ferreteria', is_public: false }]);
 			expect(screen.getByRole('link', { name: /kosmo-ferreteria/ })).toBeInTheDocument();
 		});
@@ -149,7 +168,10 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 			backend({ repo: estado({ has_repository: false, sync_status: 'not_created' }) });
 			server.use(
 				http.post(apiUrl(URL_PUSH), () =>
-					HttpResponse.json({ detail: 'El proyecto no tiene funcionalidades implementadas' }, { status: 409 }),
+					HttpResponse.json(
+						{ detail: 'El proyecto no tiene funcionalidades implementadas' },
+						{ status: 409 },
+					),
 				),
 			);
 			const { user } = renderizar();
@@ -162,7 +184,12 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 
 	describe('sincronización fallida', () => {
 		it('muestra el motivo y permite reintentar', async () => {
-			backend({ repo: estado({ sync_status: 'failed', error_message: 'Token de GitHub revocado' }) });
+			backend({
+				repo: estado({
+					sync_status: 'failed',
+					error_message: 'Token de GitHub revocado',
+				}),
+			});
 			server.use(http.post(apiUrl(URL_PUSH), () => HttpResponse.json(estado())));
 			const { user } = renderizar();
 
@@ -191,7 +218,9 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 
 	it('si no puede consultar el estado muestra el error', async () => {
 		server.use(
-			http.get(apiUrl(URL_GITHUB), () => HttpResponse.json({ detail: 'Proyecto no encontrado' }, { status: 404 })),
+			http.get(apiUrl(URL_GITHUB), () =>
+				HttpResponse.json({ detail: 'Proyecto no encontrado' }, { status: 404 }),
+			),
 		);
 		renderizar();
 
@@ -202,16 +231,24 @@ describe('GestionRepositorioGitHub (integración con useProjectGithubRepo)', () 
 	it('mientras GitHub sincroniza consulta el estado periódicamente hasta terminar', async () => {
 		let consultas = 0;
 		server.use(
-			http.get(apiUrl('/api/v1/integrations/:provider/status'), () => HttpResponse.json(crearIntegracion())),
+			http.get(apiUrl('/api/v1/integrations/:provider/status'), () =>
+				HttpResponse.json(crearIntegracion()),
+			),
 			http.get(apiUrl(URL_GITHUB), () => {
 				consultas++;
-				return HttpResponse.json(estado({ sync_status: consultas < 2 ? 'syncing' : 'synced' }));
+				return HttpResponse.json(
+					estado({ sync_status: consultas < 2 ? 'syncing' : 'synced' }),
+				);
 			}),
 		);
 		renderizar();
 
-		expect(await screen.findByText('Sincronizando el código con GitHub...')).toBeInTheDocument();
-		await waitFor(() => expect(screen.getByText('Al día')).toBeInTheDocument(), { timeout: 4_000 });
+		expect(
+			await screen.findByText('Sincronizando el código con GitHub...'),
+		).toBeInTheDocument();
+		await waitFor(() => expect(screen.getByText('Al día')).toBeInTheDocument(), {
+			timeout: 4_000,
+		});
 		expect(consultas).toBeGreaterThanOrEqual(2);
 	});
 });
