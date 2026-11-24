@@ -139,67 +139,6 @@ jobs:
       - name: Check isolated code runner syntax
         run: node --check docker/code-runner/server.js
 
-  opencode-integration:
-    name: Codegen · OpenCode start
-    needs: detect-changes
-    if: needs.detect-changes.outputs.opencode == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Build pinned OpenCode image
-        run: docker build -f docker/opencode/Dockerfile -t kosmo-opencode:ci docker/opencode
-
-      - name: Start a real isolated job with a fake key and no prompt
-        shell: bash
-        run: |
-          set -euo pipefail
-          smoke_root="$(mktemp -d "$RUNNER_TEMP/kosmo-opencode-smoke-XXXXXX")"
-          case "$smoke_root" in
-            "$RUNNER_TEMP"/kosmo-opencode-smoke-*) ;;
-            *) exit 1 ;;
-          esac
-          trap 'docker rm -f kosmo-ci-opencode-launcher >/dev/null 2>&1 || true; docker network rm kosmo-ci-codegen >/dev/null 2>&1 || true; sudo rm -rf -- "$smoke_root"' EXIT
-          mkdir -p "$smoke_root/workspaces/prj_smoke_ci"
-          printf '{}\n' > "$smoke_root/workspaces/prj_smoke_ci/opencode.json"
-          chmod 0750 "$smoke_root/workspaces"
-          sudo chown -R 1000:1000 "$smoke_root/workspaces"
-          docker network create kosmo-ci-codegen
-          docker run -d --name kosmo-ci-opencode-launcher \
-            --user 0:1000 --read-only --cap-drop ALL \
-            --security-opt no-new-privileges:true \
-            --memory 256m --cpus 0.5 --pids-limit 64 \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
-            --network kosmo-ci-codegen \
-            -v /var/run/docker.sock:/var/run/docker.sock:ro \
-            -v "$smoke_root/workspaces:/workspaces:ro" \
-            -e OPENCODE_LAUNCHER_TOKEN=ci-only-token \
-            -e KOSMO_OPENCODE_IMAGE=kosmo-opencode:ci \
-            -e KOSMO_STACK=ci \
-            -e KOSMO_NETWORK=kosmo-ci-codegen \
-            -e KOSMO_WORKSPACES_HOST_PATH="$smoke_root/workspaces" \
-            --entrypoint node kosmo-opencode:ci /usr/local/bin/opencode-launcher.js
-          for attempt in $(seq 1 20); do
-            if docker exec kosmo-ci-opencode-launcher node -e "fetch('http://127.0.0.1:8082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
-              break
-            fi
-            if [ "$attempt" -eq 20 ]; then
-              docker logs --tail 100 kosmo-ci-opencode-launcher
-              exit 1
-            fi
-            sleep 1
-          done
-          docker exec kosmo-ci-opencode-launcher node /usr/local/bin/opencode-smoke.js prj_smoke_ci
-
-
   detect-changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -213,6 +152,7 @@ jobs:
       frontend: ${{ steps.changes.outputs.frontend }}
       opencode: ${{ steps.changes.outputs.opencode }}
       generated_app: ${{ steps.changes.outputs.generated_app }}
+      codegen_matrix: ${{ steps.changes.outputs.codegen_matrix }}
 
     steps:
       - name: Checkout repository
@@ -327,6 +267,9 @@ jobs:
             echo "frontend=$frontend"
             echo "opencode=$opencode"
             echo "generated_app=$generated_app"
+            codegen_matrix=$(jq -cn --argjson opencode "$opencode" --argjson template "$generated_app" \
+              '[("OpenCode" | select($opencode)), ("Template" | select($template))]')
+            echo "codegen_matrix=$codegen_matrix"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -346,10 +289,17 @@ jobs:
             echo "- Generated app build required: \`$generated_app\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  generated-app-build:
-    name: Codegen · Template check
+  codegen:
+    name: Codegen · ${{ matrix.check }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.generated_app == 'true'
+    if: needs.detect-changes.outputs.opencode == 'true' || needs.detect-changes.outputs.generated_app == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ${{ fromJSON(needs.detect-changes.outputs.codegen_matrix) }}
+    outputs:
+      opencode_result: ${{ steps.outcome.outputs.opencode_result }}
+      template_result: ${{ steps.outcome.outputs.template_result }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -362,15 +312,81 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Build pinned OpenCode image
+        if: matrix.check == 'OpenCode'
+        run: docker build -f docker/opencode/Dockerfile -t kosmo-opencode:ci docker/opencode
+
+      - name: Start a real isolated job with a fake key and no prompt
+        if: matrix.check == 'OpenCode'
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_root="$(mktemp -d "$RUNNER_TEMP/kosmo-opencode-smoke-XXXXXX")"
+          case "$smoke_root" in
+            "$RUNNER_TEMP"/kosmo-opencode-smoke-*) ;;
+            *) exit 1 ;;
+          esac
+          trap 'docker rm -f kosmo-ci-opencode-launcher >/dev/null 2>&1 || true; docker network rm kosmo-ci-codegen >/dev/null 2>&1 || true; sudo rm -rf -- "$smoke_root"' EXIT
+          mkdir -p "$smoke_root/workspaces/prj_smoke_ci"
+          printf '{}\n' > "$smoke_root/workspaces/prj_smoke_ci/opencode.json"
+          chmod 0750 "$smoke_root/workspaces"
+          sudo chown -R 1000:1000 "$smoke_root/workspaces"
+          docker network create kosmo-ci-codegen
+          docker run -d --name kosmo-ci-opencode-launcher \
+            --user 0:1000 --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --memory 256m --cpus 0.5 --pids-limit 64 \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
+            --network kosmo-ci-codegen \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -v "$smoke_root/workspaces:/workspaces:ro" \
+            -e OPENCODE_LAUNCHER_TOKEN=ci-only-token \
+            -e KOSMO_OPENCODE_IMAGE=kosmo-opencode:ci \
+            -e KOSMO_STACK=ci \
+            -e KOSMO_NETWORK=kosmo-ci-codegen \
+            -e KOSMO_WORKSPACES_HOST_PATH="$smoke_root/workspaces" \
+            --entrypoint node kosmo-opencode:ci /usr/local/bin/opencode-launcher.js
+          for attempt in $(seq 1 20); do
+            if docker exec kosmo-ci-opencode-launcher node -e "fetch('http://127.0.0.1:8082/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs --tail 100 kosmo-ci-opencode-launcher
+              exit 1
+            fi
+            sleep 1
+          done
+          docker exec kosmo-ci-opencode-launcher node /usr/local/bin/opencode-smoke.js prj_smoke_ci
+
       - name: Build the generated app like Railway
+        if: matrix.check == 'Template'
         run: docker build -t kosmo-generated-app:ci backend/src/kosmo/infrastructure/codegen/templates/basic-next-app
 
-  backend-lint:
-    name: Backend · Code checks
+      - name: Record check result
+        id: outcome
+        if: always()
+        env:
+          CHECK: ${{ matrix.check == 'OpenCode' && 'opencode' || 'template' }}
+          RESULT: ${{ job.status }}
+        run: echo "${CHECK}_result=$RESULT" >> "$GITHUB_OUTPUT"
+
+  backend:
+    name: Backend · ${{ matrix.check }}
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: Code checks
+            timeout: 10
+          - check: Tests
+            timeout: 20
+    outputs:
+      lint_result: ${{ steps.outcome.outputs.lint_result }}
+      test_result: ${{ steps.outcome.outputs.test_result }}
 
     permissions:
       contents: read
@@ -379,13 +395,57 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      postgres:
+        image: ${{ matrix.check == 'Tests' && 'postgres:16-alpine' || '' }}
+
+        env:
+          POSTGRES_USER: kosmo
+          POSTGRES_PASSWORD: kosmo
+          POSTGRES_DB: kosmo_test
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd "pg_isready -U kosmo -d kosmo_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      mongodb:
+        image: ${{ matrix.check == 'Tests' && 'mongo:7' || '' }}
+
+        ports:
+          - 27017:27017
+
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: ${{ matrix.check == 'Tests' && 'redis:7-alpine' || '' }}
+
+        ports:
+          - 6379:6379
+
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       ENV: development
       LOG_LEVEL: INFO
       JWT_PRIVATE_KEY_PATH: ./tmp/jwt_private.pem
       JWT_PUBLIC_KEY_PATH: ./tmp/jwt_public.pem
       FERNET_MASTER_KEY: gA9S7Jv4nWq3kL8fDm2QpZx1Yh5Tn6CbRrUuIi0o4jM=
-      DATABASE_URL: postgresql+asyncpg://kosmo:kosmo@localhost:5432/kosmo_dev
+
+      DATABASE_URL: postgresql+asyncpg://kosmo:kosmo@localhost:5432/${{ matrix.check == 'Tests' && 'kosmo_test' || 'kosmo_dev' }}
+
       LLM_PROVIDER: noop
       LLM_MODEL: noop
 
@@ -412,107 +472,22 @@ jobs:
         run: uv sync --locked --all-groups
 
       - name: Check formatting with Ruff
+        if: matrix.check == 'Code checks'
         run: uv run --no-sync ruff format --check .
 
       - name: Run Ruff
+        if: matrix.check == 'Code checks'
         run: uv run --no-sync ruff check .
 
       - name: Run Pyright
+        if: matrix.check == 'Code checks'
         run: uv run --no-sync pyright
 
-  backend-test:
-    name: Backend · Tests
-    needs: detect-changes
-    if: needs.detect-changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    permissions:
-      contents: read
-
-    defaults:
-      run:
-        working-directory: backend
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-
-        env:
-          POSTGRES_USER: kosmo
-          POSTGRES_PASSWORD: kosmo
-          POSTGRES_DB: kosmo_test
-
-        ports:
-          - 5432:5432
-
-        options: >-
-          --health-cmd "pg_isready -U kosmo -d kosmo_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      mongodb:
-        image: mongo:7
-
-        ports:
-          - 27017:27017
-
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-
-        ports:
-          - 6379:6379
-
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      ENV: development
-      LOG_LEVEL: INFO
-      JWT_PRIVATE_KEY_PATH: ./tmp/jwt_private.pem
-      JWT_PUBLIC_KEY_PATH: ./tmp/jwt_public.pem
-      FERNET_MASTER_KEY: gA9S7Jv4nWq3kL8fDm2QpZx1Yh5Tn6CbRrUuIi0o4jM=
-
-      DATABASE_URL: postgresql+asyncpg://kosmo:kosmo@localhost:5432/kosmo_test
-      MONGO_URL: mongodb://localhost:27017/kosmo_agent_memory_test
-      REDIS_URL: redis://localhost:6379/0
-
-      LLM_PROVIDER: noop
-      LLM_MODEL: noop
-
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
-        with:
-          enable-cache: true
-          working-directory: backend
-          cache-dependency-glob: uv.lock
-
-      - name: Install dependencies
-        run: uv sync --locked --all-groups
-
       - name: Run backend tests
+        if: matrix.check == 'Tests'
+        env:
+          MONGO_URL: mongodb://localhost:27017/kosmo_agent_memory_test
+          REDIS_URL: redis://localhost:6379/0
         run: >-
           uv run --no-sync pytest tests
           --cov=kosmo
@@ -520,13 +495,21 @@ jobs:
           --cov-report=xml
 
       - name: Upload backend coverage
-        if: always()
+        if: always() && matrix.check == 'Tests'
         uses: actions/upload-artifact@v7
         with:
           name: backend-coverage
           path: backend/coverage.xml
           retention-days: 14
           if-no-files-found: ignore
+
+      - name: Record check result
+        id: outcome
+        if: always()
+        env:
+          CHECK: ${{ matrix.check == 'Tests' && 'test' || 'lint' }}
+          RESULT: ${{ job.status }}
+        run: echo "${CHECK}_result=$RESULT" >> "$GITHUB_OUTPUT"
 
   frontend:
     name: Frontend · Checks
@@ -596,10 +579,8 @@ jobs:
       - branch-policy
       - actionlint
       - detect-changes
-      - opencode-integration
-      - generated-app-build
-      - backend-lint
-      - backend-test
+      - codegen
+      - backend
       - frontend
 
     if: always()
@@ -614,13 +595,13 @@ jobs:
           branch_policy_result="${{ needs.branch-policy.result }}"
           detect_result="${{ needs.detect-changes.result }}"
           opencode_required="${{ needs.detect-changes.outputs.opencode }}"
-          opencode_result="${{ needs.opencode-integration.result }}"
+          opencode_result="${{ needs.codegen.outputs.opencode_result || 'skipped' }}"
           generated_app_required="${{ needs.detect-changes.outputs.generated_app }}"
-          generated_app_result="${{ needs.generated-app-build.result }}"
+          generated_app_result="${{ needs.codegen.outputs.template_result || 'skipped' }}"
 
           backend_required="${{ needs.detect-changes.outputs.backend }}"
-          backend_lint_result="${{ needs.backend-lint.result }}"
-          backend_test_result="${{ needs.backend-test.result }}"
+          backend_lint_result="${{ needs.backend.outputs.lint_result || 'skipped' }}"
+          backend_test_result="${{ needs.backend.outputs.test_result || 'skipped' }}"
 
           frontend_required="${{ needs.detect-changes.outputs.frontend }}"
           frontend_result="${{ needs.frontend.result }}"
@@ -716,6 +697,16 @@ jobs:
           if [ "$frontend_required" = "true" ] && \
              [ "$frontend_result" != "success" ]; then
             echo "Frontend CI was required but did not succeed."
+            exit 1
+          fi
+
+          if [[ "$backend_required" == "true" && "${{ needs.backend.result }}" != "success" ]]; then
+            echo "Backend checks did not all complete successfully."
+            exit 1
+          fi
+
+          if [[ ( "$opencode_required" == "true" || "$generated_app_required" == "true" ) && "${{ needs.codegen.result }}" != "success" ]]; then
+            echo "Codegen checks did not all complete successfully."
             exit 1
           fi
 
