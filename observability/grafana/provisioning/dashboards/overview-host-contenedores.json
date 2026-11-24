@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -8,52 +10,130 @@
   "liveNow": false,
   "panels": [
     {
-      "title": "Uso de CPU del Host (%)",
+      "id": 1,
+      "title": "Uso de CPU del servidor",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prom}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
-          "legendFormat": "CPU Host"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prom}"
+          },
+          "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}[5m])))",
+          "legendFormat": "CPU utilizada"
         }
-      ]
-    },
-    {
-      "title": "Uso de Memoria RAM del Host (GB)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
-          "legendFormat": "RAM Usada (GB)"
-        }
-      ]
-    },
-    {
-      "title": "Uso de RAM por Contenedor (MB)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "process_resident_memory_bytes{job=\"kosmo-backend\"} / 1024 / 1024",
-          "legendFormat": "kosmo-backend (App)"
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Memoria utilizada por el servidor",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prom}"
+      },
+      "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "label_replace(label_replace(container_memory_working_set_bytes{id=~\".*docker.*\"} / 1024 / 1024, \"nombre\", \"$1\", \"id\", \".*/system.slice:(.*)\"), \"nombre\", \"Docker Container ($1)\", \"nombre\", \"system.slice:docker:(.*)\")",
-          "legendFormat": "{{nombre}}"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prom}"
+          },
+          "expr": "node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemAvailable_bytes{job=\"node-exporter\"}",
+          "legendFormat": "Servidor"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Memoria utilizada por el backend",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prom}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prom}"
+          },
+          "expr": "process_resident_memory_bytes{job=\"kosmo-backend\"}",
+          "legendFormat": "Proceso del backend"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "description": "Memoria física que ocupa el proceso del backend, medida desde la propia aplicación."
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["kosmo", "infraestructura"],
-  "time": { "from": "now-1h", "to": "now" },
-  "title": "Overview de Host y Contenedores",
-  "uid": "kosmo-overview-host"
+  "tags": [
+    "infraestructura"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "Recursos del servidor",
+  "uid": "kosmo-overview-host",
+  "templating": {
+    "list": [
+      {
+        "name": "ds_prom",
+        "type": "datasource",
+        "query": "prometheus",
+        "regex": "/^Prometheus$/",
+        "hide": 2,
+        "refresh": 1,
+        "skipUrlSync": true
+      }
+    ]
+  }
 }
