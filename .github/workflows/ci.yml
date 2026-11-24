@@ -28,7 +28,7 @@ env:
 
 jobs:
   branch-policy:
-    name: Reglas de ramas
+    name: Branch rules
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -117,7 +117,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   actionlint:
-    name: Revisión de los flujos de trabajo
+    name: Workflow lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -140,7 +140,7 @@ jobs:
         run: node --check docker/code-runner/server.js
 
   opencode-integration:
-    name: Generación · Arranque de OpenCode
+    name: Codegen · OpenCode start
     needs: detect-changes
     if: needs.detect-changes.outputs.opencode == 'true'
     runs-on: ubuntu-latest
@@ -201,7 +201,7 @@ jobs:
 
 
   detect-changes:
-    name: Detección de cambios
+    name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -347,7 +347,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   generated-app-build:
-    name: Generación · Compilación de la plantilla
+    name: Codegen · Template check
     needs: detect-changes
     if: needs.detect-changes.outputs.generated_app == 'true'
     runs-on: ubuntu-latest
@@ -366,7 +366,7 @@ jobs:
         run: docker build -t kosmo-generated-app:ci backend/src/kosmo/infrastructure/codegen/templates/basic-next-app
 
   backend-lint:
-    name: Servidor · Calidad del código
+    name: Backend · Code checks
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
@@ -421,7 +421,7 @@ jobs:
         run: uv run --no-sync pyright
 
   backend-test:
-    name: Servidor · Pruebas
+    name: Backend · Tests
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
@@ -529,7 +529,7 @@ jobs:
           if-no-files-found: ignore
 
   frontend:
-    name: Interfaz · Validación
+    name: Frontend · Checks
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
