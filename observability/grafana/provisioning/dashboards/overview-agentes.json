@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -8,36 +10,191 @@
   "liveNow": false,
   "panels": [
     {
-      "title": "Throughput de Solicitudes HTTP (req/s)",
+      "id": 1,
+      "title": "Solicitudes por segundo",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prom}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "sum(rate(http_requests_total{handler=~\"$handler\"}[5m])) by (handler)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prom}"
+          },
+          "expr": "sum by (handler) (rate(http_requests_total{job=\"kosmo-backend\",handler=~\"${handler:regex}\"}[5m]))",
           "legendFormat": "{{handler}}"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      }
     },
     {
-      "title": "Latencia p95 por Handler (segundos)",
+      "id": 2,
+      "title": "Tiempo de respuesta por ruta (p95)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prom}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{handler=~\"$handler\"}[5m])) by (le, handler))",
-          "legendFormat": "p95 {{handler}}"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prom}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, handler) (rate(http_request_duration_seconds_bucket{job=\"kosmo-backend\",handler=~\"${handler:regex}\"}[5m])))",
+          "legendFormat": "{{handler}}"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "description": "Tiempo estimado por debajo del cual se completó el 95 % de las solicitudes de cada ruta durante los últimos cinco minutos."
     },
     {
-      "title": "Logs del Backend (Loki)",
-      "type": "logs",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+      "id": 4,
+      "title": "Validaciones de código en curso",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 7,
+        "w": 16,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${ds_prom}"
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "Loki" },
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${ds_prom}"
+          },
+          "expr": "sum(kosmo_active_code_runners{job=\"kosmo-backend\"})",
+          "legendFormat": "Ejecutores activos"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "decimals": 0,
+          "custom": {
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "description": "Ejecutores activos en KOSMO Lite en cada recolección de Prometheus. Una validación que termine entre dos muestras puede no aparecer en la gráfica."
+    },
+    {
+      "id": 5,
+      "title": "Errores de la API en los últimos 15 minutos",
+      "type": "stat",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_loki}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_loki}"
+          },
+          "expr": "sum(count_over_time(\n  {service=\"kosmo-backend\"} |= \"HTTP/\"\n  | regexp `^INFO:\\s+\\S+ - \"\\S+ (?P<request_path>[^ ?\"\\t]+)[^ \"]* HTTP/[0-9.]+\" (?P<response>[1-5][0-9]{2})(?: |$)`\n  | response =~ \"5..\"\n  | label_format route_pattern=`${handler:regex}`\n  | label_format matched=`{{ regexReplaceAll (printf \"^(%s)$\" (regexReplaceAllLiteral \"\\\\\\\\?[{][a-zA-Z_][a-zA-Z_0-9]*\\\\\\\\?[}]\" .route_pattern \"[^/]+\")) .request_path \"MATCH\" }}`\n  | matched=\"MATCH\"\n  | drop request_path, response, route_pattern, matched [15m]\n))\nor (0 * sum(count_over_time(\n  {service=\"kosmo-backend\"} |= \"HTTP/\"\n  |~ `^INFO:\\s+\\S+ - \"\\S+ \\S+ HTTP/[0-9.]+\" [1-5][0-9]{2}(?: |$)` [15m]\n)))",
+          "legendFormat": "Respuestas 5xx",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Cuenta las respuestas 500 a 599 en el registro de acceso del backend durante los 15 minutos anteriores al final del intervalo. El filtro admite una o varias rutas. Cero indica que hubo registros de acceso y ninguno coincidió con un error en la selección. Sin registros de acceso, el panel muestra «Sin datos».",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Registros del backend",
+      "type": "logs",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_loki}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_loki}"
+          },
           "expr": "{service=\"kosmo-backend\"}"
         }
       ]
@@ -46,6 +203,24 @@
   "templating": {
     "list": [
       {
+        "name": "ds_prom",
+        "type": "datasource",
+        "query": "prometheus",
+        "regex": "/^Prometheus$/",
+        "hide": 2,
+        "refresh": 1,
+        "skipUrlSync": true
+      },
+      {
+        "name": "ds_loki",
+        "type": "datasource",
+        "query": "loki",
+        "regex": "/^Loki$/",
+        "hide": 2,
+        "refresh": 1,
+        "skipUrlSync": true
+      },
+      {
         "current": {
           "selected": true,
           "text": "All",
@@ -53,26 +228,36 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "Prometheus"
+          "uid": "${ds_prom}"
         },
-        "definition": "label_values(http_requests_total, handler)",
+        "definition": "label_values(http_requests_total{job=\"kosmo-backend\"}, handler)",
         "includeAll": true,
         "multi": true,
         "name": "handler",
         "options": [],
         "query": {
-          "query": "label_values(http_requests_total, handler)",
+          "query": "label_values(http_requests_total{job=\"kosmo-backend\"}, handler)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
-        "type": "query"
+        "type": "query",
+        "label": "Ruta de la API",
+        "allValue": ".*"
       }
     ]
   },
-  "time": { "from": "now-1h", "to": "now" },
-  "title": "Overview de Agentes KOSMO",
-  "uid": "kosmo-overview-agentes"
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "Actividad de la API",
+  "uid": "kosmo-overview-agentes",
+  "tags": [
+    "api"
+  ],
+  "schemaVersion": 38,
+  "refresh": "15s"
 }

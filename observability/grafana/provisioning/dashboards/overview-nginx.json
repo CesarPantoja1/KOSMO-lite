@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -8,12 +10,26 @@
   "liveNow": false,
   "panels": [
     {
-      "title": "Logs de Nginx (Loki)",
+      "id": 1,
+      "title": "Registros de Nginx",
       "type": "logs",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${ds_loki}"
+      },
       "targets": [
         {
-          "datasource": { "type": "loki", "uid": "Loki" },
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${ds_loki}"
+          },
           "expr": "{service=\"kosmo-nginx\"}"
         }
       ]
@@ -22,8 +38,26 @@
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["kosmo", "nginx"],
-  "time": { "from": "now-1h", "to": "now" },
-  "title": "Overview de Nginx Gateway",
-  "uid": "kosmo-overview-nginx"
+  "tags": [
+    "accesos"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "Accesos a KOSMO Lite",
+  "uid": "kosmo-overview-nginx",
+  "templating": {
+    "list": [
+      {
+        "name": "ds_loki",
+        "type": "datasource",
+        "query": "loki",
+        "regex": "/^Loki$/",
+        "hide": 2,
+        "refresh": 1,
+        "skipUrlSync": true
+      }
+    ]
+  }
 }
