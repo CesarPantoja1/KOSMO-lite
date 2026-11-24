@@ -125,20 +125,19 @@
         "y": 8
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "${ds_prom}"
+        "type": "loki",
+        "uid": "${ds_loki}"
       },
       "targets": [
         {
           "refId": "A",
           "datasource": {
-            "type": "prometheus",
-            "uid": "${ds_prom}"
+            "type": "loki",
+            "uid": "${ds_loki}"
           },
-          "expr": "(sum(increase(http_requests_total{job=\"kosmo-backend\",handler=~\"${handler:regex}\",status=~\"5..\"}[15m])) or (0 * sum(increase(http_requests_total{job=\"kosmo-backend\",handler=~\"${handler:regex}\"}[15m])))) and on() (min(up{job=\"kosmo-backend\"}) == 1)",
-          "legendFormat": "Errores 5xx",
-          "instant": true,
-          "range": false
+          "expr": "sum(count_over_time(\n  {service=\"kosmo-backend\"} |= \"HTTP/\"\n  | regexp `^INFO:\\s+\\S+ - \"\\S+ (?P<request_path>[^ ?\"\\t]+)[^ \"]* HTTP/[0-9.]+\" (?P<response>[1-5][0-9]{2})(?: |$)`\n  | response =~ \"5..\"\n  | label_format route_pattern=`${handler:regex}`\n  | label_format matched=`{{ regexReplaceAll (printf \"^(%s)$\" (regexReplaceAllLiteral \"\\\\\\\\?[{][a-zA-Z_][a-zA-Z_0-9]*\\\\\\\\?[}]\" .route_pattern \"[^/]+\")) .request_path \"MATCH\" }}`\n  | matched=\"MATCH\"\n  | drop request_path, response, route_pattern, matched [15m]\n))\nor (0 * sum(count_over_time(\n  {service=\"kosmo-backend\"} |= \"HTTP/\"\n  |~ `^INFO:\\s+\\S+ - \"\\S+ \\S+ HTTP/[0-9.]+\" [1-5][0-9]{2}(?: |$)` [15m]\n)))",
+          "legendFormat": "Respuestas 5xx",
+          "queryType": "instant"
         }
       ],
       "fieldConfig": {
@@ -161,7 +160,7 @@
         },
         "overrides": []
       },
-      "description": "Estimación de respuestas HTTP 5xx para las rutas seleccionadas durante los 15 minutos anteriores al final del intervalo. Sin muestras suficientes, el panel queda sin datos.",
+      "description": "Cuenta las respuestas 500 a 599 en el registro de acceso del backend durante los 15 minutos anteriores al final del intervalo. El filtro admite una o varias rutas. Cero indica que hubo registros de acceso y ninguno coincidió con un error en la selección. Sin registros de acceso, el panel muestra «Sin datos».",
       "options": {
         "colorMode": "value",
         "graphMode": "none",
