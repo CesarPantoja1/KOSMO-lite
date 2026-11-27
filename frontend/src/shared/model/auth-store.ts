@@ -33,7 +33,8 @@ export const useAuthStore = create<AuthState>()(
 			initMockUser: () => {
 				const { mockUserId } = get();
 				if (!mockUserId) {
-					const newId = 'usr_' + Math.random().toString(36).substring(2, 10);
+					const bytes = globalThis.crypto.getRandomValues(new Uint8Array(4));
+					const newId = 'usr_' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 					set({ mockUserId: newId });
 				}
 			}
