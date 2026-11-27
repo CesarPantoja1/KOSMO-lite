@@ -121,8 +121,7 @@ _OPENAPI_TAGS = [
     {
         "name": "traceability",
         "description": (
-            "Control de navegación y trazabilidad secuencial entre las fases del flujo "
-            "Spec-Driven Development."
+            "Control de navegación y trazabilidad secuencial entre las fases del flujo Spec-Driven Development."
         ),
     },
     {
