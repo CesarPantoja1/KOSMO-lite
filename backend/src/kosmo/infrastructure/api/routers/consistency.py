@@ -215,7 +215,9 @@ async def get_consistency_activity(
 @router.post(
     "/evaluate/stream",
     summary="Evaluar consistencia entre fases (SSE streaming)",
-    description="Evalúa el impacto de cambios en cascada (features → requirements → model) con progreso SSE.",
+    description=(
+        "Evalúa el impacto de cambios en cascada (descubrimiento → características → requisitos) con progreso SSE."
+    ),
     status_code=status.HTTP_200_OK,
 )
 async def evaluate_consistency_stream(
@@ -368,7 +370,7 @@ class ApplyImpactsRequestView(BaseModel):
 @router.post(
     "/apply",
     summary="Aplicar impactos de consistencia",
-    description="Aplica las acciones sugeridas sobre requisitos, caracteristicas y diagramas.",
+    description="Aplica las acciones sugeridas sobre requisitos y características.",
     status_code=status.HTTP_200_OK,
 )
 async def apply_consistency_impacts(

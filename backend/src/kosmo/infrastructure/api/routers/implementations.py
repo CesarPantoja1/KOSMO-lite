@@ -29,7 +29,7 @@ from kosmo.infrastructure.api.schemas import (
 
 _log = structlog.get_logger(__name__)
 
-router = APIRouter(prefix="/api/v1/implementations", tags=["Implementations"])
+router = APIRouter(prefix="/api/v1/implementations", tags=["implementations"])
 
 _generation_rate_limiter = ProjectGenerationRateLimiter()
 

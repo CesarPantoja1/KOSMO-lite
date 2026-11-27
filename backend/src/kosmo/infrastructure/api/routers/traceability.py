@@ -17,7 +17,7 @@ from kosmo.infrastructure.api.dependencies.auth import (
 from kosmo.infrastructure.api.dependencies.container import get_container
 from kosmo.infrastructure.api.schemas import TraceabilityNavigationOutputView
 
-router = APIRouter(tags=["Traceability"])
+router = APIRouter(tags=["traceability"])
 
 _RESPONSES: dict[int | str, dict[str, Any]] = {
     status.HTTP_401_UNAUTHORIZED: {"description": "Credenciales de autenticación no válidas o ausentes."},
@@ -77,6 +77,7 @@ async def check_project_traceability_navigation(
     response_model=TraceabilityNavigationOutputView,
     responses=_RESPONSES,
     deprecated=True,
+    include_in_schema=False,
     summary="Verificar navegación de trazabilidad (Legacy)",
     description="Ruta legacy; migrar a /api/v1/projects/{project_id}/traceability/{entity_id}/navigation.",
 )

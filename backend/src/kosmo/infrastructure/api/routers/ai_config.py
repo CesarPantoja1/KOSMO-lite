@@ -29,7 +29,7 @@ from kosmo.infrastructure.api.schemas import (
     TestAIConnectionResponse,
 )
 
-router = APIRouter(prefix="/api/v1/ai-config", tags=["ai_config"])
+router = APIRouter(prefix="/api/v1/ai-config", tags=["ai-config"])
 
 
 @router.get(
@@ -74,7 +74,7 @@ async def sync_catalog(
 @router.get(
     "",
     response_model=AIConfigResponse,
-    summary="Obtiene la configuracion de IA del usuario actual",
+    summary="Obtiene la configuración de IA del usuario actual",
 )
 async def get_preferences(
     principal: Annotated[Principal, Depends(get_principal)],
@@ -94,7 +94,7 @@ async def get_preferences(
 @router.post(
     "",
     response_model=AIConfigResponse,
-    summary="Guarda o actualiza la configuracion de IA del usuario",
+    summary="Guarda o actualiza la configuración de IA del usuario",
 )
 async def save_preferences(
     request: SaveAIConfigRequest,
@@ -146,7 +146,7 @@ async def save_preferences(
 @router.delete(
     "",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Elimina la configuracion de IA del usuario",
+    summary="Elimina la configuración de IA del usuario",
 )
 async def delete_preferences(
     req: Request,
@@ -169,7 +169,7 @@ async def delete_preferences(
 @router.post(
     "/test",
     response_model=TestAIConnectionResponse,
-    summary="Valida las credenciales de conexion a IA",
+    summary="Valida las credenciales de conexión a IA",
 )
 async def test_connection(
     request: TestAIConnectionRequest,

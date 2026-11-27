@@ -12,7 +12,7 @@ from kosmo.infrastructure.api.dependencies.auth import get_principal, require_pr
 
 router = APIRouter(
     prefix="/mcp",
-    tags=["MCP Tools"],
+    tags=["mcp"],
     dependencies=[Depends(get_principal)],
 )
 
