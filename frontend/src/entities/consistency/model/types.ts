@@ -1,4 +1,4 @@
-export type ConsistencyTargetPhase = 'features' | 'requirements' | 'model' | 'implementation';
+export type ConsistencyTargetPhase = 'features' | 'requirements' | 'implementation';
 
 export type ConsistencyEvaluationStatus =
 	| 'evaluating'
@@ -32,8 +32,6 @@ export interface ReviewCard {
 		field: string;
 		before: string;
 		after: string;
-		before_diagram?: string;
-		after_diagram?: string;
 	} | null;
 	status: string;
 	failure_reason: string | null;

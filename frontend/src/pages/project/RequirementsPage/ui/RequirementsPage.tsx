@@ -1,15 +1,10 @@
 'use client';
 
-import { MarkdownEditor, PanelAsistenteRequisito, type SaveStatus } from '@/features';
-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { useRequirementsStore } from '@/entities/requirements';
-import { useModelingStore } from '@/entities/modeling';
 import { formatApiError } from '@/shared/api';
-import { useUnsavedChanges } from '@/features/app-state';
 import {
 	Ai,
 	ArrowLeft,
@@ -17,15 +12,18 @@ import {
 	CursorClickFill,
 	Loading,
 	ModalConfirm,
+	Requirements,
 	toast,
 } from '@/shared/ui';
-import { useAppStore } from '@/features/app-state';
-import { useProjectStore } from '@/entities/project';
 
 import { useCharacteristicStore } from '@/entities/characteristic';
+import { useProjectStore } from '@/entities/project';
+import { useRequirementsStore } from '@/entities/requirements';
 
-import { AsideCharacteristic } from '@/widgets';
-import { Requirements } from '@/shared/ui';
+import { useAppStore, useUnsavedChanges } from '@/features/app-state';
+import { AsideCharacteristic } from '@/features/aside-characteristic';
+import { RequirementsChatPanel } from '@/features/chatbot';
+import { MarkdownEditor, type SaveStatus } from '@/features/markdown-editor';
 
 const generatingRequirementsMessages = [
 	'Analizando característica...',
@@ -52,10 +50,6 @@ const RequirementsPage = () => {
 	const saveRequirements = useRequirementsStore((s) => s.saveRequirements);
 	const generateRequirements = useRequirementsStore((s) => s.generateRequirements);
 	const deleteRequirementsStore = useRequirementsStore((s) => s.deleteRequirements);
-
-	// Modeling estado (para eliminar diagrama asociado)
-	const hasDiagram = useModelingStore((s) => s.hasDiagram);
-	const deleteDiagramModeling = useModelingStore((s) => s.deleteDiagram);
 
 	const [markdown, setMarkdown] = useState('');
 	const [savedContent, setSavedContent] = useState('');
@@ -194,10 +188,6 @@ const RequirementsPage = () => {
 		try {
 			await deleteRequirementsStore(currentProject.id, featureId);
 
-			if (hasDiagram[featureId]) {
-				await deleteDiagramModeling(currentProject.id, featureId);
-			}
-
 			setMarkdown('');
 			setSavedContent('');
 			toast.success('Requisitos eliminados');
@@ -308,8 +298,8 @@ const RequirementsPage = () => {
 									</button>
 								)}
 								<Link
-									href='modelo'
-									onClick={handleNextLink('modelo')}
+									href='codigo'
+									onClick={handleNextLink('codigo')}
 									className='btn btn-primary'
 								>
 									Continuar
@@ -457,7 +447,7 @@ const RequirementsPage = () => {
 				</div>
 
 				{isChatbotOpen && (
-					<PanelAsistenteRequisito
+					<RequirementsChatPanel
 						featureId={selectedId}
 						projectId={currentProject?.id ?? null}
 						onClose={() => {

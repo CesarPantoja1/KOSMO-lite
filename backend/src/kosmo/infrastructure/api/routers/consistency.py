@@ -215,7 +215,9 @@ async def get_consistency_activity(
 @router.post(
     "/evaluate/stream",
     summary="Evaluar consistencia entre fases (SSE streaming)",
-    description="Evalúa el impacto de cambios en cascada (features → requirements → model) con progreso SSE.",
+    description=(
+        "Evalúa el impacto de cambios en cascada (descubrimiento → características → requisitos) con progreso SSE."
+    ),
     status_code=status.HTTP_200_OK,
 )
 async def evaluate_consistency_stream(
@@ -286,7 +288,6 @@ def _resolve_origin_phase(phase_name: str) -> SpecPhase:
         "discovery": SpecPhase.DESCUBRIMIENTO,
         "features": SpecPhase.CARACTERISTICAS,
         "requirements": SpecPhase.REQUISITOS,
-        "model": SpecPhase.MODELO,
         "implementation": SpecPhase.IMPLEMENTACION,
     }
     if phase_name not in reverse:
@@ -302,7 +303,6 @@ def _to_spec_phase(api_phase: str) -> SpecPhase:
         "discovery": SpecPhase.DESCUBRIMIENTO,
         "features": SpecPhase.CARACTERISTICAS,
         "requirements": SpecPhase.REQUISITOS,
-        "model": SpecPhase.MODELO,
         "implementation": SpecPhase.IMPLEMENTACION,
     }
     if api_phase not in reverse:
@@ -325,7 +325,7 @@ def _resolve_targets(phase_origin: str, phase_destination: str | None) -> list[s
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     "La dirección de evaluación no está permitida: la trazabilidad se verifica "
-                    "solo hacia la derecha (Descubrimiento → Características → Requisitos → Modelo)."
+                    "solo hacia la derecha (Descubrimiento → Características → Requisitos → Implementación)."
                 ),
             )
         return [phase_destination]
@@ -370,7 +370,7 @@ class ApplyImpactsRequestView(BaseModel):
 @router.post(
     "/apply",
     summary="Aplicar impactos de consistencia",
-    description="Aplica las acciones sugeridas sobre requisitos, caracteristicas y diagramas.",
+    description="Aplica las acciones sugeridas sobre requisitos y características.",
     status_code=status.HTTP_200_OK,
 )
 async def apply_consistency_impacts(

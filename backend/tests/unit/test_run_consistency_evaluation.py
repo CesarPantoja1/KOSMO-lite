@@ -17,7 +17,6 @@ from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.domain.sdd.document_converters import markdown_to_document
 from tests.unit.conftest import DISCOVERY_VALID
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryConsistencyEvaluationRepository,
     InMemoryDocumentRepository,
     InMemoryFeatureRepository,
@@ -68,7 +67,6 @@ def _make_repos(with_feature: bool = True) -> tuple[Any, ...]:
     projects = InMemoryProjectRepository()
     features = InMemoryFeatureRepository()
     requirements = InMemoryRequirementRepository()
-    diagrams = InMemoryActivityDiagramRepository()
     documents = InMemoryDocumentRepository()
     evaluations = InMemoryConsistencyEvaluationRepository()
     from kosmo.contracts.sdd.ids import UserId
@@ -84,7 +82,7 @@ def _make_repos(with_feature: bool = True) -> tuple[Any, ...]:
     documents.discovery_docs["prj_01"] = markdown_to_document(DISCOVERY_VALID)
     if with_feature:
         features.features["feat_01"] = _a_feature()
-    return projects, features, requirements, diagrams, documents, evaluations
+    return projects, features, requirements, documents, evaluations
 
 
 def _payload() -> dict[str, Any]:
@@ -99,7 +97,7 @@ def _payload() -> dict[str, Any]:
 @pytest.mark.asyncio
 async def test_run_evaluation_stores_fresh_rows() -> None:
     # Arrange
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     evaluator = _ActionEvaluator(
         [
             ArtifactAction(
@@ -119,7 +117,6 @@ async def test_run_evaluation_stores_fresh_rows() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -142,7 +139,7 @@ async def test_run_evaluation_stores_fresh_rows() -> None:
 @pytest.mark.asyncio
 async def test_run_evaluation_supersedes_stale_rows() -> None:
     # Arrange
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     evaluator = _ActionEvaluator(
         [
             ArtifactAction(
@@ -160,7 +157,6 @@ async def test_run_evaluation_supersedes_stale_rows() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -173,7 +169,6 @@ async def test_run_evaluation_supersedes_stale_rows() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -190,7 +185,7 @@ async def test_run_evaluation_supersedes_stale_rows() -> None:
 @pytest.mark.asyncio
 async def test_run_evaluation_contains_failure_in_failed_row() -> None:
     # Arrange
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     evaluator = _ActionEvaluator(should_fail=True)
 
     # Act
@@ -199,7 +194,6 @@ async def test_run_evaluation_contains_failure_in_failed_row() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -216,7 +210,7 @@ async def test_run_evaluation_contains_failure_in_failed_row() -> None:
 @pytest.mark.asyncio
 async def test_run_evaluation_stores_operation_id() -> None:
     # Arrange
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     evaluator = _ActionEvaluator(
         [
             ArtifactAction(
@@ -238,7 +232,6 @@ async def test_run_evaluation_stores_operation_id() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -254,7 +247,7 @@ async def test_run_evaluation_stores_operation_id() -> None:
 @pytest.mark.asyncio
 async def test_run_evaluation_skips_when_no_target_artifacts() -> None:
     # Arrange
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos(with_feature=False)
+    projects, features, requirements, documents, evaluations = _make_repos(with_feature=False)
     evaluator = _ActionEvaluator()
 
     # Act
@@ -263,7 +256,6 @@ async def test_run_evaluation_skips_when_no_target_artifacts() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=evaluator,  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -286,7 +278,7 @@ async def test_run_evaluation_propagates_user_context_from_payload() -> None:
             captured_user_ids.append(current_user_id.get())
             return ConsistencyEvaluationOutput(report_id="rpt_ctx", status=ConsistencyStatus.ANALIZADO_SIN_IMPACTO)
 
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     payload = _payload()
     payload["user_id"] = "usr_explicit_123"
 
@@ -296,7 +288,6 @@ async def test_run_evaluation_propagates_user_context_from_payload() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=_ContextSpyEvaluator(),  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -318,7 +309,7 @@ async def test_run_evaluation_falls_back_to_project_owner_id() -> None:
             captured_user_ids.append(current_user_id.get())
             return ConsistencyEvaluationOutput(report_id="rpt_ctx", status=ConsistencyStatus.ANALIZADO_SIN_IMPACTO)
 
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     payload = _payload()
     # No user_id in payload, project.owner_id is usr_01
     assert current_user_id.get() is None
@@ -328,7 +319,6 @@ async def test_run_evaluation_falls_back_to_project_owner_id() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=_ContextSpyEvaluator(),  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,
@@ -349,7 +339,7 @@ async def test_run_evaluation_handles_analisis_fallido_status() -> None:
                 failure_reason="API key inválida o cuota agotada",
             )
 
-    projects, features, requirements, diagrams, documents, evaluations = _make_repos()
+    projects, features, requirements, documents, evaluations = _make_repos()
     payload = _payload()
 
     await run_consistency_evaluation(
@@ -357,7 +347,6 @@ async def test_run_evaluation_handles_analisis_fallido_status() -> None:
         project_repo=projects,
         feature_repo=features,
         requirement_repo=requirements,
-        diagram_repo=diagrams,
         document_repo=documents,
         evaluator=_FailedStatusEvaluator(),  # type: ignore[reportArgumentType]
         evaluation_repo=evaluations,

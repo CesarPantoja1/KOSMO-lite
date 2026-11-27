@@ -21,12 +21,10 @@ from kosmo.contracts.integrations.github import (
     ProjectGitHubIntegration,
     UserGitHubIntegration,
 )
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.document import RichTextDocument, SpecPhase
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
-    ActivityDiagramId,
     ChatMessageId,
     ChatSessionId,
     ConsistencyEvaluationId,
@@ -37,7 +35,6 @@ from kosmo.contracts.sdd.ids import (
 from kosmo.contracts.sdd.project import Project
 from kosmo.infrastructure.security.fernet_vault import FernetSecretCipher
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryChatRepository,
     InMemoryConsistencyEvaluationRepository,
     InMemoryDocumentRepository,
@@ -130,19 +127,10 @@ def _a_feature(project: Project, feature_id: str, number: int = 1) -> Feature:
     )
 
 
-def _a_diagram(feature: Feature) -> DiagramaActividad:
-    return DiagramaActividad(
-        id=ActivityDiagramId(f"adg_{str(feature.id)[-4:]}"),
-        feature_id=feature.id,
-        diagram_syntax="@startuml\nstart\n:accion;\nstop\n@enduml",
-    )
-
-
 def _make_uc(
     project_repo: InMemoryProjectRepository,
     feature_repo: InMemoryFeatureRepository,
     requirement_repo: InMemoryRequirementRepository,
-    diagram_repo: InMemoryActivityDiagramRepository,
     document_repo: InMemoryDocumentRepository,
     chat_repo: InMemoryChatRepository,
     evaluation_repo: InMemoryConsistencyEvaluationRepository,
@@ -164,7 +152,6 @@ def _make_uc(
         project_repo=project_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
         document_repo=document_repo,
         chat_repo=chat_repo,
         consistency_evaluation_repo=evaluation_repo,
@@ -202,10 +189,6 @@ async def test_delete_project_removes_all_artifacts_in_cascade() -> None:
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(feature_1.id, "### REQ-1.1\n\nRequisito uno.")
     await requirement_repo.save(feature_2.id, "### REQ-2.1\n\nRequisito dos.")
-
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await diagram_repo.save(_a_diagram(feature_1))
-
     document_repo = InMemoryDocumentRepository()
     await document_repo.save_discovery(project.id, RichTextDocument(nodes=[]))
     await document_repo.save_version(project.id, SpecPhase.DESCUBRIMIENTO, "v1", [])
@@ -243,7 +226,6 @@ async def test_delete_project_removes_all_artifacts_in_cascade() -> None:
         project_repo,
         feature_repo,
         requirement_repo,
-        diagram_repo,
         document_repo,
         chat_repo,
         evaluation_repo,
@@ -260,7 +242,6 @@ async def test_delete_project_removes_all_artifacts_in_cascade() -> None:
     assert await feature_repo.by_id(feature_2.id) is None
     assert await requirement_repo.by_feature_id(feature_1.id) is None
     assert await requirement_repo.by_feature_id(feature_2.id) is None
-    assert await diagram_repo.by_feature_id(feature_1.id) is None
     assert await document_repo.get_discovery(project.id) is None
     assert document_repo.versions == {}
     assert chat_repo.sessions == []
@@ -278,7 +259,6 @@ async def test_delete_project_raises_when_project_not_found() -> None:
         InMemoryProjectRepository(),
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -304,7 +284,6 @@ async def test_delete_project_raises_when_owner_does_not_match() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -331,7 +310,6 @@ async def test_delete_project_without_artifacts_keeps_working() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -355,7 +333,6 @@ async def test_delete_project_removes_persisted_workspace() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -428,7 +405,6 @@ async def test_delete_project_global_cascade_removes_github_and_railway_and_work
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -506,7 +482,6 @@ async def test_delete_project_resilient_when_github_cleanup_fails() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -568,7 +543,6 @@ async def test_delete_project_resilient_when_railway_cleanup_fails() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -604,7 +578,6 @@ async def test_delete_project_resilient_when_workspace_cleanup_fails() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -639,7 +612,6 @@ async def test_delete_project_delegates_to_injected_delete_deployment() -> None:
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),
@@ -676,7 +648,6 @@ async def test_delete_project_delegates_to_injected_delete_github_repo() -> None
         project_repo,
         InMemoryFeatureRepository(),
         InMemoryRequirementRepository(),
-        InMemoryActivityDiagramRepository(),
         InMemoryDocumentRepository(),
         InMemoryChatRepository(),
         InMemoryConsistencyEvaluationRepository(),

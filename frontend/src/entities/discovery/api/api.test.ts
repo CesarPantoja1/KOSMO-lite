@@ -55,7 +55,9 @@ describe('discovery/api — modo real (USE_MOCKS=false)', () => {
 		const [url, options] = fetchMock.mock.calls[0];
 		expect(url).toContain('/api/v1/projects/prj_01/discovery');
 		expect((options as RequestInit).method).toBe('PUT');
-		expect(JSON.parse((options as RequestInit).body as string)).toEqual({ content: 'nuevo' });
+		expect(JSON.parse((options as RequestInit).body as string)).toEqual({
+			content: 'nuevo',
+		});
 	});
 
 	it('generateDiscovery hace POST al endpoint', async () => {
@@ -73,30 +75,16 @@ describe('discovery/api — modo real (USE_MOCKS=false)', () => {
 		);
 	});
 
-	it('sendChatMessage hace POST con el contenido del mensaje', async () => {
-		// Arrange
-		const { sendChatMessage } = await import('./api');
-		mockFetchOk({
-			message: { id: 'm1', role: 'assistant', content: 'ok' },
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await sendChatMessage('prj_01', 'Hola');
-
-		// Assert
-		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/api/v1/projects/prj_01/discovery/chat'),
-			expect.objectContaining({ method: 'POST' }),
-		);
-	});
-
 	it('getChatHistory agrega session_id y before como query params', async () => {
 		// Arrange
 		const { getChatHistory } = await import('./api');
-		mockFetchOk({ phase: 'discovery', context: 'prj_01', messages: [], has_more: false, next_cursor: null });
+		mockFetchOk({
+			phase: 'discovery',
+			context: 'prj_01',
+			messages: [],
+			has_more: false,
+			next_cursor: null,
+		});
 
 		// Act
 		await getChatHistory('prj_01', 'sess_1', 'cursor_1');
@@ -166,19 +154,6 @@ describe('discovery/api — modo mock (USE_MOCKS=true)', () => {
 
 		// Assert
 		expect(result.content).toBe('mi contenido');
-	});
-
-	it('sendChatMessage resuelve una respuesta mock', async () => {
-		// Arrange
-		const { sendChatMessage } = await import('./api');
-
-		// Act
-		const promise = sendChatMessage('prj_01', 'Hola');
-		await vi.advanceTimersByTimeAsync(500);
-		const result = await promise;
-
-		// Assert
-		expect(result.message).toBeDefined();
 	});
 
 	it('getChatHistory resuelve historial vacío en modo mock', async () => {

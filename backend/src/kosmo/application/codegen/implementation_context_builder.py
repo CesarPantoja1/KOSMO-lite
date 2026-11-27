@@ -212,7 +212,7 @@ class ImplementationContextBuilder:
             "común deben ubicarse en `src/domain/<entidad>/` para que cualquier feature pueda consumirlos "
             "sin acoplamiento inter-slice.\n"
             "- **Interacción Multi-Rol (Crucial):** Cuando la feature involucre más de un rol/actor "
-            "(o el flujo EARS/diagrama mencione múltiples actores), la UI NO debe limitarse a un único rol. "
+            "(o los requisitos EARS mencionen múltiples actores), la UI NO debe limitarse a un único rol. "
             "DEBE ofrecer la perspectiva y acciones de cada actor involucrado (por ejemplo mediante selector de rol, "
             "pestañas por rol con `<Tabs>`, o secciones específicas de la pantalla según el actor), "
             "permitiendo probar y experimentar el flujo completo para todos los roles participantes.\n"
@@ -361,7 +361,6 @@ class ImplementationContextBuilder:
         self,
         feature: Feature,
         req_markdown: str,
-        diagram_syntax: str,
         ux_prompt_block: str,
         project_context: str,
         product_map: ProductMap | None = None,
@@ -389,7 +388,6 @@ class ImplementationContextBuilder:
             f"Eres el agente de planificación para la feature '{feature.title}'.\n\n"
             f"## Descripción\n{feature.description}\n\n"
             f"## Requisitos EARS\n{req_markdown}\n\n"
-            f"## Diagrama de Actividad\n{diagram_syntax}\n\n"
             f"{disp_info}"
             "Propón un plan de implementación detallando los archivos a crear y modificar.\n"
             "OBLIGATORIO: la feature DEBE entregar una solución 100% FUNCIONAL DE EXTREMO A EXTREMO "
@@ -491,7 +489,6 @@ class ImplementationContextBuilder:
         self,
         feature: Feature,
         req_markdown: str,
-        diagram_syntax: str,
         ux_prompt_block: str,
         project_context: str,
         plan_lines: str,
@@ -520,7 +517,6 @@ class ImplementationContextBuilder:
             f"Eres el agente de construcción para la feature '{feature.title}'.\n\n"
             f"## Descripción\n{feature.description}\n\n"
             f"## Requisitos EARS\n{req_markdown}\n\n"
-            f"## Diagrama de Actividad\n{diagram_syntax}\n\n"
             f"## Plan aprobado\n{plan_lines}\n\n"
             f"{disp_info}"
             "Implementa el código y las pruebas respetando el plan aprobado.\n"

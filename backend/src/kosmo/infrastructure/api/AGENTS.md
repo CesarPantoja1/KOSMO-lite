@@ -163,7 +163,6 @@ La función `build_skill_registry()` registra exactamente **25 skills** en el `S
 | 3 | `features_generate` | CARACTERISTICAS | `FeaturesMode` | Derivación de características a partir del descubrimiento |
 | 4 | `ears_generate` | REQUISITOS | `EARSMode` | Generación de requisitos en sintaxis EARS por característica |
 | 5 | `requirements_refine` | REQUISITOS | `RequirementsRefineMode` | Refinamiento de requisitos EARS existentes |
-| 6 | `modelo_generate` | MODELO | `ModeloMode` | Generación de diagramas de actividad PlantUML |
 | 7 | `discovery_chat` | DESCUBRIMIENTO | `DiscoveryChatMode` | Chat conversacional a nivel de negocio |
 | 8 | `features_chat` | CARACTERISTICAS | `FeaturesChatMode` | Chat conversacional a nivel de característica |
 | 9 | `requirements_chat` | REQUISITOS | `RequirementsChatMode` | Chat conversacional a nivel de especificación de software |
@@ -172,15 +171,11 @@ La función `build_skill_registry()` registra exactamente **25 skills** en el `S
 | 12 | `consistency_evaluate_requirements` | REQUISITOS | `ConsistencyEvaluationMode` | Evaluación de requisitos hacia su característica padre |
 | 13 | `consistency_evaluate_requirements_upstream` | REQUISITOS | `ConsistencyEvaluationMode` | Evaluación de requisitos hacia descubrimiento (upstream) |
 | 14 | `consistency_evaluate_features_downstream` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evaluación de características hacia requisitos EARS |
-| 15 | `consistency_evaluate_features_model` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evaluación de características hacia diagramas UML |
 | 16 | `consistency_evaluate_discovery_requirements` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evaluación de descubrimiento hacia requisitos EARS |
-| 17 | `consistency_evaluate_discovery_model` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evaluación de descubrimiento hacia diagramas UML |
 | 18 | `consistency_evaluate_discovery_features` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evaluación de descubrimiento hacia características |
 | 19 | `consistency_evaluate_discovery_implementation` | DESCUBRIMIENTO | `ConsistencyEvaluationMode` | Evaluación de descubrimiento hacia implementaciones de código |
 | 20 | `consistency_evaluate_features_implementation` | CARACTERISTICAS | `ConsistencyEvaluationMode` | Evaluación de características hacia implementaciones de código |
 | 21 | `consistency_evaluate_requirements_implementation` | REQUISITOS | `ConsistencyEvaluationMode` | Evaluación de requisitos hacia implementaciones de código |
-| 22 | `consistency_evaluate_requirements_model` | REQUISITOS | `ConsistencyEvaluationMode` | Evaluación de requisitos hacia diagramas de actividad UML |
-| 23 | `consistency_evaluate_model_implementation` | MODELO | `ConsistencyEvaluationMode` | Evaluación de diagramas hacia implementaciones de código |
 | 24 | `consistency_correct` | DESCUBRIMIENTO | `ConsistencyCorrectionMode` | Generación de corrección textual exacta de artefactos |
 | 25 | `direct_modification` | DESCUBRIMIENTO | `DirectModificationMode` | Modificación directa de especificaciones sin fase de plan |
 
@@ -272,7 +267,6 @@ A continuación se detalla la totalidad de los 20 routers registrados en la apli
 | `requirements.py` | `/api/v1/projects/{project_id}/features/{feature_id}/requirements` | `requirements` | `GET /`<br>`POST /generate`<br>`PUT /`<br>`POST /refine`<br>`POST /regenerate`<br>`DELETE /` | Generación, refinamiento y actualización de requisitos en sintaxis EARS por característica. |
 | `requirement_chat.py` | `/api/v1/projects/{project_id}/features/{feature_id}/requirements/chat` | `requirements` | `POST /messages`<br>`GET /history` | Chat conversacional interactivo con streaming SSE a nivel de requisitos de software. |
 | `chat_sessions.py` | `/api/v1/projects/{project_id}/chat/sessions` | `chat` | `GET /`<br>`POST /`<br>`DELETE /{session_id}` | Gestión de múltiples hilos o sesiones independientes de conversación por fase. |
-| `modelo.py` | `/api/v1/projects/{project_id}/features/{feature_id}/modelo` | `modelo` | `GET /`<br>`POST /generate`<br>`DELETE /` | Generación y consulta de diagramas de actividad PlantUML derivados de los requisitos EARS. |
 | `documents.py` | `/api/v1/projects/{project_id}/documents` | `documents` | `POST /modify` | Modificación textual directa sobre documentos de especificación sin pasar por generación completa. |
 | `consistency.py` | `/api/v1/projects/{project_id}/consistency` | `consistency` | `POST /evaluate`<br>`GET /status`<br>`GET /review`<br>`POST /apply`<br>`POST /discard`<br>`POST /bulk-resolve`<br>`GET /activity` | Detección en cascada de impactos downstream, revisión interactiva de diffs y resolución atómica. |
 | `implementations.py` | `/api/v1/projects/{project_id}/features/{feature_id}/implementation` | `codegen` | `POST /start`<br>`GET /stream`<br>`GET /record`<br>`DELETE /` | Orquestación asíncrona de generación de código frontend, streaming SSE del progreso y rollback. |
@@ -282,7 +276,7 @@ A continuación se detalla la totalidad de los 20 routers registrados en la apli
 | `github.py` | `/api/v1/integrations/github` | `integrations` | `GET /authorize`<br>`POST /callback`<br>`GET /status`<br>`DELETE /unlink`<br>`GET /repositories`<br>`POST /projects/{project_id}/link`<br>`GET /projects/{project_id}`<br>`POST /projects/{project_id}/sync`<br>`DELETE /projects/{project_id}/unlink` | Flujo OAuth con GitHub, vinculación de repositorios remotos por proyecto y sincronización de código vía Git. |
 | `deployment.py` | `/api/v1/projects/{project_id}/deployment` | `deployment` | `POST /deploy`<br>`GET /status`<br>`DELETE /`<br>`GET /logs` | Despliegue en la nube de la aplicación generada en Railway, consulta de estado y cancelación. |
 | `schemas.py` | `/api/v1/schemas` | `schemas` | `GET /`<br>`GET /{schema_name}` | Introspección y exportación de esquemas JSON Schema de todos los DTOs de contrato para el frontend. |
-| `mcp.py` | `/mcp` | `MCP Tools` | `POST /tools/get_requirements`<br>`POST /tools/get_activity_diagram` | Endpoints de herramientas bajo el protocolo MCP para consulta contextual de especificaciones por OpenCode. |
+| `mcp.py` | `/mcp` | `MCP Tools` | `POST /tools/get_requirements` | Endpoints de herramientas bajo el protocolo MCP para consulta contextual de especificaciones por OpenCode. |
 
 ---
 

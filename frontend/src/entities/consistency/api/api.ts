@@ -16,7 +16,6 @@ const emptyStatus: ConsistencyStatusResponse = {
 	phases: {
 		features: { pending: 0, evaluating: 0, failed: 0 },
 		requirements: { pending: 0, evaluating: 0, failed: 0 },
-		model: { pending: 0, evaluating: 0, failed: 0 },
 		implementation: { pending: 0, evaluating: 0, failed: 0 },
 	},
 };

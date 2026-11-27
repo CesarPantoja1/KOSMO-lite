@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_max_concurrency: int = 100
     user_ai_config_cache_ttl_seconds: float = 60.0
+    ai_catalog_sync_enabled: bool = True
+    ai_catalog_sync_interval_hours: int = 24
+    ai_catalog_sync_initial_delay_seconds: float = 5.0
 
     # Embeddings
     embedding_provider: Literal["auto", "openai", "fastembed", "none"] = "auto"

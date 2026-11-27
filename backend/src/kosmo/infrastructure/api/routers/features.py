@@ -365,7 +365,7 @@ def _check_feature_consistency(request: Request) -> CheckFeatureConsistencyUseCa
 @router.delete(
     "/{feature_id}",
     summary="Eliminar característica",
-    description="Elimina una característica y todos sus artefactos asociados (requisitos, diagrama). "
+    description="Elimina una característica y todos sus artefactos asociados (requisitos y trazabilidad). "
     "Si tenía código generado, se elimina en background y la aplicación se valida para que "
     "siempre quede funcional.",
     status_code=status.HTTP_200_OK,

@@ -7,7 +7,6 @@ from kosmo.contracts.sdd.errors import FeatureNotFoundError, ProjectNotFoundErro
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     FeatureRepository,
     ProjectRepository,
     RequirementRepository,
@@ -22,13 +21,11 @@ class DeleteFeatureUseCase:
         project_repo: ProjectRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         traceability_repo: TraceabilityRepository | None = None,
     ) -> None:
         self._project_repo = project_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._traceability_repo = traceability_repo
 
     async def execute(self, project_id: ProjectId, feature_id: FeatureId) -> Feature:
@@ -47,7 +44,6 @@ class DeleteFeatureUseCase:
             )
 
         await self._requirement_repo.delete(feature_id)
-        await self._diagram_repo.delete(feature_id)
         await self._feature_repo.delete(feature_id)
 
         if self._traceability_repo is not None:

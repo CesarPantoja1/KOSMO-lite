@@ -1,6 +1,9 @@
 export type SseEventHandler = (event: Record<string, unknown>) => void;
 
-export async function consumeSse(response: Response, onEvent: SseEventHandler): Promise<void> {
+export async function consumeSse(
+	response: Response,
+	onEvent: SseEventHandler,
+): Promise<void> {
 	if (!response.body) {
 		throw new Error('Respuesta sin cuerpo');
 	}

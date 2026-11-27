@@ -96,7 +96,7 @@ def instrument_prometheus(app: FastAPI) -> None:
             Instrumentator,  # pyright: ignore[reportUnknownVariableType]
         )
 
-        Instrumentator().instrument(app).expose(app)  # pyright: ignore[reportUnknownMemberType]
+        Instrumentator().instrument(app).expose(app, include_in_schema=False)  # pyright: ignore[reportUnknownMemberType]
         app.state._kosmo_prometheus_instrumented = True
     except (ImportError, Exception):
         pass

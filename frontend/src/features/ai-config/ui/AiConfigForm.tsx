@@ -6,6 +6,7 @@ import {
 	TIER_LABELS,
 	maskApiKey,
 	useAiConfigStore,
+	type AIModelTier,
 	type AIProvider,
 	type SaveAIConfigRequest,
 } from '@/entities/ai-config';
@@ -108,7 +109,7 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 	const hasExistingKey = config?.has_api_key ?? false;
 	const canSave = apiKey.trim().length > 0 && !loading;
 
-	const tierOrder: Array<'flagship' | 'balanced' | 'fast'> = [
+	const tierOrder: AIModelTier[] = [
 		'flagship',
 		'balanced',
 		'fast',
@@ -119,6 +120,7 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 			models: selectedProviderInfo?.models.filter((m) => m.tier === tier) ?? [],
 		}))
 		.filter((group) => group.models.length > 0);
+
 
 	const cardClasses = embedded
 		? 'flex flex-col gap-4'
@@ -210,13 +212,13 @@ export function AiConfigForm({ onSaved, embedded }: AiConfigFormProps) {
 						<select
 							value={model}
 							onChange={(e) => setModel(e.target.value)}
-							className='bg-neutral-50 border border-neutral-300 text-neutral-800 rounded-lg px-3 py-2.5 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all w-full'
+							className='bg-neutral-50 border border-neutral-300 text-neutral-800 rounded-lg px-3 py-2.5 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all w-full font-medium'
 						>
 							{modelsByTier.map(({ tier, models }) => (
 								<optgroup key={tier} label={`— ${TIER_LABELS[tier]}`}>
 									{models.map((m) => (
 										<option key={m.id} value={m.id}>
-											{m.display_name}
+											{m.display_name}{m.is_deprecated ? ' (Deprecado)' : ''}
 										</option>
 									))}
 								</optgroup>

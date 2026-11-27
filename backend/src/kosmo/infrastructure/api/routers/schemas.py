@@ -54,12 +54,12 @@ _REGISTRY: dict[str, type[BaseModel]] = {
 }
 
 
-@router.get("")
+@router.get("", summary="Listar esquemas de contratos disponibles")
 async def list_schemas() -> dict[str, list[str]]:
     return {"schemas": sorted(_REGISTRY.keys())}
 
 
-@router.get("/{name}")
+@router.get("/{name}", summary="Obtener esquema JSON de un DTO por nombre")
 async def get_schema(name: str) -> dict[str, Any]:
     model = _REGISTRY.get(name)
     if model is None:

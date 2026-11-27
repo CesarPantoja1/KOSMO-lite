@@ -90,7 +90,7 @@ def _get_discovery_chat_history(request: Request) -> GetDiscoveryChatHistoryUseC
     "",
     summary="Generar documento de descubrimiento con IA",
     description=(
-        "Genera un documento de visión de producto estructurado en 8 secciones, utilizando inteligencia artificial."
+        "Genera un documento de visión de producto estructurado en 7 secciones, utilizando inteligencia artificial."
     ),
     response_model=DiscoveryResponse,
     status_code=status.HTTP_200_OK,

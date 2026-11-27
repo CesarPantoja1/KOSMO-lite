@@ -9,8 +9,15 @@ process.env.KOSMO_STACK = "test";
 process.env.KOSMO_NETWORK = "kosmo-test-network";
 process.env.KOSMO_WORKSPACES_HOST_PATH = "/opt/kosmo/test/workspaces";
 
-const { buildJobConfig, secretExecArgs, validId, validModel, validContainerId, ownedJobId,
+const { defaultOpenCodeCatalog, buildJobConfig, secretExecArgs, validId, validModel, validContainerId, ownedJobId,
   workspaceReadError } = require("./launcher");
+
+test("catalog exposes supported providers and canonical models", () => {
+  assert.ok(defaultOpenCodeCatalog.openai.includes("gpt-4o"));
+  assert.ok(defaultOpenCodeCatalog.anthropic.includes("claude-3-7-sonnet"));
+  assert.ok(defaultOpenCodeCatalog.google.includes("gemini-2.0-flash"));
+  assert.ok(defaultOpenCodeCatalog.deepseek.includes("deepseek-flash"));
+});
 
 test("job mounts one project and never exposes provider key in Docker metadata", () => {
   const config = buildJobConfig(

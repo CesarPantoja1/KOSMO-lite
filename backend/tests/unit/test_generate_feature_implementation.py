@@ -11,7 +11,6 @@ import pytest
 from kosmo.application.codegen.generate_feature_implementation import (
     GenerateFeatureImplementationInput,
     GenerateFeatureImplementationUseCase,
-    MissingDiagramError,
     MissingRequirementsError,
     OpenCodeGenerationError,
     OpenCodeUnavailableError,
@@ -20,7 +19,6 @@ from kosmo.application.codegen.generate_feature_implementation import (
     _normalize_generated_file_path,
     _raise_for_opencode_error,
 )
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.codegen import (
     CodeRunnerPort,
     CodeWorkspace,
@@ -44,7 +42,6 @@ from kosmo.contracts.sdd.codegen import (
 from kosmo.contracts.sdd.errors import FeatureNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
-    ActivityDiagramId,
     FeatureId,
     ImplementationId,
     ProjectId,
@@ -55,7 +52,6 @@ from kosmo.contracts.sdd.project import Project
 from kosmo.domain.sdd.document_converters import markdown_to_document
 from kosmo.infrastructure.codegen.workspace import WorkspaceLockedError
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryDocumentRepository,
     InMemoryFeatureRepository,
     InMemoryProjectRepository,
@@ -383,7 +379,6 @@ async def test_generate_feature_implementation_success() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -402,18 +397,10 @@ async def test_generate_feature_implementation_success() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -445,7 +432,6 @@ async def test_generate_events_include_run_id() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -464,18 +450,10 @@ async def test_generate_events_include_run_id() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_runid"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -501,7 +479,6 @@ async def test_generate_propaga_run_id_a_la_validacion() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -520,18 +497,10 @@ async def test_generate_propaga_run_id_a_la_validacion() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_runval"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -554,7 +523,6 @@ async def test_generate_events_no_mencionan_opencode() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -573,18 +541,10 @@ async def test_generate_events_no_mencionan_opencode() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_nooc"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -614,7 +574,6 @@ async def test_generate_feature_implementation_incluye_contexto_y_ui_en_prompts(
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     project_repo = InMemoryProjectRepository()
     document_repo = InMemoryDocumentRepository()
     workspace_manager = FakeWorkspaceManager()
@@ -648,18 +607,10 @@ async def test_generate_feature_implementation_incluye_contexto_y_ui_en_prompts(
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los productos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_ui"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar producto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -696,7 +647,6 @@ async def test_plan_prompt_incluye_documento_completo_sin_truncar() -> None:
     document_repo = InMemoryDocumentRepository()
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -727,18 +677,10 @@ async def test_plan_prompt_incluye_documento_completo_sin_truncar() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_vision"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -763,7 +705,6 @@ async def test_generate_feature_implementation_raises_when_feature_not_found() -
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner()
@@ -773,7 +714,6 @@ async def test_generate_feature_implementation_raises_when_feature_not_found() -
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -794,7 +734,6 @@ async def test_generate_feature_implementation_raises_when_requirements_missing(
     # Arrange (CA-02: Generación fallida por falta de requisitos)
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner()
@@ -817,7 +756,6 @@ async def test_generate_feature_implementation_raises_when_requirements_missing(
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -836,11 +774,10 @@ async def test_generate_feature_implementation_raises_when_requirements_missing(
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_generate_feature_implementation_raises_when_activity_diagram_missing() -> None:
-    # Arrange (CA-03: Generación fallida por falta de diagrama)
+async def test_generate_feature_implementation_succeeds_without_diagram() -> None:
+    # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner()
@@ -859,12 +796,10 @@ async def test_generate_feature_implementation_raises_when_activity_diagram_miss
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-3.1: Exportar")
-    # Diagrama de actividad NO generado
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -872,13 +807,11 @@ async def test_generate_feature_implementation_raises_when_activity_diagram_miss
         traceability_repo=trace_repo,
     )
 
-    # Act & Assert
-    with pytest.raises(MissingDiagramError) as exc_info:
-        await use_case.execute(GenerateFeatureImplementationInput(feature_id=feat_id))
+    # Act
+    output = await use_case.execute(GenerateFeatureImplementationInput(feature_id=feat_id))
 
-    expected_msg = "Esta característica no tiene diagrama de actividad generado. Genera el diagrama antes de continuar."
-    assert expected_msg in str(exc_info.value)
-    assert await workspace_manager.is_locked(prj_id) is False
+    # Assert: Se genera exitosamente sin requerir diagrama de actividad
+    assert output.success is True
 
 
 @pytest.mark.asyncio
@@ -887,7 +820,6 @@ async def test_generate_feature_implementation_retries_on_validation_failure_and
     # Arrange (Reintento de validación con retroalimentación)
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(fail_count_before_pass=1)  # Falla en intento 1, pasa en intento 2
@@ -906,18 +838,10 @@ async def test_generate_feature_implementation_retries_on_validation_failure_and
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-4.1: Calcular")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_04"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -944,7 +868,6 @@ async def test_generate_feature_implementation_exhausts_retries_and_marks_requir
     # Arrange (CA-04: Generación fallida tras agotar correcciones)
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=False)  # Siempre falla
@@ -963,18 +886,10 @@ async def test_generate_feature_implementation_exhausts_retries_and_marks_requir
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-5.1: Fail")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_05"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1001,7 +916,6 @@ async def test_generate_feature_implementation_execute_stream_yields_events() ->
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1020,18 +934,10 @@ async def test_generate_feature_implementation_execute_stream_yields_events() ->
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-6.1: Stream")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_06"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1060,7 +966,6 @@ async def test_generate_feature_implementation_always_releases_lock_on_error() -
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
 
     class CrashingOpenCodeClient(FakeOpenCodeClient):
@@ -1084,18 +989,10 @@ async def test_generate_feature_implementation_always_releases_lock_on_error() -
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-7.1: Crash")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_07"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1116,7 +1013,6 @@ async def test_generate_feature_implementation_closes_session_on_plan_exception(
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = ExplodingOpenCodeClient(agent="plan", explode_on_call=1)
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1135,18 +1031,10 @@ async def test_generate_feature_implementation_closes_session_on_plan_exception(
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Plan crash")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_plan"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1171,7 +1059,6 @@ async def test_generate_feature_implementation_closes_session_on_build_exception
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = ExplodingOpenCodeClient(agent="build", explode_on_call=1)
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1190,18 +1077,10 @@ async def test_generate_feature_implementation_closes_session_on_build_exception
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Build crash")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_build"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1226,7 +1105,6 @@ async def test_generate_feature_implementation_closes_session_on_fix_exception()
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = ExplodingOpenCodeClient(agent="build", explode_on_call=2)
     code_runner = FakeCodeRunner(should_pass=False)  # Valida falla -> dispara fix
@@ -1245,18 +1123,10 @@ async def test_generate_feature_implementation_closes_session_on_fix_exception()
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Fix crash")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_fix"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1281,7 +1151,6 @@ async def test_retry_emits_retry_events() -> None:
     """T17: Verificar que se emitan eventos RETRY con los errores parseados en cada reintento."""
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(fail_count_before_pass=2)  # Falla 2 veces, pasa en el 3ro
@@ -1300,18 +1169,10 @@ async def test_retry_emits_retry_events() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-17.1: Retry")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_17"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1335,7 +1196,6 @@ async def test_exhausted_retries_calls_rollback() -> None:
     """T17: Verificar que al agotar reintentos se invoque rollback_workspace."""
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=False)
@@ -1354,18 +1214,10 @@ async def test_exhausted_retries_calls_rollback() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-18.1: Rollback")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_18"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1386,7 +1238,6 @@ async def test_retry_history_accumulated() -> None:
     """T17: Verificar que el historial de errores por intento se acumule correctamente."""
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=False)
@@ -1405,18 +1256,10 @@ async def test_retry_history_accumulated() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-19.1: History")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_19"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1442,7 +1285,6 @@ async def test_build_prompt_incluye_requisitos() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1461,18 +1303,10 @@ async def test_build_prompt_incluye_requisitos() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1491,7 +1325,6 @@ async def test_build_prompt_incluye_requisitos() -> None:
     assert "[create] src/app/registrar-gastos/page.tsx" in build_prompt
     assert "[create] tests/registrar-gastos.test.ts" in build_prompt
     assert "# REQ-1.1: El sistema registrará los gastos" in build_prompt
-    assert "## Diagrama de Actividad" in build_prompt
 
 
 @pytest.mark.asyncio
@@ -1500,7 +1333,6 @@ async def test_generate_registers_traceability_post_commit() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1519,18 +1351,10 @@ async def test_generate_registers_traceability_post_commit() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1567,7 +1391,6 @@ async def test_generate_emits_error_event_si_trazabilidad_falla() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1586,18 +1409,10 @@ async def test_generate_emits_error_event_si_trazabilidad_falla() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1625,7 +1440,6 @@ async def test_generate_raises_when_opencode_no_disponible() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = UnhealthyOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1644,18 +1458,10 @@ async def test_generate_raises_when_opencode_no_disponible() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1678,7 +1484,6 @@ async def test_generate_fails_when_structural_validation_fails() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     # Emite únicamente tests, omitiendo page.tsx y feature slice
     opencode_client = FakeOpenCodeClient(
@@ -1700,18 +1505,10 @@ async def test_generate_fails_when_structural_validation_fails() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1739,7 +1536,6 @@ async def test_generate_includes_implemented_features_in_context() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1783,18 +1579,10 @@ async def test_generate_includes_implemented_features_in_context() -> None:
     )
     await feature_repo.save(feature2)
     await requirement_repo.save(feat2_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_02"),
-            feature_id=feat2_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1825,7 +1613,6 @@ async def test_generate_omits_implemented_features_section_when_none_exist() -> 
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1844,18 +1631,10 @@ async def test_generate_omits_implemented_features_section_when_none_exist() -> 
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará los gastos")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar gasto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1874,11 +1653,10 @@ async def test_generate_omits_implemented_features_section_when_none_exist() -> 
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_generate_includes_ears_and_diagram_in_build_prompt() -> None:
+async def test_generate_includes_ears_in_build_prompt() -> None:
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1897,18 +1675,10 @@ async def test_generate_includes_ears_and_diagram_in_build_prompt() -> None:
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará el monto del gasto")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Ingresar monto;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -1924,7 +1694,7 @@ async def test_generate_includes_ears_and_diagram_in_build_prompt() -> None:
     build_prompt = next(prompt for _, prompt, agent in opencode_client.prompts_sent if agent == "build")
     assert "## Descripción\nPermite registrar transacciones de gastos" in build_prompt
     assert "## Requisitos EARS\n# REQ-1.1: El sistema registrará el monto del gasto" in build_prompt
-    assert "## Diagrama de Actividad\n@startuml" in build_prompt
+    assert "## Diagrama de Actividad" not in build_prompt
     assert "## Plan aprobado" in build_prompt
 
 
@@ -1934,7 +1704,6 @@ async def test_plan_and_build_prompts_include_drizzle_database_directives() -> N
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -1953,18 +1722,10 @@ async def test_plan_and_build_prompts_include_drizzle_database_directives() -> N
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: El sistema registrará el gasto")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_01"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\n:Registrar;\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2006,7 +1767,6 @@ async def test_generate_feature_filters_unsafe_and_normalizes_generated_file_pat
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
 
     class MaliciousPathsOpenCodeClient(FakeOpenCodeClient):
@@ -2062,18 +1822,10 @@ async def test_generate_feature_filters_unsafe_and_normalizes_generated_file_pat
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Requisito")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_safe"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2099,7 +1851,6 @@ async def test_generate_handles_unexpected_exception_marks_failed_and_releases_l
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
 
     class CrashingOpenCodeClient(FakeOpenCodeClient):
@@ -2130,18 +1881,10 @@ async def test_generate_handles_unexpected_exception_marks_failed_and_releases_l
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Requisito")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_crash"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2167,7 +1910,6 @@ async def test_generate_uses_canonical_slice_operations_when_plan_agent_returns_
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager()
 
     class EmptyPlanOpenCodeClient(FakeOpenCodeClient):
@@ -2216,18 +1958,10 @@ async def test_generate_uses_canonical_slice_operations_when_plan_agent_returns_
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Requisito")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_fallback"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2259,7 +1993,6 @@ async def test_generate_injects_existing_db_schema_into_prompts_when_present(
     # Arrange
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     workspace_manager = FakeWorkspaceManager(workspace_dir=str(tmp_path))
     opencode_client = FakeOpenCodeClient()
     code_runner = FakeCodeRunner(should_pass=True)
@@ -2285,18 +2018,10 @@ async def test_generate_injects_existing_db_schema_into_prompts_when_present(
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Categorías")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_schema"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2340,7 +2065,6 @@ async def test_auto_sync_github_ejecuta_push_tras_commit_exitoso(tmp_path: Path)
 
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     impl_repo = FakeFeatureImplementationRepository()
     trace_repo = InMemoryTraceabilityRepository()
     project_repo = InMemoryProjectRepository()
@@ -2378,13 +2102,6 @@ async def test_auto_sync_github_ejecuta_push_tras_commit_exitoso(tmp_path: Path)
         )
     )
     await requirement_repo.save(feat_id, "# REQ-1")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_gh"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     mock_sync_use_case = AsyncMock()
     mock_sync_use_case.execute.return_value = MagicMock(
@@ -2395,7 +2112,6 @@ async def test_auto_sync_github_ejecuta_push_tras_commit_exitoso(tmp_path: Path)
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2424,7 +2140,6 @@ async def test_build_timeout_recovers_when_workspace_has_valid_feature_structure
     # Arrange workspace with valid structure generated on disk before timeout
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     impl_repo = FakeFeatureImplementationRepository()
     trace_repo = InMemoryTraceabilityRepository()
 
@@ -2440,13 +2155,6 @@ async def test_build_timeout_recovers_when_workspace_has_valid_feature_structure
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Test recovery")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_rec_1"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     # Prepare files in workspace tmp_path
     page_dir = tmp_path / "src" / "app" / "valid-recovery"
@@ -2491,7 +2199,6 @@ async def test_build_timeout_recovers_when_workspace_has_valid_feature_structure
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2520,7 +2227,6 @@ async def test_build_timeout_rolls_back_when_workspace_structure_is_invalid(
 ) -> None:
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     impl_repo = FakeFeatureImplementationRepository()
     trace_repo = InMemoryTraceabilityRepository()
 
@@ -2536,13 +2242,6 @@ async def test_build_timeout_rolls_back_when_workspace_structure_is_invalid(
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Test rollback")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_rec_2"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     # Empty workspace - no files generated
     workspace_manager = FakeWorkspaceManager(workspace_dir=str(tmp_path))
@@ -2573,7 +2272,6 @@ async def test_build_timeout_rolls_back_when_workspace_structure_is_invalid(
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2595,7 +2293,6 @@ async def test_fix_prompt_filters_opencode_error_event_without_aborting_retry(
 ) -> None:
     feature_repo = InMemoryFeatureRepository()
     requirement_repo = InMemoryRequirementRepository()
-    activity_diagram_repo = InMemoryActivityDiagramRepository()
     impl_repo = FakeFeatureImplementationRepository()
     trace_repo = InMemoryTraceabilityRepository()
 
@@ -2611,13 +2308,6 @@ async def test_fix_prompt_filters_opencode_error_event_without_aborting_retry(
     )
     await feature_repo.save(feature)
     await requirement_repo.save(feat_id, "# REQ-1.1: Test fix error filter")
-    await activity_diagram_repo.save(
-        DiagramaActividad(
-            id=ActivityDiagramId("diag_fix_flt"),
-            feature_id=feat_id,
-            diagram_syntax="@startuml\nstart\nstop\n@enduml",
-        )
-    )
 
     page_dir = tmp_path / "src" / "app" / "filter-fix"
     page_dir.mkdir(parents=True)
@@ -2658,7 +2348,6 @@ async def test_fix_prompt_filters_opencode_error_event_without_aborting_retry(
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        activity_diagram_repo=activity_diagram_repo,
         workspace_manager=workspace_manager,
         opencode_client=opencode_client,
         code_runner=code_runner,
@@ -2752,7 +2441,6 @@ async def test_generate_feature_implementation_records_telemetry_metrics() -> No
     try:
         feature_repo = InMemoryFeatureRepository()
         requirement_repo = InMemoryRequirementRepository()
-        activity_diagram_repo = InMemoryActivityDiagramRepository()
         workspace_manager = FakeWorkspaceManager()
         opencode_client = FakeOpenCodeClient()
         code_runner = FakeCodeRunner(should_pass=True)
@@ -2771,18 +2459,10 @@ async def test_generate_feature_implementation_records_telemetry_metrics() -> No
         )
         await feature_repo.save(feature)
         await requirement_repo.save(feat_id, "# REQ-1.1: Test")
-        await activity_diagram_repo.save(
-            DiagramaActividad(
-                id=ActivityDiagramId("diag_tel"),
-                feature_id=feat_id,
-                diagram_syntax="@startuml\nstart\n:accion;\nstop\n@enduml",
-            )
-        )
 
         use_case = GenerateFeatureImplementationUseCase(
             feature_repo=feature_repo,
             requirement_repo=requirement_repo,
-            activity_diagram_repo=activity_diagram_repo,
             workspace_manager=workspace_manager,
             opencode_client=opencode_client,
             code_runner=code_runner,

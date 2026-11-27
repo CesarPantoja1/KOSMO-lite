@@ -16,7 +16,6 @@ from kosmo.contracts.sdd.document import SPEC_TO_API_PHASE, SpecPhase
 from kosmo.contracts.sdd.ears import EARSRequirement
 from kosmo.contracts.sdd.ids import FeatureId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     FeatureRepository,
     RequirementRepository,
 )
@@ -34,7 +33,6 @@ _SOURCE_LABEL: dict[SpecPhase, str] = {
     SpecPhase.DESCUBRIMIENTO: "Descubrimiento",
     SpecPhase.CARACTERISTICAS: "Características",
     SpecPhase.REQUISITOS: "Requisitos",
-    SpecPhase.MODELO: "Modelo",
     SpecPhase.IMPLEMENTACION: "Implementación",
 }
 
@@ -88,7 +86,6 @@ async def enrich_impact_items(
     source_phase: SpecPhase,
     feature_repo: FeatureRepository,
     requirement_repo: RequirementRepository,
-    diagram_repo: ActivityDiagramRepository,
 ) -> list[ImpactItem]:
     items: list[ImpactItem] = []
 
@@ -139,12 +136,6 @@ async def enrich_impact_items(
         found_features = list(feature_by_id.values())
         raw_reqs = await asyncio.gather(*(requirement_repo.by_feature_id(f.id) for f in found_features))
         req_md_by_feature_id = {f.id: md for f, md in zip(found_features, raw_reqs, strict=False) if md is not None}
-
-    diagram_exists_by_feature_id: dict[FeatureId, bool] = {}
-    if target_spec == SpecPhase.MODELO and feature_by_id:
-        found_features = list(feature_by_id.values())
-        raw_exists = await asyncio.gather(*(diagram_repo.exists(f.id) for f in found_features))
-        diagram_exists_by_feature_id = {f.id: exists for f, exists in zip(found_features, raw_exists, strict=False)}
 
     for fid_str in result.affected_artifact_ids:
         feature = feature_by_id.get(fid_str)
@@ -387,23 +378,6 @@ async def enrich_impact_items(
                             action=per_action,
                         )
                     )
-        elif target_spec == SpecPhase.MODELO:
-            exists = diagram_exists_by_feature_id.get(feature.id, False)
-            if exists:
-                items.append(
-                    ImpactItem(
-                        id=item_id,
-                        phase=SPEC_TO_API_PHASE[target_spec],
-                        target_id=fid_str,
-                        artifact_type="ActivityDiagram",
-                        target_display_id=feature.display_id,
-                        target_title=f"Diagrama de {feature.title}",
-                        section=action.suggested_field if action else "estructura UML",
-                        rationale=per_rationale or "El cambio podría requerir actualizar el diagrama de actividad.",
-                        diff=diff,
-                        action=per_action,
-                    )
-                )
         elif target_spec == SpecPhase.IMPLEMENTACION:
             items.append(
                 ImpactItem(

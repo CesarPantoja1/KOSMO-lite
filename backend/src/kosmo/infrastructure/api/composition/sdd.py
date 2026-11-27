@@ -32,11 +32,6 @@ from kosmo.application.features.delete_feature import DeleteFeatureUseCase
 from kosmo.application.features.get_feature_chat_history import GetFeatureChatHistoryUseCase
 from kosmo.application.features.list_features import ListFeaturesUseCase
 from kosmo.application.integrations.delete_deployment import DeleteDeploymentUseCase
-from kosmo.application.modelo import (
-    DeleteActivityDiagramUseCase,
-    GenerateActivityDiagramUseCase,
-    GetActivityDiagramUseCase,
-)
 from kosmo.application.projects import (
     CreateProjectUseCase,
     DeleteProjectUseCase,
@@ -58,7 +53,6 @@ from kosmo.contracts.integrations.deployment import DeploymentProviderPort, Depl
 from kosmo.contracts.integrations.github import GitHubClientPort
 from kosmo.contracts.sdd.codegen import WorkspaceManagerPort
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     RequirementRepository,
@@ -94,7 +88,6 @@ def build_project_components(
             project_repo=repos.projects,
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
             document_repo=repos.documents,
             chat_repo=repos.chat,
             consistency_evaluation_repo=repos.consistency_evaluations,
@@ -274,39 +267,9 @@ def build_requirements_components(
             project_repo=repos.projects,
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
         ),
         get_requirement_chat_history=get_requirement_chat_history,
         requirement_repo=repos.requirements,
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class ModeloComponents:
-    generate_diagram: GenerateActivityDiagramUseCase
-    get_diagram: GetActivityDiagramUseCase
-    delete_diagram: DeleteActivityDiagramUseCase
-    diagram_repo: ActivityDiagramRepository
-
-
-def build_modelo_components(repos: RepositoryRegistry, pipeline: PipelineComponents) -> ModeloComponents:
-    return ModeloComponents(
-        generate_diagram=GenerateActivityDiagramUseCase(
-            feature_repo=repos.features,
-            requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
-            agent=pipeline.agent,
-            project_repo=repos.projects,
-        ),
-        get_diagram=GetActivityDiagramUseCase(
-            feature_repo=repos.features,
-            diagram_repo=repos.diagrams,
-        ),
-        delete_diagram=DeleteActivityDiagramUseCase(
-            feature_repo=repos.features,
-            diagram_repo=repos.diagrams,
-        ),
-        diagram_repo=repos.diagrams,
     )
 
 
@@ -338,7 +301,6 @@ def build_consistency_components(
         document_repo=repos.documents,
         feature_repo=repos.features,
         requirement_repo=repos.requirements,
-        diagram_repo=repos.diagrams,
         implementation_repo=repos.implementations,
     )
     discard_evaluation = DiscardConsistencyEvaluationUseCase(evaluation_repo=evaluation_repo)
@@ -349,13 +311,11 @@ def build_consistency_components(
             evaluator=evaluator,
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
         ),
         cascade_consistency=CascadingConsistencyUseCase(
             project_repo=repos.projects,
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
             evaluator=evaluator,
         ),
         apply_consistency_impacts=apply_impacts,
@@ -363,7 +323,6 @@ def build_consistency_components(
             project_repo=repos.projects,
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
             traceability_repo=repos.traceability,
         ),
         consistency_status=GetConsistencyStatusUseCase(evaluation_repo=evaluation_repo),
@@ -372,7 +331,6 @@ def build_consistency_components(
             document_repo=repos.documents,
             feature_repo=repos.features,
             requirement_repo=repos.requirements,
-            diagram_repo=repos.diagrams,
             implementation_repo=repos.implementations,
         ),
         apply_consistency_evaluation=apply_evaluation,

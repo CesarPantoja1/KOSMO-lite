@@ -6,7 +6,6 @@ from kosmo.application.codegen.generate_feature_implementation import (
     GenerateFeatureImplementationInput,
     GenerateFeatureImplementationOutput,
     GenerateFeatureImplementationUseCase,
-    MissingDiagramError,
     MissingRequirementsError,
 )
 from kosmo.application.codegen.get_implementation_record import (
@@ -51,7 +50,6 @@ __all__ = [
     "GetImplementationRecordUseCase",
     "ImplementationContextBuilder",
     "ImplementationRecordOutput",
-    "MissingDiagramError",
     "MissingRequirementsError",
     "PlanningService",
     "PostDeployService",

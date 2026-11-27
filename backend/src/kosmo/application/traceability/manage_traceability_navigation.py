@@ -47,28 +47,16 @@ class ManageTraceabilityNavigationUseCase:
                 source_level=SpecPhase.CARACTERISTICAS.value,
             )
 
-        if input_data.level == SpecPhase.MODELO:
+        if input_data.level == SpecPhase.IMPLEMENTACION:
             return TraceabilityNavigationOutput(
                 permitted=False,
                 redirect_message=(
-                    f"El modelo de '{feature.title}' se genera a partir de sus requisitos. "
+                    f"La implementación de '{feature.title}' se genera a partir de sus requisitos. "
                     "Para editarlo, dirígete a la vista de requisitos."
                 ),
                 source_entity_name=feature.title,
                 source_entity_id=str(feature.id),
                 source_level=SpecPhase.REQUISITOS.value,
-            )
-
-        if input_data.level == SpecPhase.IMPLEMENTACION:
-            return TraceabilityNavigationOutput(
-                permitted=False,
-                redirect_message=(
-                    f"La implementación de '{feature.title}' se genera a partir de su modelo. "
-                    "Para editarlo, dirígete a la vista de modelo."
-                ),
-                source_entity_name=feature.title,
-                source_entity_id=str(feature.id),
-                source_level=SpecPhase.MODELO.value,
             )
 
         return TraceabilityNavigationOutput(permitted=True)

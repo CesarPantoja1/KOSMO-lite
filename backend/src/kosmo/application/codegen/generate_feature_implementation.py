@@ -73,7 +73,6 @@ from kosmo.contracts.sdd.errors import FeatureNotFoundError
 from kosmo.contracts.sdd.ids import FeatureId, ImplementationId, ProjectId
 from kosmo.contracts.sdd.product_map import ProductMap
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
@@ -84,22 +83,12 @@ from kosmo.contracts.telemetry import record_codegen_duration
 _log = structlog.get_logger("kosmo.codegen.generate")
 
 _DEFAULT_REQ_MSG = "Esta característica no tiene requisitos EARS generados. Genera los requisitos antes de continuar."
-_DEFAULT_DIAG_MSG = (
-    "Esta característica no tiene diagrama de actividad generado. Genera el diagrama antes de continuar."
-)
 
 
 class MissingRequirementsError(ValueError):
     """Lanzada cuando la característica no tiene requisitos EARS generados (CA-02)."""
 
     def __init__(self, message: str = _DEFAULT_REQ_MSG) -> None:
-        super().__init__(message)
-
-
-class MissingDiagramError(ValueError):
-    """Lanzada cuando la característica no tiene diagrama de actividad generado (CA-03)."""
-
-    def __init__(self, message: str = _DEFAULT_DIAG_MSG) -> None:
         super().__init__(message)
 
 
@@ -128,7 +117,6 @@ __all__ = [
     "GenerateFeatureImplementationInput",
     "GenerateFeatureImplementationOutput",
     "GenerateFeatureImplementationUseCase",
-    "MissingDiagramError",
     "MissingRequirementsError",
     "OpenCodeGenerationError",
     "OpenCodeUnavailableError",
@@ -172,7 +160,6 @@ class GenerateFeatureImplementationUseCase:
         self,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        activity_diagram_repo: ActivityDiagramRepository,
         workspace_manager: WorkspaceManagerPort,
         opencode_client: OpenCodeClientPort,
         code_runner: CodeRunnerPort,
@@ -198,7 +185,6 @@ class GenerateFeatureImplementationUseCase:
     ) -> None:
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._activity_diagram_repo = activity_diagram_repo
         self._workspace_manager = workspace_manager
         self._opencode_client = opencode_client
         self._code_runner = code_runner
@@ -361,7 +347,6 @@ class GenerateFeatureImplementationUseCase:
         # 1. Consultar precondiciones de repositorios secuencialmente para evitar checkouts concurrentes del pool
         feature = await self._feature_repo.by_id(input_data.feature_id)
         req_markdown = await self._requirement_repo.by_feature_id(input_data.feature_id)
-        diagram = await self._activity_diagram_repo.by_feature_id(input_data.feature_id)
 
         # 2. Validar existencia de Feature
         if feature is None:
@@ -373,10 +358,6 @@ class GenerateFeatureImplementationUseCase:
         # 3. Validar presencia de requisitos EARS (CA-02)
         if not req_markdown or not req_markdown.strip():
             raise MissingRequirementsError(_DEFAULT_REQ_MSG)
-
-        # 4. Validar presencia de diagrama de actividad (CA-03)
-        if diagram is None or not diagram.diagram_syntax.strip():
-            raise MissingDiagramError(_DEFAULT_DIAG_MSG)
 
         validate_config = getattr(self._opencode_client, "validate_user_config", None)
         if validate_config is not None:
@@ -482,7 +463,6 @@ class GenerateFeatureImplementationUseCase:
             planning_res = await self._planning_service.execute_plan(
                 feature=feature,
                 req_markdown=req_markdown,
-                diagram_syntax=diagram.diagram_syntax,
                 workspace_dir=workspace_dir,
                 manifest_files=workspace.manifest_files if workspace else (),
                 session_id=session_id,
@@ -495,7 +475,6 @@ class GenerateFeatureImplementationUseCase:
             generated_files = await self._build_service.execute_build(
                 feature=feature,
                 req_markdown=req_markdown,
-                diagram_syntax=diagram.diagram_syntax,
                 ux_prompt_block=planning_res.ux_analysis.prompt_block,
                 project_context=planning_res.project_context,
                 impl_plan=planning_res.impl_plan,

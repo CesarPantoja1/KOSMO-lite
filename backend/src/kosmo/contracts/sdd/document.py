@@ -79,7 +79,6 @@ class ProjectPhase(StrEnum):
     descubrimiento = "descubrimiento"
     caracteristicas = "caracteristicas"
     requisitos = "requisitos"
-    modelo = "modelo"
     implementacion = "implementacion"
 
 
@@ -92,7 +91,6 @@ class SpecPhase(StrEnum):
     DESCUBRIMIENTO = "descubrimiento"
     CARACTERISTICAS = "caracteristicas"
     REQUISITOS = "requisitos"
-    MODELO = "modelo"
     IMPLEMENTACION = "implementacion"
 
 
@@ -100,7 +98,6 @@ SPEC_TO_API_PHASE: dict[SpecPhase, str] = {
     SpecPhase.DESCUBRIMIENTO: "discovery",
     SpecPhase.CARACTERISTICAS: "features",
     SpecPhase.REQUISITOS: "requirements",
-    SpecPhase.MODELO: "model",
     SpecPhase.IMPLEMENTACION: "implementation",
 }
 

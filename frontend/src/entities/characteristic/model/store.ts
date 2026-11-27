@@ -6,7 +6,6 @@ import {
 	getCharacteristics,
 	getChatHistory,
 	getSuggestCharacteristics,
-	sendChatMessage,
 } from '../api/api';
 import type {
 	CharacteristicResponse,
@@ -14,7 +13,7 @@ import type {
 	SuggestCharacteristic,
 } from './types';
 import { appendMessage, createUserMessage } from '@/shared/model/chat-message';
-import type { ChatMessage, ChatResponse } from '@/shared/model/chat-message';
+import type { ChatMessage } from '@/shared/model/chat-message';
 
 interface CharacteristicStore {
 	currentCharacteristics: CharacteristicResponse[];
@@ -33,7 +32,6 @@ interface CharacteristicStore {
 		item: { title: string; description: string; origin?: string },
 	) => Promise<CreateCharacteristicResponse>;
 
-	sendChatMessage: (featureId: string, content: string) => Promise<ChatResponse>;
 	loadChatHistory: (
 		featureId: string,
 		sessionId?: string | null,
@@ -98,30 +96,6 @@ export const useCharacteristicStore = create<CharacteristicStore>()(
 					}));
 				}
 				return data;
-			},
-
-			sendChatMessage: async (featureId, content) => {
-				const userMessage = createUserMessage(content);
-
-				const current = get().chatHistories[featureId] ?? [];
-				set({
-					chatHistories: {
-						...get().chatHistories,
-						[featureId]: appendMessage(current, userMessage),
-					},
-				});
-
-				const response = await sendChatMessage(featureId, content);
-
-				const afterUser = get().chatHistories[featureId] ?? [];
-				set({
-					chatHistories: {
-						...get().chatHistories,
-						[featureId]: appendMessage(afterUser, response.message),
-					},
-				});
-
-				return response;
 			},
 
 			appendUserMessage: (featureId, content) => {

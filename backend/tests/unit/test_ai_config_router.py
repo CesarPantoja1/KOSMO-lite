@@ -64,9 +64,12 @@ def override_ai_config_use_cases(
     mock_delete_preferences,
     mock_test_connection,
 ):
+    from kosmo.application.ai.get_ai_catalog import GetAiCatalogUseCase
     from kosmo.application.ai.manage_ai_preferences import ManageAIPreferencesUseCase
     from kosmo.application.ai.validate_ai_connection import ValidateAIConnectionUseCase
+    from kosmo.contracts.ai.ai_config import SUPPORTED_PROVIDERS
     from kosmo.infrastructure.api.dependencies.ai_config import (
+        get_ai_catalog_use_case,
         get_manage_ai_preferences_use_case,
         get_validate_ai_connection_use_case,
     )
@@ -79,13 +82,18 @@ def override_ai_config_use_cases(
     mock_validate_use_case = MagicMock(spec=ValidateAIConnectionUseCase)
     mock_validate_use_case.execute = mock_test_connection
 
+    mock_catalog_use_case = MagicMock(spec=GetAiCatalogUseCase)
+    mock_catalog_use_case.execute = AsyncMock(return_value=list(SUPPORTED_PROVIDERS))
+
     app.dependency_overrides[get_manage_ai_preferences_use_case] = lambda: mock_manage_use_case
     app.dependency_overrides[get_validate_ai_connection_use_case] = lambda: mock_validate_use_case
+    app.dependency_overrides[get_ai_catalog_use_case] = lambda: mock_catalog_use_case
 
     yield
 
     app.dependency_overrides.pop(get_manage_ai_preferences_use_case, None)
     app.dependency_overrides.pop(get_validate_ai_connection_use_case, None)
+    app.dependency_overrides.pop(get_ai_catalog_use_case, None)
 
 
 def test_get_preferences_returns_200(auth_client: TestClient, mock_get_preferences):
@@ -221,3 +229,5 @@ def test_get_providers_returns_200(client: TestClient):
             assert "id" in model
             assert "display_name" in model
             assert "tier" in model
+            assert "description" in model
+            assert "recommended" in model

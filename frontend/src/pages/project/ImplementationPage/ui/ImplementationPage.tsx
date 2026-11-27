@@ -3,11 +3,6 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 
-import { useCharacteristicStore } from '@/entities/characteristic';
-import { useImplementationStore } from '@/entities/implementation';
-import { useModelingStore } from '@/entities/modeling';
-import { useProjectStore } from '@/entities/project';
-import { useProjectGithubRepo } from '@/features/github-sync';
 import { formatApiError } from '@/shared/api';
 import {
 	Ai,
@@ -20,7 +15,13 @@ import {
 	toast,
 	WarningIcon,
 } from '@/shared/ui';
-import { AsideCharacteristic } from '@/widgets';
+
+import { useCharacteristicStore } from '@/entities/characteristic';
+import { useImplementationStore } from '@/entities/implementation';
+import { useProjectStore } from '@/entities/project';
+
+import { AsideCharacteristic } from '@/features/aside-characteristic';
+import { useProjectGithubRepo } from '@/features/github-sync';
 
 const ImplementationPage = () => {
 	const characteristics = useCharacteristicStore((s) => s.currentCharacteristics);
@@ -42,11 +43,11 @@ const ImplementationPage = () => {
 	const progress = useImplementationStore((s) => s.progress);
 	const errorMessage = useImplementationStore((s) => s.errorMessage);
 	const implementations = useImplementationStore((s) => s.implementations);
-	const requiresReviewByFeature = useImplementationStore((s) => s.requiresReviewByFeature);
+	const requiresReviewByFeature = useImplementationStore(
+		(s) => s.requiresReviewByFeature,
+	);
 	const startGeneration = useImplementationStore((s) => s.startGeneration);
 	const loadImplementation = useImplementationStore((s) => s.loadImplementation);
-
-	const hasDiagram = useModelingStore((s) => s.hasDiagram);
 
 	const selectedCharacteristic = characteristics.find((c) => c.id === selectedId) ?? null;
 	const hasCharacteristics = characteristics.length > 0;
@@ -55,7 +56,6 @@ const ImplementationPage = () => {
 	const currentRequiresReview = selectedId
 		? !!requiresReviewByFeature[selectedId] || status === 'requires_review'
 		: false;
-	const selectedHasDiagram = selectedId ? !!hasDiagram[selectedId] : false;
 	const isGenerating = status === 'generating';
 
 	useEffect(() => {
@@ -115,7 +115,8 @@ const ImplementationPage = () => {
 						Preparando repositorio en GitHub...
 					</button>
 					<p className='text-xs text-neutral-400'>
-						El repositorio se está inicializando en segundo plano. Estará listo en un momento.
+						El repositorio se está inicializando en segundo plano. Estará listo en un
+						momento.
 					</p>
 				</div>
 			);
@@ -137,7 +138,8 @@ const ImplementationPage = () => {
 						type='button'
 						onClick={async () => {
 							const repoName =
-								githubStatus?.suggested_repo_name || `kosmo-${currentProject?.slug || 'app'}`;
+								githubStatus?.suggested_repo_name ||
+								`kosmo-${currentProject?.slug || 'app'}`;
 							try {
 								await retryCreateRepo({ repo_name: repoName, is_public: true });
 								toast.success('Repositorio creado exitosamente en GitHub');
@@ -180,7 +182,7 @@ const ImplementationPage = () => {
 			{isGenerating && (
 				<Loading
 					title='Generando implementación'
-					description='Transformando requisitos y modelo en código funcional.'
+					description='Transformando requisitos en código funcional.'
 					messages={progress}
 				/>
 			)}
@@ -281,42 +283,21 @@ const ImplementationPage = () => {
 											</p>
 										</div>
 
-										{!selectedHasDiagram ? (
-											<div className='flex flex-col my-auto items-center gap-5 px-12'>
-												<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-warning-50'>
-													<Ai color='text-warning-500' size={48} />
-												</div>
-												<div className='flex flex-col items-center gap-2 text-center max-w-md'>
-													<h3 className='text-neutral-800 text-lg font-semibold'>
-														Falta diagrama de actividad
-													</h3>
-													<p className='text-neutral-500 text-sm'>
-														Esta funcionalidad no tiene diagrama de actividad generado.
-														Genera el diagrama antes de continuar con la implementación.
-													</p>
-												</div>
-												<Link href='/proyecto/modelo' className='btn btn-secondary'>
-													<ArrowLeft color='' size={18} />
-													Ir a diagramas
-												</Link>
+										<div className='flex flex-col my-auto items-center gap-5 px-12'>
+											<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-ai-50'>
+												<Ai color='text-ai-500' size={48} />
 											</div>
-										) : (
-											<div className='flex flex-col my-auto items-center gap-5 px-12'>
-												<div className='flex h-20 w-20 items-center justify-center rounded-2xl bg-ai-50'>
-													<Ai color='text-ai-500' size={48} />
-												</div>
-												<div className='flex flex-col items-center gap-2 text-center max-w-md'>
-													<h3 className='text-neutral-800 text-lg font-semibold'>
-														Aún no hay implementación generada
-													</h3>
-													<p className='text-neutral-500 text-sm'>
-														Esta funcionalidad aún no tiene código generado. El asistente
-														creará la estructura de implementación automáticamente.
-													</p>
-												</div>
-												{renderGenerateAction('Generar implementación')}
+											<div className='flex flex-col items-center gap-2 text-center max-w-md'>
+												<h3 className='text-neutral-800 text-lg font-semibold'>
+													Aún no hay implementación generada
+												</h3>
+												<p className='text-neutral-500 text-sm'>
+													Esta funcionalidad aún no tiene código generado. El asistente
+													creará la estructura de implementación automáticamente.
+												</p>
 											</div>
-										)}
+											{renderGenerateAction('Generar implementación')}
+										</div>
 									</div>
 								)}
 
@@ -351,15 +332,21 @@ const ImplementationPage = () => {
 														Implementación desactualizada
 													</h3>
 													<p className='text-neutral-600 text-sm'>
-														Las especificaciones de esta funcionalidad (Descubrimiento, Requisitos o Modelo) cambiaron recientemente. El código generado previamente ya no coincide con los nuevos requisitos.
+														Las especificaciones de esta funcionalidad (Descubrimiento o
+														Requisitos) cambiaron recientemente. El código generado
+														previamente ya no coincide con los nuevos requisitos.
 													</p>
 													<p className='text-neutral-500 text-xs mt-1'>
-														Haz clic en «Regenerar implementación» para actualizar el código automáticamente con las nuevas reglas.
+														Haz clic en «Regenerar implementación» para actualizar el
+														código automáticamente con las nuevas reglas.
 													</p>
 												</div>
 												<div className='flex items-center gap-3 mt-2 flex-wrap justify-center'>
 													{renderGenerateAction('Regenerar implementación')}
-													<Link href='/proyecto/codigo/resumen' className='btn btn-secondary'>
+													<Link
+														href='/proyecto/codigo/resumen'
+														className='btn btn-secondary'
+													>
 														Ver código actual
 													</Link>
 												</div>

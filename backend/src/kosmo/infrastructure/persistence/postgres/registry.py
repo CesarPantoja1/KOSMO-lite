@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from kosmo.infrastructure.persistence.postgres.repositories import (
-    SqlAlchemyActivityDiagramRepository,
+    SqlAlchemyAiCatalogRepository,
     SqlAlchemyAuditEventSink,
     SqlAlchemyChatRepository,
     SqlAlchemyCodeSyncLogRepository,
@@ -35,7 +35,6 @@ class RepositoryRegistry:
     documents: SqlAlchemyDocumentRepository
     features: SqlAlchemyFeatureRepository
     requirements: SqlAlchemyRequirementRepository
-    diagrams: SqlAlchemyActivityDiagramRepository
     chat: SqlAlchemyChatRepository
     traceability: SqlAlchemyTraceabilityRepository
     users: SqlAlchemyUserRepository
@@ -44,6 +43,7 @@ class RepositoryRegistry:
     workspaces: SqlAlchemyWorkspaceRepository
     implementations: SqlAlchemyFeatureImplementationRepository
     user_ai_configs: SqlAlchemyUserAiConfigRepository
+    ai_catalog: SqlAlchemyAiCatalogRepository
     project_integrations: SqlAlchemyProjectGitHubIntegrationRepository
     project_deployments: SqlAlchemyProjectDeploymentRepository
     sync_logs: SqlAlchemyCodeSyncLogRepository
@@ -58,7 +58,6 @@ class RepositoryRegistry:
             documents=SqlAlchemyDocumentRepository(session_factory),
             features=SqlAlchemyFeatureRepository(session_factory),
             requirements=SqlAlchemyRequirementRepository(session_factory),
-            diagrams=SqlAlchemyActivityDiagramRepository(session_factory),
             chat=SqlAlchemyChatRepository(session_factory),
             traceability=SqlAlchemyTraceabilityRepository(session_factory),
             users=SqlAlchemyUserRepository(session_factory),
@@ -67,6 +66,7 @@ class RepositoryRegistry:
             workspaces=SqlAlchemyWorkspaceRepository(session_factory),
             implementations=SqlAlchemyFeatureImplementationRepository(session_factory),
             user_ai_configs=SqlAlchemyUserAiConfigRepository(session_factory),
+            ai_catalog=SqlAlchemyAiCatalogRepository(session_factory),
             project_integrations=SqlAlchemyProjectGitHubIntegrationRepository(session_factory),
             project_deployments=SqlAlchemyProjectDeploymentRepository(session_factory),
             sync_logs=SqlAlchemyCodeSyncLogRepository(session_factory),

@@ -1,13 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useAppStore } from '@/features/app-state';
+
 import {
 	CONSISTENCY_REVIEW_ROUTES,
 	firstPhaseToReview,
 	sumPhaseStatus,
 } from '@/entities/consistency';
 import type { ConsistencyStatusResponse } from '@/entities/consistency';
+
+import { useAppStore } from '@/features/app-state';
 
 interface ConsistencyGateButtonProps {
 	status: ConsistencyStatusResponse | null;

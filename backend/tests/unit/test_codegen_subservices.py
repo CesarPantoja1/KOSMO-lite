@@ -226,7 +226,6 @@ async def test_planning_service_executes_plan_and_persists() -> None:
     res = await service.execute_plan(
         feature=feature,
         req_markdown="### REQ-1.1 Categorías",
-        diagram_syntax="@startuml\nstart\nstop\n@enduml",
         workspace_dir="/workspace",
         manifest_files=(),
         session_id="oc_test_sess",
@@ -277,7 +276,6 @@ async def test_build_service_executes_build_and_collects_files() -> None:
     generated = await service.execute_build(
         feature=feature,
         req_markdown="REQ-1",
-        diagram_syntax="",
         ux_prompt_block="",
         project_context="",
         impl_plan=plan,
@@ -321,7 +319,6 @@ async def test_build_service_raises_on_opencode_error_when_workspace_invalid() -
         await service.execute_build(
             feature=feature,
             req_markdown="REQ-1",
-            diagram_syntax="",
             ux_prompt_block="",
             project_context="",
             impl_plan=plan,
@@ -609,7 +606,6 @@ async def test_execution_and_verification_subservice_aliases_and_injection() -> 
     use_case = GenerateFeatureImplementationUseCase(
         feature_repo=InMemoryFeatureRepository(),
         requirement_repo=InMemoryRequirementRepository(),
-        activity_diagram_repo=None,  # type: ignore[arg-type]
         workspace_manager=_FakeWorkspaceManager(),
         opencode_client=_FakeOpenCodeClient(),
         code_runner=_FakeCodeRunner(ValidationRunResult(all_passed=True, steps=())),

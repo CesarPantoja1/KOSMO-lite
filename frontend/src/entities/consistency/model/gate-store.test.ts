@@ -18,7 +18,6 @@ const emptyStatus = {
 	phases: {
 		features: { pending: 0, evaluating: 0, failed: 0 },
 		requirements: { pending: 0, evaluating: 0, failed: 0 },
-		model: { pending: 0, evaluating: 0, failed: 0 },
 		implementation: { pending: 0, evaluating: 0, failed: 0 },
 	},
 };
@@ -34,7 +33,6 @@ describe('useConsistencyGateStore', () => {
 			phases: {
 				features: { pending: 2, evaluating: 1, failed: 0 },
 				requirements: { pending: 0, evaluating: 0, failed: 1 },
-				model: { pending: 0, evaluating: 0, failed: 0 },
 				implementation: { pending: 0, evaluating: 0, failed: 0 },
 			},
 		});
@@ -118,7 +116,6 @@ describe('useConsistencyGateStore', () => {
 				phases: {
 					features: { pending: 2, evaluating: 0, failed: 0 },
 					requirements: { pending: 3, evaluating: 0, failed: 0 },
-					model: { pending: 1, evaluating: 0, failed: 0 },
 					implementation: { pending: 1, evaluating: 0, failed: 0 },
 				},
 			},

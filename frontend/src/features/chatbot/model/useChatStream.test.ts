@@ -1,191 +1,93 @@
-import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SseStartOptions } from '@/shared/lib/useSseStream';
-
-vi.mock('@/shared/lib/useSseStream', () => ({
-	useSseStream: vi.fn(),
-}));
-
-import { useSseStream } from '@/shared/lib/useSseStream';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { HttpResponse, apiUrl, delay, http, respuestaSse, server, streamControlado } from '@/test';
 import { useChatStream } from './useChatStream';
 
-const startMock = vi.fn();
-const stopMock = vi.fn();
-
-vi.mocked(useSseStream).mockReturnValue({
-	phase: 'idle',
-	error: null,
-	start: startMock,
-	stop: stopMock,
-});
+const URL_STREAM = '/api/v1/features/feat_1/chat/stream';
 
 describe('useChatStream', () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		startMock.mockResolvedValue(undefined);
-	});
-
-	it('invoca start con la url y el body dados', () => {
-		// Arrange
+	it('inicia en fase idle', () => {
 		const { result } = renderHook(() => useChatStream());
 
-		// Act
-		act(() => {
-			result.current.send('/api/v1/chat', { content: 'Hola' });
-		});
-
-		// Assert
-		expect(startMock).toHaveBeenCalledWith(
-			expect.objectContaining({ url: '/api/v1/chat', body: { content: 'Hola' } }),
-		);
+		expect(result.current.phase).toBe('idle');
 	});
 
-	it('propaga eventos "chunk" a onChunk', () => {
-		// Arrange
+	it('pasa por las fases connecting → streaming → done', async () => {
+		const stream = streamControlado();
+		server.use(http.post(apiUrl(URL_STREAM), () => stream.respuesta));
+		const { result } = renderHook(() => useChatStream());
+
+		act(() => result.current.send(URL_STREAM, { content: 'Hola' }));
+		expect(result.current.phase).toBe('connecting');
+
+		await waitFor(() => expect(result.current.phase).toBe('streaming'));
+
+		act(() => stream.cerrar());
+		await waitFor(() => expect(result.current.phase).toBe('done'));
+	});
+
+	it('entrega los chunks y el mensaje final a sus callbacks', async () => {
+		server.use(
+			http.post(apiUrl(URL_STREAM), () =>
+				respuestaSse([
+					{ type: 'chunk', content: 'Ho' },
+					{ type: 'chunk', content: 'la' },
+					{ type: 'message', id: 'm1', content: 'Hola' },
+				]),
+			),
+		);
 		const onChunk = vi.fn();
-		let capturedOnEvent: SseStartOptions['onEvent'] = () => {};
-		startMock.mockImplementation((opts: SseStartOptions) => {
-			capturedOnEvent = opts.onEvent;
-			return Promise.resolve();
-		});
-		const { result } = renderHook(() => useChatStream({ onChunk }));
-
-		// Act
-		act(() => {
-			result.current.send('/url', { content: 'x' });
-		});
-		act(() => {
-			capturedOnEvent({ type: 'chunk', content: 'Hola ' });
-		});
-
-		// Assert
-		expect(onChunk).toHaveBeenCalledWith('Hola ');
-	});
-
-	it('transforma un evento "message" a ChatMessage y lo pasa a onMessage', () => {
-		// Arrange
 		const onMessage = vi.fn();
-		let capturedOnEvent: SseStartOptions['onEvent'] = () => {};
-		startMock.mockImplementation((opts: SseStartOptions) => {
-			capturedOnEvent = opts.onEvent;
-			return Promise.resolve();
-		});
-		const { result } = renderHook(() => useChatStream({ onMessage }));
+		const { result } = renderHook(() => useChatStream({ onChunk, onMessage }));
 
-		// Act
-		act(() => {
-			result.current.send('/url', { content: 'x' });
-		});
-		act(() => {
-			capturedOnEvent({
-				type: 'message',
-				id: 'm1',
-				content: 'Respuesta completa',
-				timestamp: '2026-01-01T00:00:00Z',
-				suggestions: [
-					{
-						id: 's1',
-						section: 'Sección',
-						description: 'desc',
-						diff_before: 'antes',
-						diff_after: 'después',
-						rationale: 'porque sí',
-						applied: true,
-						not_applied_reason: null,
-					},
-				],
-				modification: {
-					applied: true,
-					modified_section: 'Sección',
-					change_description: 'cambio',
-				},
-			});
-		});
+		act(() => result.current.send(URL_STREAM, { content: 'x' }));
+		await waitFor(() => expect(result.current.phase).toBe('done'));
 
-		// Assert
+		expect(onChunk.mock.calls.map(([c]) => c)).toEqual(['Ho', 'la']);
 		expect(onMessage).toHaveBeenCalledWith(
-			expect.objectContaining({
-				id: 'm1',
-				role: 'assistant',
-				content: 'Respuesta completa',
-				created_at: '2026-01-01T00:00:00Z',
-			}),
+			expect.objectContaining({ id: 'm1', role: 'assistant', content: 'Hola' }),
 		);
-		const message = onMessage.mock.calls[0][0];
-		expect(message.change_suggestions).toHaveLength(1);
-		expect(message.change_suggestions[0].section).toBe('Sección');
-		expect(message.modification?.applied).toBe(true);
 	});
 
-	it('usa valores por defecto cuando el evento "message" no trae sugerencias ni modificación', () => {
-		// Arrange
-		const onMessage = vi.fn();
-		let capturedOnEvent: SseStartOptions['onEvent'] = () => {};
-		startMock.mockImplementation((opts: SseStartOptions) => {
-			capturedOnEvent = opts.onEvent;
-			return Promise.resolve();
-		});
-		const { result } = renderHook(() => useChatStream({ onMessage }));
-
-		// Act
-		act(() => {
-			result.current.send('/url', { content: 'x' });
-		});
-		act(() => {
-			capturedOnEvent({ type: 'message', content: 'simple' });
-		});
-
-		// Assert
-		const message = onMessage.mock.calls[0][0];
-		expect(message.change_suggestions).toEqual([]);
-		expect(message.modification).toBeNull();
-	});
-
-	it('propaga eventos "error" a onError con un mensaje por defecto', () => {
-		// Arrange
+	it('pasa a fase error y notifica a onError cuando el servidor responde con error', async () => {
+		server.use(
+			http.post(apiUrl(URL_STREAM), () =>
+				HttpResponse.json({ detail: 'Límite de uso alcanzado' }, { status: 429 }),
+			),
+		);
 		const onError = vi.fn();
-		let capturedOnEvent: SseStartOptions['onEvent'] = () => {};
-		startMock.mockImplementation((opts: SseStartOptions) => {
-			capturedOnEvent = opts.onEvent;
-			return Promise.resolve();
-		});
 		const { result } = renderHook(() => useChatStream({ onError }));
 
-		// Act
-		act(() => {
-			result.current.send('/url', { content: 'x' });
-		});
-		act(() => {
-			capturedOnEvent({ type: 'error' });
-		});
+		act(() => result.current.send(URL_STREAM, { content: 'x' }));
 
-		// Assert
-		expect(onError).toHaveBeenCalledWith(expect.any(Error));
-		expect(onError.mock.calls[0][0].message).toBe('Error al procesar el mensaje.');
+		await waitFor(() => expect(result.current.phase).toBe('error'));
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ status: 429, detail: 'Límite de uso alcanzado' }),
+		);
 	});
 
-	it('ignora silenciosamente si start() rechaza la promesa', async () => {
-		// Arrange
-		startMock.mockRejectedValue(new Error('fallo de red'));
-		const { result } = renderHook(() => useChatStream());
+	it('stop() cancela, vuelve a idle y no lo reporta como error', async () => {
+		server.use(
+			http.post(apiUrl(URL_STREAM), async () => {
+				await delay('infinite');
+				return respuestaSse([]);
+			}),
+		);
+		const onError = vi.fn();
+		const { result } = renderHook(() => useChatStream({ onError }));
 
-		// Act & Assert (no debe lanzar sin capturar)
-		await act(async () => {
-			result.current.send('/url', { content: 'x' });
-			await Promise.resolve();
-		});
+		act(() => result.current.send(URL_STREAM, { content: 'x' }));
+		expect(result.current.phase).toBe('connecting');
 
-		expect(startMock).toHaveBeenCalled();
+		act(() => result.current.stop());
+
+		await waitFor(() => expect(result.current.phase).toBe('idle'));
+		expect(onError).not.toHaveBeenCalled();
 	});
 
-	it('expone stop del stream subyacente', () => {
-		// Arrange
+	it('stop() sin un stream activo no lanza errores', () => {
 		const { result } = renderHook(() => useChatStream());
 
-		// Act
-		result.current.stop();
-
-		// Assert
-		expect(stopMock).toHaveBeenCalled();
+		expect(() => result.current.stop()).not.toThrow();
 	});
 });

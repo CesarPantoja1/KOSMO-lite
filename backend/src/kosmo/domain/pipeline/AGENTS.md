@@ -238,7 +238,6 @@ domain/pipeline/
 | `EARSMode` | REQUISITOS | 0.3 | 8192 | `EARSSet` | `validate_ears_syntax`, `validate_ears_quality`, `validate_ears_software_level` |
 | `RequirementsChatMode` | REQUISITOS | 0.4 | 8192 | `RespuestaChatLLM` | Ninguna |
 | `RequirementsRefineMode` | REQUISITOS | 0.3 | 8192 | `RequirementsDocument` | Ninguna |
-| `ModeloMode` | MODELO | 0.2 | 8192 | `DiagramSpec` | `validate_activity_diagram_syntax` |
 | `ConsistencyEvaluationMode` | Transversal | 0.2 | 16384 | `ConsistencyDetectionReport` | `get_requirements_for_feature`, `get_diagram_for_feature` |
 | `ConsistencyCorrectionMode` | Transversal | 0.2 | 16384 | `ConsistencyCorrection` | Ninguna |
 | `DirectModificationMode` | Configurable | 0.1 | 8192 | `DirectModificationResult` | Ninguna |

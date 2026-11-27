@@ -328,16 +328,3 @@ def test_idor_get_requirements_blocks_intruder(idor_client: TestClient) -> None:
     # Assert
     assert response.status_code == 404
     assert "no encontrado" in response.json()["detail"]
-
-
-@pytest.mark.unit
-@pytest.mark.idor
-def test_idor_get_model_diagram_blocks_intruder(idor_client: TestClient) -> None:
-    # Act: Intruso intenta obtener diagrama de modelo de Alice
-    response = idor_client.get(
-        "/api/v1/features/feat_alice/diagram?project_id=prj_alice",
-        headers={"Authorization": "Bearer mock"},
-    )
-    # Assert
-    assert response.status_code == 404
-    assert "no encontrado" in response.json()["detail"]

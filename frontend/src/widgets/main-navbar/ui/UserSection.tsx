@@ -3,10 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { ModalConfirm, UserCircle } from '@/shared/ui';
+
 import { User, authApi } from '@/entities/user';
+
 import { clearAllStores, useAppStore } from '@/features/app-state';
-import { UserCircle } from '@/shared/ui';
-import { ModalConfirm } from '@/shared/ui/ModalConfirm';
 
 interface UserSectionProps {
 	user: User | null;

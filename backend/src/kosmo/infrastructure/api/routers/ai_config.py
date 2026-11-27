@@ -2,10 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from kosmo.application.ai.get_ai_catalog import GetAiCatalogUseCase
 from kosmo.application.ai.manage_ai_preferences import ManageAIPreferencesUseCase
+from kosmo.application.ai.sync_ai_catalog import SyncAiCatalogUseCase
 from kosmo.application.ai.validate_ai_connection import ValidateAIConnectionUseCase
 from kosmo.contracts.ai.ai_config import (
-    SUPPORTED_PROVIDERS,
     AIConfigError,
     AIProvider,
     SaveAIConfigInput,
@@ -13,8 +14,10 @@ from kosmo.contracts.ai.ai_config import (
 )
 from kosmo.contracts.auth import Principal
 from kosmo.infrastructure.api.dependencies import (
+    get_ai_catalog_use_case,
     get_manage_ai_preferences_use_case,
     get_principal,
+    get_sync_ai_catalog_use_case,
     get_validate_ai_connection_use_case,
 )
 from kosmo.infrastructure.api.schemas import (
@@ -26,7 +29,7 @@ from kosmo.infrastructure.api.schemas import (
     TestAIConnectionResponse,
 )
 
-router = APIRouter(prefix="/api/v1/ai-config", tags=["ai_config"])
+router = APIRouter(prefix="/api/v1/ai-config", tags=["ai-config"])
 
 
 @router.get(
@@ -34,21 +37,44 @@ router = APIRouter(prefix="/api/v1/ai-config", tags=["ai_config"])
     response_model=list[AIProviderInfoResponse],
     summary="Devuelve el catálogo de proveedores y modelos de IA disponibles",
 )
-def get_providers() -> list[AIProviderInfoResponse]:
+async def get_providers(
+    use_case: Annotated[GetAiCatalogUseCase, Depends(get_ai_catalog_use_case)],
+) -> list[AIProviderInfoResponse]:
+    providers = await use_case.execute()
     return [
         AIProviderInfoResponse(
             value=p.value,
             label=p.label,
-            models=[AIModelInfoResponse(id=m.id, display_name=m.display_name, tier=m.tier) for m in p.models],
+            models=[
+                AIModelInfoResponse(
+                    id=m.id,
+                    display_name=m.display_name,
+                    tier=m.tier,
+                    description=m.description,
+                    recommended=m.recommended,
+                )
+                for m in p.models
+            ],
         )
-        for p in SUPPORTED_PROVIDERS
+        for p in providers
     ]
+
+
+@router.post(
+    "/sync",
+    summary="Dispara la sincronización dinámica del catálogo de modelos de IA",
+)
+async def sync_catalog(
+    _principal: Annotated[Principal, Depends(get_principal)],
+    use_case: Annotated[SyncAiCatalogUseCase, Depends(get_sync_ai_catalog_use_case)],
+) -> dict[str, int]:
+    return await use_case.execute()
 
 
 @router.get(
     "",
     response_model=AIConfigResponse,
-    summary="Obtiene la configuracion de IA del usuario actual",
+    summary="Obtiene la configuración de IA del usuario actual",
 )
 async def get_preferences(
     principal: Annotated[Principal, Depends(get_principal)],
@@ -68,7 +94,7 @@ async def get_preferences(
 @router.post(
     "",
     response_model=AIConfigResponse,
-    summary="Guarda o actualiza la configuracion de IA del usuario",
+    summary="Guarda o actualiza la configuración de IA del usuario",
 )
 async def save_preferences(
     request: SaveAIConfigRequest,
@@ -120,7 +146,7 @@ async def save_preferences(
 @router.delete(
     "",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Elimina la configuracion de IA del usuario",
+    summary="Elimina la configuración de IA del usuario",
 )
 async def delete_preferences(
     req: Request,
@@ -143,7 +169,7 @@ async def delete_preferences(
 @router.post(
     "/test",
     response_model=TestAIConnectionResponse,
-    summary="Valida las credenciales de conexion a IA",
+    summary="Valida las credenciales de conexión a IA",
 )
 async def test_connection(
     request: TestAIConnectionRequest,

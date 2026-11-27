@@ -1,14 +1,45 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from dataclasses import replace
 
 import pytest
 import schemathesis
 from fastapi.testclient import TestClient
 
+from kosmo.application.ai.get_ai_catalog import GetAiCatalogUseCase
+from kosmo.contracts.ai.catalog import AiCatalogRepository, CatalogModel
 from kosmo.contracts.auth import Principal
+from kosmo.infrastructure.api.dependencies.ai_config import get_ai_catalog_use_case
 from kosmo.infrastructure.api.dependencies.auth import get_principal
 from kosmo.infrastructure.api.main import app
+
+
+class _InMemoryAiCatalogRepository:
+    def __init__(self) -> None:
+        self._models: dict[tuple[str, str], CatalogModel] = {}
+
+    async def list_active(self, provider: str | None = None) -> list[CatalogModel]:
+        return [
+            m
+            for m in self._models.values()
+            if m.is_active and m.opencode_compatible and (provider is None or m.provider == provider)
+        ]
+
+    async def get_by_provider_and_model(self, provider: str, model_id: str) -> CatalogModel | None:
+        for m in self._models.values():
+            if m.provider == provider and (m.model_id == model_id or m.opencode_model_id == model_id):
+                return m
+        return None
+
+    async def upsert_batch(self, models: list[CatalogModel]) -> None:
+        for m in models:
+            self._models[(m.provider, m.model_id)] = m
+
+    async def mark_unseen_as_retired(self, provider: str, seen_model_ids: set[str]) -> None:
+        for key, m in list(self._models.items()):
+            if m.provider == provider and m.model_id not in seen_model_ids:
+                self._models[key] = replace(m, is_active=False, is_deprecated=True)
 
 
 @pytest.fixture(scope="module")
@@ -18,10 +49,15 @@ def schema() -> schemathesis.openapi.OpenApiSchema:
 
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient]:
+    catalog_repo: AiCatalogRepository = _InMemoryAiCatalogRepository()
     app.dependency_overrides[get_principal] = lambda: Principal(subject="usr_contract")
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.pop(get_principal, None)
+    app.dependency_overrides[get_ai_catalog_use_case] = lambda: GetAiCatalogUseCase(catalog_repo=catalog_repo)
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.pop(get_principal, None)
+        app.dependency_overrides.pop(get_ai_catalog_use_case, None)
 
 
 @pytest.mark.contract
@@ -127,17 +163,14 @@ def test_ai_config_providers_conforms_to_openapi_contract(
 def test_traceability_navigation_endpoint_conforms_to_openapi_contract(
     schema: schemathesis.openapi.OpenApiSchema,
 ) -> None:
-    # Legacy compatibility route
-    path = "/api/v1/traceability/{entity_id}/navigation"
-    assert path in schema
-    operation = schema[path]["get"]
-    assert operation.tags == ["Traceability"]
+    # La ruta legacy sigue operativa en tiempo de ejecución pero oculta en OpenAPI
+    assert "/api/v1/traceability/{entity_id}/navigation" not in app.openapi()["paths"]
 
     # Canonical project-nested REST route
     canonical_path = "/api/v1/projects/{project_id}/traceability/{entity_id}/navigation"
     assert canonical_path in schema
     canonical_op = schema[canonical_path]["get"]
-    assert canonical_op.tags == ["Traceability"]
+    assert canonical_op.tags == ["traceability"]
 
 
 @pytest.mark.contract

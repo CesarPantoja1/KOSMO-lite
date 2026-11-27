@@ -11,7 +11,6 @@ from kosmo.contracts.sdd.errors import (
 )
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     FeatureRepository,
     ProjectRepository,
     RequirementRepository,
@@ -27,23 +26,17 @@ class DeleteRequirementsInput:
 
 
 class DeleteRequirementsUseCase:
-    """Caso de uso: elimina los requisitos EARS de una característica.
-
-    El modelo de actividad derivado de los requisitos se elimina en cascada
-    si existe.
-    """
+    """Caso de uso: elimina los requisitos EARS de una característica."""
 
     def __init__(
         self,
         project_repo: ProjectRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
     ) -> None:
         self._project_repo = project_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
 
     async def execute(self, input_data: DeleteRequirementsInput) -> None:
         instance = f"/api/v1/projects/{input_data.project_id}/features/{input_data.feature_id}/requirements"
@@ -70,7 +63,6 @@ class DeleteRequirementsUseCase:
             )
 
         await self._requirement_repo.delete(input_data.feature_id)
-        await self._diagram_repo.delete(input_data.feature_id)
 
         _log.info(
             "delete_requirements.success",

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ItemWizardProps } from '../model/wizard';
+import { ItemWizardProps } from '../model/types';
 
 const WizardItem = ({
 	href,

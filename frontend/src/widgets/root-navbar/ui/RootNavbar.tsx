@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
-import { Logo } from '@/shared/ui';
+import { usePathname, useRouter } from 'next/navigation';
+
 import { useAuthStore } from '@/shared/model';
+import { Logo } from '@/shared/ui';
 
 interface RootNavbarProps {
 	onComenzar?: () => void;

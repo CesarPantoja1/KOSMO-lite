@@ -124,8 +124,6 @@ from kosmo.contracts.pipeline import (
     GenerationMetadata,
     ImplementationContext,
     ImplementationPhaseContext,
-    ModeloPhaseContext,
-    ModeloPhaseOutput,
     PhaseMode,
     PhaseNotSupportedError,
     PhaseTransitionError,
@@ -135,7 +133,6 @@ from kosmo.contracts.pipeline import (
     ToolDefinition,
     ValidationResult,
 )
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.codegen import (
     CodeRunnerPort,
     CodeWorkspace,
@@ -163,10 +160,9 @@ from kosmo.contracts.sdd.codegen import (
     WorkspaceStatus,
 )
 from kosmo.contracts.sdd.document import SpecPhase
-from kosmo.contracts.sdd.errors import ChatSessionNotFoundError, DiagramNotFoundError
+from kosmo.contracts.sdd.errors import ChatSessionNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
-    ActivityDiagramId,
     ApiKey,
     AuditId,
     ChatHistoryId,
@@ -184,7 +180,6 @@ from kosmo.contracts.sdd.ids import (
 )
 from kosmo.contracts.sdd.project import Project
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
@@ -216,8 +211,6 @@ __all__ = [
     "AIConnectionTester",
     "AIProvider",
     "AccountLockedError",
-    "ActivityDiagramId",
-    "ActivityDiagramRepository",
     "AgentPort",
     "ApiKey",
     "AppliedChange",
@@ -250,8 +243,6 @@ __all__ = [
     "DeploymentProvider",
     "DeploymentProviderPort",
     "DeploymentStatus",
-    "DiagramNotFoundError",
-    "DiagramaActividad",
     "DiffCambio",
     "DiscoveryPhaseContext",
     "DiscoveryPhaseOutput",
@@ -300,8 +291,6 @@ __all__ = [
     "MensajeChat",
     "MissingTokenError",
     "ModificacionChat",
-    "ModeloPhaseContext",
-    "ModeloPhaseOutput",
     "OpenCodeClientPort",
     "OpenCodeEvent",
     "OpenCodeEventType",

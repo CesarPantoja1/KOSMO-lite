@@ -73,7 +73,6 @@ class PlanningService:
         *,
         feature: Feature,
         req_markdown: str,
-        diagram_syntax: str,
         workspace_dir: str,
         manifest_files: tuple[str, ...],
         session_id: str,
@@ -110,7 +109,7 @@ class PlanningService:
                 event_type=OpenCodeEventType.PLAN_PROGRESS,
                 session_id=session_id,
                 data={
-                    "delta": f"Analizando requisitos, UX, integración y diagrama de '{feature.title}'...",
+                    "delta": f"Analizando requisitos, UX e integración de '{feature.title}'...",
                     "stage": "planning",
                 },
             )
@@ -119,7 +118,6 @@ class PlanningService:
         plan_prompt = self._context_builder.build_plan_prompt(
             feature=feature,
             req_markdown=req_markdown,
-            diagram_syntax=diagram_syntax,
             ux_prompt_block=ux_analysis.prompt_block,
             project_context=project_context,
             product_map=product_map,

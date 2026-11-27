@@ -23,7 +23,8 @@ vi.mock('@/entities/user', () => {
 			scopes: ['agent:run', 'profile:read'],
 		},
 	};
-	const useAuthStoreFn = (selector: (state: typeof fakeState) => unknown) => selector(fakeState);
+	const useAuthStoreFn = (selector: (state: typeof fakeState) => unknown) =>
+		selector(fakeState);
 	useAuthStoreFn.getState = () => ({
 		user: fakeState.user,
 		setUser: vi.fn(),
@@ -101,7 +102,9 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 		render(<CuentaTab user={{ subject: 'usr_1', scopes: [] }} />);
 
 		await waitFor(() => {
-			expect(screen.getAllByRole('button', { name: 'Conectar' }).length).toBeGreaterThan(0);
+			expect(screen.getAllByRole('button', { name: 'Conectar' }).length).toBeGreaterThan(
+				0,
+			);
 		});
 
 		const connectButtons = screen.getAllByRole('button', { name: 'Conectar' });
@@ -131,7 +134,9 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 		render(<CuentaTab user={{ subject: 'usr_1', scopes: [] }} />);
 
 		await waitFor(() => {
-			expect(screen.getAllByRole('button', { name: 'Conectar' }).length).toBeGreaterThan(0);
+			expect(screen.getAllByRole('button', { name: 'Conectar' }).length).toBeGreaterThan(
+				0,
+			);
 		});
 
 		// Simulamos el postMessage emitido por el popup
@@ -150,9 +155,9 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 
 		await waitFor(() => {
 			expect(connectSpy).toHaveBeenCalledWith('github', {
-			code: 'fake-oauth-auth-code-123',
-			redirect_uri: expect.stringContaining('/perfil'),
-			code_verifier: 'v'.repeat(64),
+				code: 'fake-oauth-auth-code-123',
+				redirect_uri: expect.stringContaining('/perfil'),
+				code_verifier: 'v'.repeat(64),
 			});
 		});
 
@@ -175,12 +180,16 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 		});
 
 		delete (window as { location?: unknown }).location;
-		window.location = new URL('http://localhost:3000/perfil?code=github_code_abc&state=github.test-state') as unknown as Location;
+		window.location = new URL(
+			'http://localhost:3000/perfil?code=github_code_abc&state=github.test-state',
+		) as unknown as Location;
 
 		render(<ProfilePage />);
 
 		expect(screen.getByText('Completando autorización…')).toBeInTheDocument();
-		expect(screen.queryByText('Gestiona tu cuenta y configuración')).not.toBeInTheDocument();
+		expect(
+			screen.queryByText('Gestiona tu cuenta y configuración'),
+		).not.toBeInTheDocument();
 
 		expect(mockOpener.postMessage).toHaveBeenCalledTimes(1);
 		expect(mockOpener.postMessage).toHaveBeenCalledWith(
@@ -214,7 +223,9 @@ describe('ProfilePage and CuentaTab OAuth flow', () => {
 		});
 
 		delete (window as { location?: unknown }).location;
-		window.location = new URL('http://localhost:3000/perfil?code=github_code_abc&state=github.test-state') as unknown as Location;
+		window.location = new URL(
+			'http://localhost:3000/perfil?code=github_code_abc&state=github.test-state',
+		) as unknown as Location;
 
 		const { rerender } = render(<ProfilePage />);
 		rerender(<ProfilePage />);

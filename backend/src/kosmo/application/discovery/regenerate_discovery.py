@@ -12,7 +12,6 @@ from kosmo.contracts.sdd.errors import LLMInvocationError, ProjectNotFoundError
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
@@ -41,7 +40,6 @@ class RegenerateDiscoveryUseCase:
         document_repo: DocumentRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         agent: AgentPort,
         outbox: OutboxPort | None = None,
     ) -> None:
@@ -49,7 +47,6 @@ class RegenerateDiscoveryUseCase:
         self._document_repo = document_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._agent = agent
         self._outbox = outbox
 
@@ -166,14 +163,4 @@ class RegenerateDiscoveryUseCase:
                 if not parts or not parts[-1].startswith("## Requisitos"):
                     parts.append("\n## Requisitos\n")
                 parts.append(f"- {f.display_id}: {req_md[:300]}")
-
-        for f in features:
-            diagram_exists = await self._diagram_repo.exists(f.id)
-            if diagram_exists:
-                if not parts or not parts[-1].startswith("## Diagramas"):
-                    parts.append("\n## Diagramas\n")
-                diagram = await self._diagram_repo.by_feature_id(f.id)
-                if diagram:
-                    parts.append(f"- {f.display_id}: {diagram.diagram_syntax[:200]}")
-
         return "\n".join(parts) if len(parts) > 0 else ""

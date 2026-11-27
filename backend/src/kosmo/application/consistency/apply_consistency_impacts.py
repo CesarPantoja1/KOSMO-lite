@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 import structlog
 
 from kosmo.contracts.persistence.persistence import UnitOfWork
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.codegen import FeatureImplementationStatus
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.ids import FeatureId, ProjectId
@@ -14,7 +13,6 @@ from kosmo.domain.sdd.document_converters import document_to_markdown, markdown_
 from kosmo.domain.sdd.plan_diffs import apply_change_diff
 from kosmo.domain.sdd.requirements_markdown import parse_requirements_markdown
 from kosmo.domain.sdd.text_normalizer import strip_origin_line
-from kosmo.domain.sdd.validators.activity_diagram_validator import validate_activity_diagram_syntax
 
 _log = structlog.get_logger(__name__)
 
@@ -126,12 +124,6 @@ class ApplyConsistencyImpactsUseCase:
             if action == "delete":
                 return await self._delete_feature(uow, feature_id)
             return await self._update_feature(uow, feature_id, field, before, after)
-
-        if artifact_type == "ActivityDiagram":
-            if action == "delete":
-                return None  # cascada BD: la feature padre ya se eliminó
-            return await self._update_diagram(uow, feature_id, before, after)
-
         if artifact_type == "FeatureImplementation":
             if action == "delete":
                 return await self._delete_implementation(uow, feature_id)
@@ -256,7 +248,6 @@ class ApplyConsistencyImpactsUseCase:
             return "La caracteristica no existe"
 
         await uow.requirements.delete(feature_id)
-        await uow.diagrams.delete(feature_id)
         await uow.features.delete(feature_id)
 
         try:
@@ -273,32 +264,4 @@ class ApplyConsistencyImpactsUseCase:
             feature_id=str(feature_id),
             display_id=feature.display_id,
         )
-        return None
-
-    async def _update_diagram(self, uow: UnitOfWork, feature_id: FeatureId, before: str, after: str) -> str | None:
-        diagram = await uow.diagrams.by_feature_id(feature_id, for_update=True)
-        if diagram is None:
-            return "El diagrama no existe"
-
-        result = apply_change_diff(diagram.diagram_syntax, before=before, after=after)
-        if result is None:
-            return "El texto original no se encontro en el diagrama"
-
-        validation = validate_activity_diagram_syntax(result)
-        if not validation.is_valid:
-            _log.warning(
-                "consistency.diagram_validation_failed",
-                feature_id=str(feature_id),
-                errors=validation.errors,
-            )
-            return f"El cambio dejaría el diagrama con sintaxis inválida: {'; '.join(validation.errors)}"
-
-        updated = DiagramaActividad(
-            id=diagram.id,
-            feature_id=diagram.feature_id,
-            diagram_syntax=result,
-            created_at=diagram.created_at,
-            updated_at=datetime.now(UTC),
-        )
-        await uow.diagrams.save(updated)
         return None

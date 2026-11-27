@@ -6,7 +6,6 @@ from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.domain.pipeline.phase_validators.discovery_validator import validate_discovery_structure
 from kosmo.domain.sdd.document_converters import markdown_to_document
 from kosmo.domain.sdd.few_shot.loader import load_example
-from kosmo.domain.sdd.validators.activity_diagram_validator import validate_activity_diagram_syntax
 
 
 @pytest.mark.unit
@@ -41,17 +40,6 @@ def test_load_ears_example_is_valid() -> None:
     assert text is not None
     assert "REQ-1.1" in text
     assert "REQ-1.2" in text
-
-
-@pytest.mark.unit
-def test_load_modelo_example_is_valid_plantuml() -> None:
-    # Arrange & Act
-    text = load_example(SpecPhase.MODELO)
-
-    # Assert
-    assert text is not None
-    result = validate_activity_diagram_syntax(text)
-    assert result.is_valid, f"Errores: {result.errors}"
 
 
 @pytest.mark.unit
@@ -106,18 +94,3 @@ def test_ears_mode_system_prompt_includes_few_shot() -> None:
     # Assert
     assert "Ejemplo de referencia" in prompt
     assert "REQ-1.1" in prompt
-
-
-@pytest.mark.unit
-def test_modelo_mode_system_prompt_includes_few_shot() -> None:
-    # Arrange
-    from kosmo.domain.pipeline.phase_modes.modelo_mode import ModeloMode
-
-    mode = ModeloMode()
-
-    # Act
-    prompt = mode.system_prompt
-
-    # Assert
-    assert "Ejemplo de referencia" in prompt
-    assert "@startuml" in prompt

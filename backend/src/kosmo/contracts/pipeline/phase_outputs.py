@@ -71,14 +71,6 @@ class EARSPhaseOutput:
     generation_metadata: GenerationMetadata
 
 
-@dataclass(frozen=True)
-class ModeloPhaseOutput:
-    feature_id: FeatureId
-    diagram_syntax: str
-    validation_result: ValidationResult
-    generation_metadata: GenerationMetadata
-
-
 # ── Modelos de salida estructurada del LLM (pydantic-ai output_type) ──
 
 
@@ -119,10 +111,6 @@ class EARSSet(BaseModel):
 
 class RequirementsDocument(BaseModel):
     requirements_markdown: str = Field(description="Documento de requisitos completo en markdown")
-
-
-class DiagramSpec(BaseModel):
-    diagram_syntax: str = Field(description="Codigo fuente PlantUML del diagrama de actividad")
 
 
 class ConsistencyAction(BaseModel):

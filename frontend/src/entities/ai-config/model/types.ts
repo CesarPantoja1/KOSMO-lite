@@ -1,11 +1,16 @@
 export type AIProvider = 'openai' | 'anthropic' | 'google' | 'deepseek' | 'custom';
 
-export type AIModelTier = 'flagship' | 'balanced' | 'fast';
+export type AIModelTier = 'flagship' | 'reasoning' | 'balanced' | 'fast';
 
 export interface AIModelInfo {
 	id: string;
 	display_name: string;
 	tier: AIModelTier;
+	description?: string;
+	recommended?: boolean;
+	opencode_model_id?: string;
+	context_window?: number;
+	is_deprecated?: boolean;
 }
 
 export interface AIProviderInfo {
@@ -19,6 +24,7 @@ export const DEFAULT_AI_MODEL = 'gemini-3.8-flash';
 
 export const TIER_LABELS: Record<AIModelTier, string> = {
 	flagship: 'Máxima capacidad',
+	reasoning: 'Razonamiento especializado',
 	balanced: 'Equilibrado',
 	fast: 'Más veloz',
 };

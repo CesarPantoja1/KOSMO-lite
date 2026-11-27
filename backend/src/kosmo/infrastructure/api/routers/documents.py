@@ -46,7 +46,6 @@ _PHASE_MAP: dict[str, SpecPhase] = {
     "discovery": SpecPhase.DESCUBRIMIENTO,
     "features": SpecPhase.CARACTERISTICAS,
     "requirements": SpecPhase.REQUISITOS,
-    "model": SpecPhase.MODELO,
 }
 
 
@@ -67,7 +66,7 @@ async def _verify_document_ownership(
         )
     if document_type == "discovery":
         await require_project_owner(container, document_id, principal)
-    elif document_type in ("features", "requirements", "model"):
+    elif document_type in ("features", "requirements"):
         await verify_feature_owner(document_id, principal, request)
     else:
         await require_project_owner(container, document_id, principal)

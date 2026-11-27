@@ -10,5 +10,4 @@ export {
 	generateRequirements,
 	deleteRequirements,
 	getRequirementChatHistory,
-	sendRequirementChatMessage,
 } from './api/api';

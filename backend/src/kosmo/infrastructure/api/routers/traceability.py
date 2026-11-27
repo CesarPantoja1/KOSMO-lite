@@ -17,7 +17,7 @@ from kosmo.infrastructure.api.dependencies.auth import (
 from kosmo.infrastructure.api.dependencies.container import get_container
 from kosmo.infrastructure.api.schemas import TraceabilityNavigationOutputView
 
-router = APIRouter(tags=["Traceability"])
+router = APIRouter(tags=["traceability"])
 
 _RESPONSES: dict[int | str, dict[str, Any]] = {
     status.HTTP_401_UNAUTHORIZED: {"description": "Credenciales de autenticación no válidas o ausentes."},
@@ -54,7 +54,7 @@ async def check_project_traceability_navigation(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Característica {entity_id} no encontrada en este proyecto",
                 )
-        elif level in (SpecPhase.REQUISITOS, SpecPhase.MODELO):
+        elif level == SpecPhase.REQUISITOS:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Característica {entity_id} no encontrada",
@@ -77,6 +77,7 @@ async def check_project_traceability_navigation(
     response_model=TraceabilityNavigationOutputView,
     responses=_RESPONSES,
     deprecated=True,
+    include_in_schema=False,
     summary="Verificar navegación de trazabilidad (Legacy)",
     description="Ruta legacy; migrar a /api/v1/projects/{project_id}/traceability/{entity_id}/navigation.",
 )
@@ -97,7 +98,7 @@ async def check_traceability_navigation(
             feature = await container.repos.features.by_id(FeatureId(entity_id))
             if feature is not None:
                 project_id = feature.project_id
-            elif level in (SpecPhase.REQUISITOS, SpecPhase.MODELO):
+            elif level == SpecPhase.REQUISITOS:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Característica {entity_id} no encontrada",

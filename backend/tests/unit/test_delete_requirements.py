@@ -6,17 +6,15 @@ from kosmo.application.requirements.delete_requirements import (
     DeleteRequirementsInput,
     DeleteRequirementsUseCase,
 )
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.errors import (
     FeatureNotFoundError,
     ProjectNotFoundError,
     RequirementsNotFoundError,
 )
 from kosmo.contracts.sdd.feature import Feature
-from kosmo.contracts.sdd.ids import ActivityDiagramId, FeatureId, ProjectId, UserId
+from kosmo.contracts.sdd.ids import FeatureId, ProjectId, UserId
 from kosmo.contracts.sdd.project import Project
 from tests.unit.fakes import (
-    InMemoryActivityDiagramRepository,
     InMemoryFeatureRepository,
     InMemoryOutbox,
     InMemoryProjectRepository,
@@ -45,14 +43,6 @@ def _a_feature(project: Project, feature_id: str = "feat_del_req") -> Feature:
     )
 
 
-def _a_diagram(feature: Feature) -> DiagramaActividad:
-    return DiagramaActividad(
-        id=ActivityDiagramId("adg_del_req"),
-        feature_id=feature.id,
-        diagram_syntax="@startuml\nstart\n:accion;\nstop\n@enduml",
-    )
-
-
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_delete_requirements_elimina_sin_disparar_consistencia() -> None:
@@ -67,15 +57,11 @@ async def test_delete_requirements_elimina_sin_disparar_consistencia() -> None:
 
     requirement_repo = InMemoryRequirementRepository()
     await requirement_repo.save(feature.id, "REQ-1.1: El sistema shall...")
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await diagram_repo.save(_a_diagram(feature))
-
     outbox = InMemoryOutbox()
     use_case = DeleteRequirementsUseCase(
         project_repo=project_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
     )
 
     # Act
@@ -83,67 +69,7 @@ async def test_delete_requirements_elimina_sin_disparar_consistencia() -> None:
 
     # Assert — requisitos y modelo eliminados; NO se dispara evaluación de consistencia
     assert await requirement_repo.by_feature_id(feature.id) is None
-    assert await diagram_repo.by_feature_id(feature.id) is None
     assert len(outbox.jobs) == 0
-
-
-@pytest.mark.asyncio
-@pytest.mark.unit
-async def test_delete_requirements_cascades_diagram() -> None:
-    # Arrange
-    project_repo = InMemoryProjectRepository()
-    project = _a_project("prj_del_req2")
-    await project_repo.save(project)
-
-    feature_repo = InMemoryFeatureRepository()
-    feature = _a_feature(project, "feat_del_req2")
-    await feature_repo.save(feature)
-
-    requirement_repo = InMemoryRequirementRepository()
-    await requirement_repo.save(feature.id, "REQ-1.1: El sistema shall...")
-    diagram_repo = InMemoryActivityDiagramRepository()
-    await diagram_repo.save(_a_diagram(feature))
-
-    use_case = DeleteRequirementsUseCase(
-        project_repo=project_repo,
-        feature_repo=feature_repo,
-        requirement_repo=requirement_repo,
-        diagram_repo=diagram_repo,
-    )
-
-    # Act
-    await use_case.execute(DeleteRequirementsInput(project_id=project.id, feature_id=feature.id))
-
-    # Assert — el modelo derivado de los requisitos se elimina en cascada
-    assert await requirement_repo.by_feature_id(feature.id) is None
-    assert await diagram_repo.by_feature_id(feature.id) is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.unit
-async def test_delete_requirements_cascade_tolerates_missing_diagram() -> None:
-    # Arrange — hay requisitos pero nunca se generó el modelo
-    project_repo = InMemoryProjectRepository()
-    project = _a_project("prj_del_req3")
-    await project_repo.save(project)
-
-    feature_repo = InMemoryFeatureRepository()
-    feature = _a_feature(project, "feat_del_req3")
-    await feature_repo.save(feature)
-
-    requirement_repo = InMemoryRequirementRepository()
-    await requirement_repo.save(feature.id, "REQ-1.1: El sistema shall...")
-
-    use_case = DeleteRequirementsUseCase(
-        project_repo=project_repo,
-        feature_repo=feature_repo,
-        requirement_repo=requirement_repo,
-        diagram_repo=InMemoryActivityDiagramRepository(),
-    )
-
-    # Act & Assert — el cascade no falla cuando el modelo no existe
-    await use_case.execute(DeleteRequirementsInput(project_id=project.id, feature_id=feature.id))
-    assert await requirement_repo.by_feature_id(feature.id) is None
 
 
 @pytest.mark.asyncio
@@ -154,7 +80,6 @@ async def test_delete_requirements_raises_when_project_not_found() -> None:
         project_repo=InMemoryProjectRepository(),
         feature_repo=InMemoryFeatureRepository(),
         requirement_repo=InMemoryRequirementRepository(),
-        diagram_repo=InMemoryActivityDiagramRepository(),
     )
 
     # Act & Assert
@@ -181,7 +106,6 @@ async def test_delete_requirements_raises_when_feature_not_found() -> None:
         project_repo=project_repo,
         feature_repo=InMemoryFeatureRepository(),
         requirement_repo=InMemoryRequirementRepository(),
-        diagram_repo=InMemoryActivityDiagramRepository(),
     )
 
     # Act & Assert
@@ -208,7 +132,6 @@ async def test_delete_requirements_raises_when_requirements_not_found() -> None:
         project_repo=project_repo,
         feature_repo=feature_repo,
         requirement_repo=InMemoryRequirementRepository(),
-        diagram_repo=InMemoryActivityDiagramRepository(),
     )
 
     # Act & Assert
@@ -237,7 +160,6 @@ async def test_delete_requirements_elimina_sin_depender_de_outbox() -> None:
         project_repo=project_repo,
         feature_repo=feature_repo,
         requirement_repo=requirement_repo,
-        diagram_repo=InMemoryActivityDiagramRepository(),
     )
 
     # Act & Assert — sin outbox el caso de uso sigue funcionando

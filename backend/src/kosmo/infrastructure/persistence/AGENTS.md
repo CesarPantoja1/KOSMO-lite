@@ -23,13 +23,12 @@ Este módulo implementa la capa de persistencia completa de KOSMO dentro de la a
 infrastructure/persistence/
 ├── __init__.py                                 # Módulo de persistencia
 ├── postgres/
-│   ├── models.py                               # 22 modelos ORM SQLAlchemy 2.0 (tablas PostgreSQL)
+│   ├── models.py                               # 21 modelos ORM SQLAlchemy 2.0 (tablas PostgreSQL)
 │   ├── uow.py                                  # SqlAlchemyUnitOfWork con pila ContextVar (_UowContext)
 │   ├── outbox.py                               # OutboxStore y run_outbox_worker (SKIP LOCKED, backoff)
 │   ├── registry.py                             # RepositoryRegistry (19 repositorios SQL instanciados)
 │   └── repositories/
 │       ├── __init__.py                         # Reexportación de 21 clases de repositorio/store/sink
-│       ├── activity_diagram_repo.py            # SqlAlchemyActivityDiagramRepository
 │       ├── agent_memory_repo.py                # SqlAlchemyAgentSessionStore, SqlAlchemyKnowledgePatternStore
 │       ├── audit.py                            # SqlAlchemyAuditEventSink (auditoría best-effort)
 │       ├── chat_repo.py                        # SqlAlchemyChatRepository (sesiones, mensajes, cursores)
@@ -71,7 +70,6 @@ Todos los modelos heredan de `Base(DeclarativeBase)` en [postgres/models.py](fil
 | `TraceabilityEdgeModel` | `traceability_edges` | `id` (String 64) | — | — | `source_type`, `source_id`, `target_type`, `target_id`, `origin` (`llm`/manual) |
 | `DiscoveryDocumentModel` | `discovery` | `project_id` (String 64) | `project_id` → `projects.id` (`CASCADE`) | PK es FK | `markdown` (Text con las 7 secciones canónicas de Discovery) |
 | `AgentSessionModel` | `agent_sessions` | `id` (String 64) | `project_id` → `projects.id` (`CASCADE`) | Index `project_id` | `session_type`, `phase`, `conversation` (JSONB), `reasoning_log` (JSONB), `embedding` (Vector 1536), `reflection` |
-| `ActivityDiagramModel` | `activity_diagrams` | `id` (String 64) | `feature_id` → `features.id` (`CASCADE`) | Unique & Index `feature_id` | `diagram_syntax` (Text PlantUML con `@startuml`/`@enduml`) |
 | `KnowledgePatternModel` | `knowledge_patterns` | `id` (String 64) | — | Unique `(phase, pattern_text)`, Index `phase` | `phase`, `pattern_text`, `support_count` (Int) |
 | `ChatMessageModel` | `chat_messages` | `id` (String 64) | `project_id` → `projects.id` (`CASCADE`) | Index `project_id`, Index `session_id` | `phase`, `context_id`, `role`, `content`, `suggested_change` (JSONB), `error` |
 | `ChatSessionModel` | `chat_sessions` | `id` (String 64) | `project_id` → `projects.id` (`CASCADE`) | Index `project_id` | `phase`, `context_id` |
@@ -107,7 +105,6 @@ Cada nivel de anidamiento crea un `_UowContext` con su propia `AsyncSession` y r
 - `documents`: `SqlAlchemyDocumentRepository`
 - `features`: `SqlAlchemyFeatureRepository`
 - `requirements`: `SqlAlchemyRequirementRepository`
-- `diagrams`: `SqlAlchemyActivityDiagramRepository`
 - `implementations`: `SqlAlchemyFeatureImplementationRepository`
 - `chat`: `SqlAlchemyChatRepository`
 - `traceability`: `SqlAlchemyTraceabilityRepository`
@@ -185,7 +182,6 @@ Dataclass inmutable (`frozen=True`, `slots=True`) que actúa como catálogo de i
 2. `documents`: `SqlAlchemyDocumentRepository`
 3. `features`: `SqlAlchemyFeatureRepository`
 4. `requirements`: `SqlAlchemyRequirementRepository`
-5. `diagrams`: `SqlAlchemyActivityDiagramRepository`
 6. `chat`: `SqlAlchemyChatRepository`
 7. `traceability`: `SqlAlchemyTraceabilityRepository`
 8. `users`: `SqlAlchemyUserRepository`
@@ -389,7 +385,6 @@ def __init__(
 | `FeatureRepository` | `SqlAlchemyFeatureRepository` | [postgres/repositories/feature_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/feature_repo.py) |
 | `RequirementRepository` | `SqlAlchemyRequirementRepository` | [postgres/repositories/requirement_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/requirement_repo.py) |
 | `DocumentRepository` | `SqlAlchemyDocumentRepository` | [postgres/repositories/document_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/document_repo.py) |
-| `ActivityDiagramRepository` | `SqlAlchemyActivityDiagramRepository` | [postgres/repositories/activity_diagram_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/activity_diagram_repo.py) |
 | `ChatRepository` | `SqlAlchemyChatRepository` | [postgres/repositories/chat_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/chat_repo.py) |
 | `TraceabilityRepository` | `SqlAlchemyTraceabilityRepository` | [postgres/repositories/traceability_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/traceability_repo.py) |
 | `ConsistencyEvaluationRepository` | `SqlAlchemyConsistencyEvaluationRepository` | [postgres/repositories/consistency_repo.py](file:///c:/projects/KOSMO/backend/src/kosmo/infrastructure/persistence/postgres/repositories/consistency_repo.py) |

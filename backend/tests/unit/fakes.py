@@ -27,7 +27,6 @@ from kosmo.contracts.memory.agent_memory import (
     KnowledgePattern,
     ProjectMemoryContext,
 )
-from kosmo.contracts.sdd.activity_diagram import DiagramaActividad
 from kosmo.contracts.sdd.document import RichTextDocument, SpecPhase
 from kosmo.contracts.sdd.feature import Feature
 from kosmo.contracts.sdd.ids import (
@@ -183,32 +182,6 @@ class InMemoryRequirementRepository:
 
     async def delete(self, feature_id: FeatureId) -> None:
         self._requirements.pop(str(feature_id), None)
-
-
-class InMemoryActivityDiagramRepository:
-    def __init__(self) -> None:
-        self._diagrams: dict[str, DiagramaActividad] = {}
-        self.locked_feature_ids: list[str] = []
-
-    async def save(self, diagram: DiagramaActividad) -> DiagramaActividad:
-        self._diagrams[str(diagram.feature_id)] = diagram
-        return diagram
-
-    async def by_feature_id(
-        self,
-        feature_id: FeatureId,
-        *,
-        for_update: bool = False,
-    ) -> DiagramaActividad | None:
-        if for_update:
-            self.locked_feature_ids.append(str(feature_id))
-        return self._diagrams.get(str(feature_id))
-
-    async def exists(self, feature_id: FeatureId) -> bool:
-        return str(feature_id) in self._diagrams
-
-    async def delete(self, feature_id: FeatureId) -> None:
-        self._diagrams.pop(str(feature_id), None)
 
 
 class StubEmbedder:
@@ -501,7 +474,6 @@ class InMemoryUnitOfWork:
         documents: InMemoryDocumentRepository | None = None,
         features: InMemoryFeatureRepository | None = None,
         requirements: InMemoryRequirementRepository | None = None,
-        diagrams: InMemoryActivityDiagramRepository | None = None,
         implementations: InMemoryFeatureImplementationRepository | None = None,
         chat: InMemoryChatRepository | None = None,
         traceability: InMemoryTraceabilityRepository | None = None,
@@ -511,7 +483,6 @@ class InMemoryUnitOfWork:
         self.documents = documents or InMemoryDocumentRepository()
         self.features = features or InMemoryFeatureRepository()
         self.requirements = requirements or InMemoryRequirementRepository()
-        self.diagrams = diagrams or InMemoryActivityDiagramRepository()
         self.implementations = implementations or InMemoryFeatureImplementationRepository()
         self.chat = chat or InMemoryChatRepository()
         self.traceability = traceability or InMemoryTraceabilityRepository()

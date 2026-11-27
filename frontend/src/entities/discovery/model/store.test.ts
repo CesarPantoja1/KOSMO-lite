@@ -4,7 +4,6 @@ vi.mock('../api/api', () => ({
 	getDiscovery: vi.fn(),
 	saveDiscovery: vi.fn(),
 	generateDiscovery: vi.fn(),
-	sendChatMessage: vi.fn(),
 	getChatHistory: vi.fn(),
 }));
 
@@ -12,7 +11,6 @@ import {
 	getDiscovery,
 	saveDiscovery,
 	generateDiscovery,
-	sendChatMessage,
 	getChatHistory,
 } from '../api/api';
 import { useDiscoveryStore, clearDiscoveryStore } from './store';
@@ -21,7 +19,6 @@ const api = {
 	getDiscovery: vi.mocked(getDiscovery),
 	saveDiscovery: vi.mocked(saveDiscovery),
 	generateDiscovery: vi.mocked(generateDiscovery),
-	sendChatMessage: vi.mocked(sendChatMessage),
 	getChatHistory: vi.mocked(getChatHistory),
 };
 
@@ -52,7 +49,11 @@ describe('useDiscoveryStore', () => {
 
 	it('saveDiscovery actualiza el descubrimiento actual', async () => {
 		// Arrange
-		api.saveDiscovery.mockResolvedValue({ id: 'd1', project_id: 'prj_01', content: 'guardado' });
+		api.saveDiscovery.mockResolvedValue({
+			id: 'd1',
+			project_id: 'prj_01',
+			content: 'guardado',
+		});
 
 		// Act
 		await useDiscoveryStore.getState().saveDiscovery('prj_01', 'guardado');
@@ -63,32 +64,17 @@ describe('useDiscoveryStore', () => {
 
 	it('generateDiscovery actualiza el descubrimiento actual', async () => {
 		// Arrange
-		api.generateDiscovery.mockResolvedValue({ id: 'd1', project_id: 'prj_01', content: 'generado' });
+		api.generateDiscovery.mockResolvedValue({
+			id: 'd1',
+			project_id: 'prj_01',
+			content: 'generado',
+		});
 
 		// Act
 		await useDiscoveryStore.getState().generateDiscovery('prj_01');
 
 		// Assert
 		expect(useDiscoveryStore.getState().currentDiscovery?.content).toBe('generado');
-	});
-
-	it('sendChatMessage agrega el mensaje del usuario y luego la respuesta', async () => {
-		// Arrange
-		api.sendChatMessage.mockResolvedValue({
-			message: { id: 'm1', role: 'assistant', content: 'Respuesta' } as never,
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await useDiscoveryStore.getState().sendChatMessage('prj_01', 'Hola');
-
-		// Assert
-		const history = useDiscoveryStore.getState().chatHistory;
-		expect(history).toHaveLength(2);
-		expect(history[0].role).toBe('user');
-		expect(history[1].content).toBe('Respuesta');
 	});
 
 	it('appendUserMessage y appendAssistantMessage agregan mensajes locales', () => {
@@ -179,7 +165,9 @@ describe('useDiscoveryStore', () => {
 
 	it('clearDiscovery limpia solo el descubrimiento actual', () => {
 		// Arrange
-		useDiscoveryStore.setState({ currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' } });
+		useDiscoveryStore.setState({
+			currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' },
+		});
 
 		// Act
 		useDiscoveryStore.getState().clearDiscovery();
@@ -210,7 +198,9 @@ describe('useDiscoveryStore', () => {
 
 	it('clearDiscoveryStore limpia el storage persistido y el estado', () => {
 		// Arrange
-		useDiscoveryStore.setState({ currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' } });
+		useDiscoveryStore.setState({
+			currentDiscovery: { id: 'd1', project_id: 'p', content: 'x' },
+		});
 
 		// Act
 		clearDiscoveryStore();

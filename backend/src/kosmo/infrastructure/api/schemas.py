@@ -974,6 +974,8 @@ class AIModelInfoResponse(BaseModel):
     id: str
     display_name: str
     tier: str
+    description: str = ""
+    recommended: bool = False
 
 
 class AIProviderInfoResponse(BaseModel):

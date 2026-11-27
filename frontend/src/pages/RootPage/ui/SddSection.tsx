@@ -5,16 +5,14 @@ const steps = [
 	['02', 'Descubrimiento', 'IA'],
 	['03', 'Funcionalidades', 'IA + negocio'],
 	['04', 'Criterios', 'Especificación'],
-	['05', 'Diagramas', 'Modelo'],
-	['06', 'Implementación', 'Generación'],
-	['07', 'Aplicación', 'Resultado'],
+	['05', 'Implementación', 'Generación'],
+	['06', 'Aplicación', 'Resultado'],
 ];
 
 const sddItems = [
 	'Primero entendemos el negocio.',
 	'Después definimos qué debe hacer el sistema.',
 	'Convertimos las funcionalidades en especificaciones.',
-	'Modelamos el comportamiento esperado.',
 	'Finalmente generamos el código.',
 ];
 

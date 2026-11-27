@@ -19,6 +19,7 @@ from kosmo.application.codegen.recover_zombie_implementations import recover_zom
 from kosmo.application.integrations.recover_pending_deployments import recover_pending_deployments
 from kosmo.config import settings
 from kosmo.contracts.sdd.errors import SpecError
+from kosmo.infrastructure.api.catalog_sync_worker import run_catalog_sync_worker
 from kosmo.infrastructure.api.composition import AppContainer, build_app_components
 from kosmo.infrastructure.api.middlewares import RequestLoggingMiddleware
 from kosmo.infrastructure.api.routers.ai_config import router as ai_config_router
@@ -35,7 +36,6 @@ from kosmo.infrastructure.api.routers.implementations import router as implement
 from kosmo.infrastructure.api.routers.integrations import router as integrations_router
 from kosmo.infrastructure.api.routers.knowledge import router as knowledge_router
 from kosmo.infrastructure.api.routers.mcp import router as mcp_router
-from kosmo.infrastructure.api.routers.modelo import router as modelo_router
 from kosmo.infrastructure.api.routers.projects import router as projects_router
 from kosmo.infrastructure.api.routers.requirement_chat import router as requirement_chat_router
 from kosmo.infrastructure.api.routers.requirements import router as requirements_router
@@ -58,74 +58,122 @@ _OPENAPI_TAGS = [
     {
         "name": "auth",
         "description": (
-            "Flujo de autenticación PKCE + OAuth 2.0. "
-            "Los endpoints siguen el estándar RFC 6749/7636: el cliente genera un "
-            "``code_verifier`` efímero, solicita un ``authorization_code`` en ``/authorize``, "
-            "lo intercambia por tokens JWT en ``/token`` y los renueva con ``/refresh``. "
-            "Todos los endpoints protegidos requieren ``Authorization: Bearer <access_token>``."
+            "Acceso y autenticación mediante OAuth 2.0 y tokens JWT firmados con RS256. "
+            "Permite registrar cuentas, iniciar sesión, obtener e intercambiar tokens, "
+            "renovar credenciales, consultar el usuario autenticado y cerrar sesión."
         ),
     },
     {
-        "name": "projects",
+        "name": "chat-sessions",
         "description": (
-            "Gestión de proyectos. Permite crear, listar y consultar proyectos "
-            "asociados al usuario autenticado. Cada proyecto agrupa el ciclo "
-            "completo de especificación, modelado y generación de artefactos."
+            "Gestión de sesiones de chat por fase del flujo SDD. Permite listar, crear "
+            "y eliminar hilos de conversación con contexto independiente."
         ),
     },
     {
-        "name": "discovery",
+        "name": "ai-config",
         "description": (
-            "Generación de documentos de descubrimiento mediante IA. "
-            "Permite generar, consultar y actualizar el documento de visión "
-            "de producto de un proyecto. El documento se estructura en 8 "
-            "secciones obligatorias que cubren visión, problema, actores, "
-            "propuesta de valor, casos de uso, capacidades, reglas de negocio "
-            "y atributos de calidad."
-        ),
-    },
-    {
-        "name": "features",
-        "description": (
-            "Generación y gestión de características del producto software mediante IA. "
-            "Permite generar características a partir del documento de descubrimiento, "
-            "sugerir nuevas características no duplicadas, listar las existentes y "
-            "guardar las seleccionadas por el usuario."
-        ),
-    },
-    {
-        "name": "requirements",
-        "description": (
-            "Generación y gestión de requisitos EARS por característica mediante IA. "
-            "Permite generar requisitos a partir del documento de descubrimiento y la "
-            "característica seleccionada, consultarlos y actualizar su contenido en Markdown."
-        ),
-    },
-    {
-        "name": "modelo",
-        "description": (
-            "Generación y consulta de diagramas de actividad PlantUML por característica mediante IA. "
-            "Permite generar diagramas UML a partir de los requisitos EARS y consultar los diagramas generados."
+            "Gestión de proveedores, catálogo de modelos y credenciales de IA configuradas "
+            "para la orquestación del flujo de generación."
         ),
     },
     {
         "name": "schemas",
         "description": (
-            "Introspección de contratos. Permite al Frontend consultar el JSON Schema "
-            "de cualquier DTO expuesto por la API para generación dinámica de formularios, "
-            "validaciones y tipos TypeScript."
+            "Introspección de contratos de datos. Permite al cliente web consultar el JSON Schema "
+            "de los DTOs expuestos bajo OpenAPI 3.1 para mantener tipado compartido."
+        ),
+    },
+    {
+        "name": "projects",
+        "description": (
+            "Ciclo de vida de proyectos. Permite crear, listar, consultar y eliminar proyectos "
+            "asociados al usuario autenticado."
+        ),
+    },
+    {
+        "name": "discovery",
+        "description": (
+            "Descubrimiento del producto impulsado por IA. Permite generar, consultar, actualizar "
+            "y refinar mediante chat el documento de negocio estructurado en 7 secciones obligatorias: "
+            "visión del producto, espacio del problema, actores, propuesta de valor, metas del producto, "
+            "reglas de negocio y alcance."
         ),
     },
     {
         "name": "documents",
-        "description": "Modificación directa de documentos sin fase de plan intermedio.",
+        "description": "Modificación directa y reversión de versiones de documentos de especificación.",
+    },
+    {
+        "name": "features",
+        "description": (
+            "Especificación de características funcionales del producto. Permite generar, sugerir, "
+            "crear, listar, editar, eliminar y refinar características mediante chat interactivo."
+        ),
+    },
+    {
+        "name": "requirements",
+        "description": (
+            "Formalización de requisitos en formato EARS y criterios de aceptación Given-When-Then "
+            "por característica, junto con su asistente conversacional de refinamiento."
+        ),
+    },
+    {
+        "name": "traceability",
+        "description": (
+            "Control de navegación y trazabilidad secuencial entre las fases del flujo Spec-Driven Development."
+        ),
+    },
+    {
+        "name": "knowledge",
+        "description": "Consolidación de conocimiento y patrones reutilizables del agente.",
+    },
+    {
+        "name": "consistency",
+        "description": (
+            "Evaluación de consistencia en cascada y resolución de impactos sobre artefactos "
+            "dependientes ante modificaciones del usuario."
+        ),
+    },
+    {
+        "name": "implementations",
+        "description": (
+            "Generación de código en entorno aislado con OpenCode, transmisión de progreso en tiempo real "
+            "mediante Server-Sent Events (SSE) y validación automática del workspace."
+        ),
+    },
+    {
+        "name": "mcp",
+        "description": (
+            "Herramientas de contexto (MCP) expuestas para la consulta controlada de requisitos "
+            "aprobados durante la implementación."
+        ),
+    },
+    {
+        "name": "integrations",
+        "description": (
+            "Vinculación, verificación de estado y desvinculación de plataformas externas "
+            "mediante OAuth 2.0 (GitHub y Railway)."
+        ),
+    },
+    {
+        "name": "github",
+        "description": "Consulta y sincronización automática de repositorios hacia GitHub.",
+    },
+    {
+        "name": "deploy",
+        "description": "Publicación asíncrona, monitoreo de estado y eliminación de despliegues en Railway.",
+    },
+    {
+        "name": "health",
+        "description": "Verificación de disponibilidad operativa del servidor Back-End.",
     },
 ]
 
 _CONTACT = {
-    "name": "Equipo KOSMO",
+    "name": "Equipo KOSMO Lite",
     "email": "dev@kosmo.app",
-    "url": "https://github.com/CesarPantoja1/KOSMO",
+    "url": "https://github.com/CesarPantoja1/KOSMO-lite",
 }
 
 _LICENSE = {
@@ -134,35 +182,25 @@ _LICENSE = {
 }
 
 _DESCRIPTION = """
-KOSMO Backend API
+KOSMO Lite — Back-End API
 
-KOSMO es una plataforma de agentes de IA con identidad centralizada.
-Esta API gestiona el ciclo completo de autenticación de usuarios y la
-introspección de contratos de datos para el Frontend.
+Motor de orquestación del Back-End de **KOSMO Lite**, diseñado bajo Arquitectura Hexagonal
+y estrategia **API-First** para transformar especificaciones en lenguaje natural en aplicaciones
+web funcionales mediante **Spec-Driven Development (SDD)** y **OpenCode**.
 
-### Flujo de autenticación recomendado
+### Organización modular en tres pilares
 
-```
-1. POST /api/v1/auth/register      → Crear cuenta
-2. POST /api/v1/auth/authorize     → Obtener authorization_code (PKCE)
-3. POST /api/v1/auth/token         → Intercambiar código por JWT pair
-4. GET  /api/v1/auth/me            → Verificar identidad (Bearer token)
-5. POST /api/v1/auth/refresh       → Renovar tokens antes de expirar
-6. POST /api/v1/auth/logout        → Revocar sesión activa
-```
+1. **Acceso y Configuración** (`auth`, `chat-sessions`, `ai-config`, `schemas`, `projects`)
+2. **Flujo Spec-Driven Development (SDD)** (`discovery`, `documents`, `features`, `requirements`,
+   `traceability`, `knowledge`, `consistency`)
+3. **Implementación y Entrega** (`implementations`, `mcp`, `integrations`, `github`, `deploy`, `health`)
 
-### Seguridad
+### Seguridad y contratos de error
 
-- Tokens firmados con **RS256** (par de claves RSA 2048-bit)
-- Contraseñas hasheadas con **Argon2id** (OWASP 2025)
-- Refresh tokens con **Token Rotation**: cada uso emite un par nuevo
-- Rate limiting por IP en todos los endpoints sensibles
-- Secrets cifrados con **Fernet** (AES-128-CBC + HMAC-SHA256)
-
-### Respuestas de error
-
-Todos los errores de autenticación siguen el esquema `OAuthErrorResponse`
-(RFC 6749). Los errores de infraestructura usan `HttpErrorResponse`.
+- Autenticación y delegación mediante **OAuth 2.0** con tokens **JWT** firmados con **RS256**
+- Protección de acceso entre recursos de usuario (**BOLA/IDOR**) y cabeceras HTTP de seguridad
+- Respuestas de error estandarizadas bajo **RFC 7807** (`application/problem+json`)
+  con identificador de trazabilidad `trace_id`
 """
 
 _SERVERS = [
@@ -252,7 +290,6 @@ def _make_outbox_handler(container: AppContainer) -> OutboxHandler:
                 project_repo=container.repos.projects,
                 feature_repo=container.repos.features,
                 requirement_repo=container.repos.requirements,
-                diagram_repo=container.repos.diagrams,
                 document_repo=container.repos.documents,
                 evaluator=container.pipeline.consistency_evaluator,
                 evaluation_repo=container.repos.consistency_evaluations,
@@ -281,7 +318,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         )
     app.state.container = components
     app.state.requirement_repo = components.repos.requirements
-    app.state.diagram_repo = components.repos.diagrams
 
     outbox_task = asyncio.create_task(run_outbox_worker(components.pipeline.outbox, _make_outbox_handler(components)))
 
@@ -316,6 +352,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
                 delay = min(delay * 2, 600.0)
 
     recovery_task = asyncio.create_task(_recover_after_lease_expiry(), name="codegen_recovery_task")
+    sync_task: asyncio.Task[None] | None = None
+    if settings.ai_catalog_sync_enabled:
+        sync_task = asyncio.create_task(
+            run_catalog_sync_worker(components, settings),
+            name="ai_catalog_sync_worker",
+        )
 
     # El estado de despliegue persiste en PostgreSQL, pero las tareas de sondeo no.
     # Reanudarlas evita que un reinicio durante una publicación deje la UI en BUILDING.
@@ -330,6 +372,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     try:
         yield
     finally:
+        if sync_task is not None:
+            sync_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await sync_task
         recovery_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await recovery_task
@@ -525,7 +571,6 @@ app.include_router(feature_chat_router)
 app.include_router(requirements_router)
 app.include_router(requirement_chat_router)
 app.include_router(chat_sessions_router)
-app.include_router(modelo_router)
 app.include_router(consistency_router)
 app.include_router(schemas_router)
 app.include_router(knowledge_router)

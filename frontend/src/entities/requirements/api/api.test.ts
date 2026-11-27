@@ -30,7 +30,12 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 	it('getRequirements consulta el endpoint con project_id como query', async () => {
 		// Arrange
 		const { getRequirements } = await import('./api');
-		mockFetchOk({ feature_id: 'f1', feature_number: 1, document_markdown: 'md', total: 1 });
+		mockFetchOk({
+			feature_id: 'f1',
+			feature_number: 1,
+			document_markdown: 'md',
+			total: 1,
+		});
 
 		// Act
 		const result = await getRequirements('prj_01', 'f1');
@@ -64,7 +69,12 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 	it('generateRequirements hace POST con project_id', async () => {
 		// Arrange
 		const { generateRequirements } = await import('./api');
-		mockFetchOk({ feature_id: 'f1', feature_number: 1, document_markdown: 'generado', total: 4 });
+		mockFetchOk({
+			feature_id: 'f1',
+			feature_number: 1,
+			document_markdown: 'generado',
+			total: 4,
+		});
 
 		// Act
 		const result = await generateRequirements('prj_01', 'f1');
@@ -95,7 +105,13 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 	it('getRequirementChatHistory agrega session_id y before como query params', async () => {
 		// Arrange
 		const { getRequirementChatHistory } = await import('./api');
-		mockFetchOk({ phase: 'requirements', context: 'f1', messages: [], has_more: false, next_cursor: null });
+		mockFetchOk({
+			phase: 'requirements',
+			context: 'f1',
+			messages: [],
+			has_more: false,
+			next_cursor: null,
+		});
 
 		// Act
 		await getRequirementChatHistory('f1', 'sess_1', 'cursor_1');
@@ -104,26 +120,6 @@ describe('requirements/api — modo real (USE_MOCKS=false)', () => {
 		const [url] = fetchMock.mock.calls[0];
 		expect(url).toContain('session_id=sess_1');
 		expect(url).toContain('before=cursor_1');
-	});
-
-	it('sendRequirementChatMessage hace POST con el contenido', async () => {
-		// Arrange
-		const { sendRequirementChatMessage } = await import('./api');
-		mockFetchOk({
-			message: { id: 'm1', role: 'assistant', content: 'ok' },
-			modification: null,
-			redirect: null,
-			consistency: null,
-		});
-
-		// Act
-		await sendRequirementChatMessage('f1', 'Hola');
-
-		// Assert
-		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/api/v1/features/f1/requirements/chat'),
-			expect.objectContaining({ method: 'POST' }),
-		);
 	});
 
 	it('propaga el error de la API cuando la petición falla', async () => {
@@ -211,29 +207,4 @@ describe('requirements/api — modo mock (USE_MOCKS=true)', () => {
 		expect(result.messages).toEqual([]);
 	});
 
-	it('sendRequirementChatMessage devuelve una sugerencia de cambio simulada', async () => {
-		// Arrange
-		const { sendRequirementChatMessage } = await import('./api');
-
-		// Act
-		const promise = sendRequirementChatMessage('f1', 'Agrega validación');
-		await vi.advanceTimersByTimeAsync(600);
-		const result = await promise;
-
-		// Assert
-		expect(result.message.change_suggestions).toHaveLength(1);
-	});
-
-	it('sendRequirementChatMessage lanza error cuando el contenido simula formato inválido', async () => {
-		// Arrange
-		const { sendRequirementChatMessage } = await import('./api');
-
-		// Act
-		const promise = sendRequirementChatMessage('f1', 'contenido con ERROR_FORMATO');
-		const assertion = expect(promise).rejects.toThrow('formato inválido');
-		await vi.advanceTimersByTimeAsync(600);
-
-		// Assert
-		await assertion;
-	});
 });

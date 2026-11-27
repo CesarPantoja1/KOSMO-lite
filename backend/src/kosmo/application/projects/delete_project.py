@@ -34,7 +34,6 @@ from kosmo.contracts.sdd.codegen import WorkspaceManagerPort
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.ids import ProjectId, UserId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     DocumentRepository,
     FeatureRepository,
     ProjectRepository,
@@ -53,7 +52,7 @@ class DeleteProjectInput:
 class DeleteProjectUseCase:
     """Caso de uso: elimina un proyecto y todos sus artefactos en cascada.
 
-    Descubrimiento, versiones, características, requisitos, modelos, chat,
+    Descubrimiento, versiones, características, requisitos, chat,
     evaluaciones de consistencia, sesiones de agente, trazabilidad, workspace,
     despliegue en la nube (Railway) y repositorio remoto en GitHub.
     """
@@ -63,7 +62,6 @@ class DeleteProjectUseCase:
         project_repo: ProjectRepository,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
         document_repo: DocumentRepository,
         chat_repo: ChatRepository,
         consistency_evaluation_repo: ConsistencyEvaluationRepository,
@@ -84,7 +82,6 @@ class DeleteProjectUseCase:
         self._project_repo = project_repo
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
         self._document_repo = document_repo
         self._chat_repo = chat_repo
         self._consistency_evaluation_repo = consistency_evaluation_repo
@@ -153,7 +150,6 @@ class DeleteProjectUseCase:
         features = await self._feature_repo.list_by_project(input_data.project_id)
         for feature in features:
             await self._requirement_repo.delete(feature.id)
-            await self._diagram_repo.delete(feature.id)
             await self._delete_traceability(str(feature.id))
             await self._feature_repo.delete(feature.id)
 

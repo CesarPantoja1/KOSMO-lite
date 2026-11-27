@@ -6,14 +6,9 @@ import {
 	saveRequirements as saveRequirementsApi,
 	generateRequirements as generateRequirementsApi,
 	deleteRequirements as deleteRequirementsApi,
-	sendRequirementChatMessage as sendRequirementChatMessageApi,
 } from '../api/api';
-import type { ChatMessage, ChatResponse } from '@/shared/model/chat-message';
-import {
-	appendMessage,
-	createAssistantError,
-	createUserMessage,
-} from '@/shared/model/chat-message';
+import type { ChatMessage } from '@/shared/model/chat-message';
+import { appendMessage, createUserMessage } from '@/shared/model/chat-message';
 
 interface RequirementsStore {
 	currentRequirements: Record<string, string>;
@@ -42,7 +37,6 @@ interface RequirementsStore {
 		featureId: string,
 		sessionId?: string | null,
 	) => Promise<void>;
-	sendChatMessage: (featureId: string, content: string) => Promise<ChatResponse>;
 	appendUserMessage: (featureId: string, content: string) => void;
 	appendAssistantMessage: (featureId: string, message: ChatMessage) => void;
 	clearChatHistory: (featureId: string) => void;
@@ -136,49 +130,6 @@ export const useRequirementsStore = create<RequirementsStore>()(
 					historyHasMore: response.has_more,
 					historyCursor: response.next_cursor,
 				}));
-			},
-			sendChatMessage: async (featureId, content) => {
-				const userMessage = createUserMessage(content);
-
-				const current = get().chatHistories[featureId] ?? [];
-				set({
-					chatHistories: {
-						...get().chatHistories,
-						[featureId]: appendMessage(current, userMessage),
-					},
-				});
-
-				try {
-					const response = await sendRequirementChatMessageApi(featureId, content);
-					const afterUser = get().chatHistories[featureId] ?? [];
-					set({
-						chatHistories: {
-							...get().chatHistories,
-							[featureId]: appendMessage(afterUser, response.message),
-						},
-					});
-					return response;
-				} catch (error) {
-					// Handle invalid format error or general errors gracefully
-					const isInvalidFormat =
-						error instanceof Error &&
-						(error.message.includes('inválido') || error.message.includes('format'));
-
-					const errorMessage = createAssistantError(
-						isInvalidFormat
-							? '⚠️ El agente generó una respuesta con formato inválido. Por favor, intenta reformular tu solicitud.'
-							: '⚠️ Ocurrió un error al procesar tu solicitud.',
-					);
-
-					const afterUser = get().chatHistories[featureId] ?? [];
-					set({
-						chatHistories: {
-							...get().chatHistories,
-							[featureId]: appendMessage(afterUser, errorMessage),
-						},
-					});
-					throw error;
-				}
 			},
 			clearChatHistory: (featureId) =>
 				set((state) => ({

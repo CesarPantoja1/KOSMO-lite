@@ -6,7 +6,7 @@ from kosmo.contracts.memory.user_preference import UserPreference
 from kosmo.contracts.sdd.document import RichTextDocument, SpecPhase
 from kosmo.contracts.sdd.ears import EARSRequirement
 from kosmo.contracts.sdd.feature import Feature
-from kosmo.contracts.sdd.ids import FeatureId, ProjectId
+from kosmo.contracts.sdd.ids import ProjectId
 
 
 @dataclass(frozen=True)
@@ -53,13 +53,6 @@ class RequirementsRefinePhaseContext:
     feature_number: int
     current_requirements_markdown: str
     user_instructions: str
-    user_preferences: list[UserPreference] = field(default_factory=list)  # type: ignore[reportUnknownVariableType]
-
-
-@dataclass(frozen=True)
-class ModeloPhaseContext:
-    feature_id: FeatureId
-    ears_requirements: str
     user_preferences: list[UserPreference] = field(default_factory=list)  # type: ignore[reportUnknownVariableType]
 
 

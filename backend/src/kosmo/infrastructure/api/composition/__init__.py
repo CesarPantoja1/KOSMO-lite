@@ -26,13 +26,11 @@ from kosmo.infrastructure.api.composition.sdd import (
     ConsistencyComponents,
     DiscoveryComponents,
     FeaturesComponents,
-    ModeloComponents,
     ProjectComponents,
     RequirementsComponents,
     build_consistency_components,
     build_discovery_components,
     build_features_components,
-    build_modelo_components,
     build_project_components,
     build_requirements_components,
 )
@@ -49,7 +47,6 @@ __all__ = [
     "DiscoveryComponents",
     "FeaturesComponents",
     "IntegrationsComponents",
-    "ModeloComponents",
     "PipelineComponents",
     "ProjectComponents",
     "RequirementsComponents",
@@ -61,7 +58,6 @@ __all__ = [
     "build_discovery_components",
     "build_features_components",
     "build_integrations_components",
-    "build_modelo_components",
     "build_pipeline_components",
     "build_project_components",
     "build_requirements_components",
@@ -80,7 +76,6 @@ class AppContainer:
     discovery: DiscoveryComponents
     features: FeaturesComponents
     requirements: RequirementsComponents
-    modelo: ModeloComponents
     consistency: ConsistencyComponents
     codegen: CodegenComponents
     integrations: IntegrationsComponents
@@ -129,7 +124,6 @@ def build_app_components(settings: Settings) -> AppContainer:
     discovery = build_discovery_components(repos, pipeline)
     features = build_features_components(repos, pipeline, discovery.consistency_evaluator)
     requirements = build_requirements_components(repos, pipeline, uow)
-    modelo = build_modelo_components(repos, pipeline)
     consistency = build_consistency_components(repos, discovery.consistency_evaluator, uow)
 
     cipher = (
@@ -180,7 +174,6 @@ def build_app_components(settings: Settings) -> AppContainer:
         discovery=discovery,
         features=features,
         requirements=requirements,
-        modelo=modelo,
         consistency=consistency,
         codegen=codegen,
         integrations=integrations,

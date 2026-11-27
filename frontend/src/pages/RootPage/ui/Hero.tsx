@@ -8,7 +8,6 @@ import {
 	Folder,
 	Implementation,
 	Logo,
-	Modeling,
 	Requirements,
 } from '@/shared/ui';
 import { useEffect, useState } from 'react';
@@ -31,7 +30,6 @@ const sidebarItems = [
 		label: 'Criterios (EARS)',
 		icon: <Requirements size={12} color='text-neutral-500' />,
 	},
-	{ label: 'Diagramas', icon: <Modeling size={12} color='text-neutral-500' /> },
 	{
 		label: 'Implementación',
 		icon: <Implementation size={12} color='text-neutral-500' />,
@@ -60,15 +58,6 @@ const earsCriteria = [
 	'EL sistema DEBE permitir al usuario buscar espacios CUANDO seleccione fecha y hora.',
 	'EL sistema DEBE confirmar la reserva CUANDO el usuario seleccione un espacio disponible.',
 	'EL sistema DEBE enviar notificación CUANDO se confirme la reserva.',
-];
-
-const diagramNodes = [
-	{ type: 'start', label: 'Inicio' },
-	{ type: 'user', label: '[Usuario] Buscar espacio' },
-	{ type: 'system', label: '[Sistema] Mostrar disponibles' },
-	{ type: 'user', label: '[Usuario] Seleccionar espacio' },
-	{ type: 'system', label: '[Sistema] Confirmar reserva' },
-	{ type: 'end', label: 'Fin' },
 ];
 
 const codeLines = [
@@ -136,14 +125,12 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 	const user = useAuthStore((s) => s.user);
 	const [activeStep, setActiveStep] = useState(0);
 	const [typedText, setTypedText] = useState('');
-	const [visibleDiagramNodes, setVisibleDiagramNodes] = useState(0);
 	const [visibleCodeLines, setVisibleCodeLines] = useState(0);
 	const [visibleAppRows, setVisibleAppRows] = useState(0);
 
 	const goToStep = (step: number) => {
 		setActiveStep(step);
 		setTypedText('');
-		setVisibleDiagramNodes(0);
 		setVisibleCodeLines(0);
 		setVisibleAppRows(0);
 	};
@@ -167,17 +154,6 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 		let count = 0;
 		const interval = setInterval(() => {
 			count++;
-			setVisibleDiagramNodes(count);
-			if (count >= diagramNodes.length) clearInterval(interval);
-		}, 200);
-		return () => clearInterval(interval);
-	}, [activeStep]);
-
-	useEffect(() => {
-		if (activeStep !== 5) return;
-		let count = 0;
-		const interval = setInterval(() => {
-			count++;
 			setVisibleCodeLines(count);
 			if (count >= codeLines.length) clearInterval(interval);
 		}, 250);
@@ -185,7 +161,7 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 	}, [activeStep]);
 
 	useEffect(() => {
-		if (activeStep !== 6) return;
+		if (activeStep !== 5) return;
 		let count = 0;
 		const interval = setInterval(() => {
 			count++;
@@ -216,7 +192,7 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 
 					<p className='mt-7 max-w-xl text-lg leading-8 text-neutral-500'>
 						KOSMO toma tu idea de negocio y la transforma paso a paso en especificaciones
-						claras, diagramas y código listo para construir una aplicación real.
+						claras y código listo para construir una aplicación real.
 					</p>
 
 					<div className='mt-8 flex flex-wrap gap-4'>
@@ -432,58 +408,8 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 									</div>
 								)}
 
-								{/* Step 4: Diagramas - Nodes appear sequentially */}
+								{/* Step 4: Implementación - Code lines appear sequentially */}
 								{activeStep === 4 && (
-									<div>
-										<div className='mb-4 flex items-center justify-between'>
-											<div>
-												<h3 className='text-sm font-semibold text-neutral-800'>
-													Diagramas
-												</h3>
-												<p className='mt-1 text-[11px] text-neutral-500'>
-													Diagrama de actividades del sistema.
-												</p>
-											</div>
-											<div className='flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-neutral-100'>
-												<Modeling size={16} color='text-neutral-500' />
-											</div>
-										</div>
-
-										<div className='rounded-xl border border-neutral-200 bg-neutral-50 p-4'>
-											<div className='flex flex-col items-center space-y-2 text-[10px]'>
-												{diagramNodes.map((node, i) => (
-													<div key={i} className='flex flex-col items-center'>
-														{i > 0 && visibleDiagramNodes > i && (
-															<span
-																className='mock-animate-item text-neutral-300'
-																style={{ animationDelay: '0ms' }}
-															>
-																↓
-															</span>
-														)}
-														{visibleDiagramNodes > i && (
-															<div
-																className={`mock-animate-item rounded-lg border px-4 py-2 ${
-																	node.type === 'start' || node.type === 'end'
-																		? 'rounded-full border-neutral-300 bg-neutral-0 font-medium text-neutral-600'
-																		: node.type === 'user'
-																			? 'border-primary-200 bg-primary-50 text-primary-700'
-																			: 'border-ai-200 bg-ai-50 text-ai-700'
-																}`}
-																style={{ animationDelay: `${i * 200}ms` }}
-															>
-																{node.label}
-															</div>
-														)}
-													</div>
-												))}
-											</div>
-										</div>
-									</div>
-								)}
-
-								{/* Step 5: Implementación - Code lines appear sequentially */}
-								{activeStep === 5 && (
 									<div>
 										<div className='mb-4 flex items-center justify-between'>
 											<div>
@@ -530,8 +456,8 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 									</div>
 								)}
 
-								{/* Step 6: Aplicación - Rows slide in sequentially */}
-								{activeStep === 6 && (
+								{/* Step 5: Aplicación - Rows slide in sequentially */}
+								{activeStep === 5 && (
 									<div>
 										<div className='mb-4 flex items-center justify-between'>
 											<div>
@@ -592,7 +518,7 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 
 						{/* BOTÓN SIGUIENTE */}
 						<div className='border-t border-neutral-200 px-5 py-3'>
-							{activeStep < 6 && (
+							{activeStep < 5 && (
 								<button
 									onClick={() => goToStep(activeStep + 1)}
 									className='btn btn-primary btn-sm'
@@ -601,7 +527,7 @@ export function Hero({ onComenzar, onVerVideo }: HeroProps) {
 									<ArrowRight size={14} color='text-neutral-0' />
 								</button>
 							)}
-							{activeStep === 6 && (
+							{activeStep === 5 && (
 								<button
 									onClick={user ? () => router.push('/proyecto') : onComenzar}
 									className='btn btn-primary btn-sm'

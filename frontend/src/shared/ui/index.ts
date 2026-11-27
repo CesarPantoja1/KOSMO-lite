@@ -5,8 +5,6 @@ export { ModalConfirm } from './ModalConfirm';
 export { CharacterCounter } from './CharacterCounter';
 export { OAuthIntegration } from './OAuthIntegration';
 export type { OAuthIntegrationProps } from './OAuthIntegration';
-export { ConfirmacionVisibilidadRepositorio } from './ConfirmacionVisibilidadRepositorio';
-export { FormularioCreacionRepositorio } from './FormularioCreacionRepositorio';
 
 // icons
 export { default as Ai } from './icons/Ai';
@@ -30,7 +28,6 @@ export { default as List } from './icons/List';
 export { default as Load } from './icons/Load';
 export { default as MaxEditor } from './icons/MaxEditor';
 export { default as MinEditor } from './icons/MinEditor';
-export { default as Modeling } from './icons/Modeling';
 export { default as OpenMarkdownContent } from './icons/OpenMarkdownContent';
 export { default as Plus } from './icons/Plus';
 export { default as Requirements } from './icons/Requirements';
@@ -65,7 +62,6 @@ export { default as InfoCircleIcon } from './icons/InfoCircleIcon';
 export { default as PlusSmallIcon } from './icons/PlusSmallIcon';
 
 // toast
-
 export { toast } from './toast/toast';
 export { ToasterProvider } from './toast/ToasterProvider';
 export type {

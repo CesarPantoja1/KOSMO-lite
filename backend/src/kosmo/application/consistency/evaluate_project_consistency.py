@@ -11,7 +11,6 @@ from kosmo.contracts.sdd.document import SpecPhase
 from kosmo.contracts.sdd.errors import ProjectNotFoundError
 from kosmo.contracts.sdd.ids import ProjectId
 from kosmo.contracts.sdd.repositories import (
-    ActivityDiagramRepository,
     FeatureRepository,
     ProjectRepository,
     RequirementRepository,
@@ -43,13 +42,11 @@ class EvaluateProjectConsistencyUseCase:
         evaluator: ConsistencyEvaluator,
         feature_repo: FeatureRepository,
         requirement_repo: RequirementRepository,
-        diagram_repo: ActivityDiagramRepository,
     ) -> None:
         self._project_repo = project_repo
         self._evaluator = evaluator
         self._feature_repo = feature_repo
         self._requirement_repo = requirement_repo
-        self._diagram_repo = diagram_repo
 
     async def execute(self, input_data: EvaluateProjectConsistencyInput) -> EvaluateProjectConsistencyOutput:
         from ulid import ULID
@@ -90,7 +87,6 @@ class EvaluateProjectConsistencyUseCase:
                     input_data.source_phase,
                     self._feature_repo,
                     self._requirement_repo,
-                    self._diagram_repo,
                 )
             except Exception:
                 _log.warning(

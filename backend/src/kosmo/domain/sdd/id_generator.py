@@ -13,7 +13,6 @@ _PREFIX_MAP: dict[str, str] = {
     "pipeline": "pipe_",
     "requirement": "req_",
     "agent_memory": "agm_",
-    "activity_diagram": "dia_",
     "knowledge_pattern": "kpat_",
     "chat_history": "chh_",
     "chat_message": "msg_",
@@ -35,6 +34,8 @@ _PREFIX_MAP: dict[str, str] = {
     "integration": "uint_",
     "project_integration": "pint_",
     "code_sync_log": "csync_",
+    "catalog": "cat_",
+    "catalog_model": "cat_",
 }
 
 

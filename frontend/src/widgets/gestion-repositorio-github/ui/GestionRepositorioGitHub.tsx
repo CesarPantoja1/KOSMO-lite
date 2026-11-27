@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import type { ProjectGitHubStatus } from '@/entities/project';
-import type { ProjectGithubViewState } from '@/features/github-sync';
-import { FormularioCreacionRepositorio } from '@/shared/ui';
+
+import { formatApiError } from '@/shared/api';
 import {
 	ArrowRight,
 	Clock,
@@ -13,7 +12,12 @@ import {
 	toast,
 	WarningIcon,
 } from '@/shared/ui';
-import { formatApiError } from '@/shared/api';
+
+import type { ProjectGitHubStatus } from '@/entities/project';
+
+import type { ProjectGithubViewState } from '@/features/github-sync';
+
+import { FormularioCreacionRepositorio } from './FormularioCreacionRepositorio';
 
 type Props = {
 	viewState: ProjectGithubViewState;
